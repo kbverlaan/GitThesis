@@ -1,0 +1,102 @@
+[WORKING TITLE]
+Proposal - Draft 1
+
+Koen Verlaan
+Master Computational Science
+University of Amsterdam
+2026
+
+---
+
+-INTRODUCTION-
+% 
+After the ending of the Cold War, a debate started around the motivations of states as old paradigms couldn't explain the peaceful transition.
+The common theory was grounded in Neorealism and stated that states have fixed identities that are exogneous and homogenous: states act for survival or power accumulation. Waltz (1) elaborates on the theory of REALISM, where structure determines the outcomes.
+In 1992, Wendt (2) propagates a new claim, namely that of CONSTRUCTIVISM. He disputes the theory of Waltz by stating that states are not inherently focused on self-optimization, but that their identities and interests are formed through their interactions with others. In essence, states are not self-optimizing per se. Percieved semantic meaning of interactions determine identity and interest. States can become self-optimizing, but not because they are. Process determines the outcomes.
+[POLISH THE FRAMING]
+
+The thesis will try to map these theories to a computational domain. 
+    * REINFORCEMENT LEARNING AGENTS are pure utility optimisers. Their policies and actions are based upon pure game theoretic calculation that ensures their optimal long-term utility accumulation. If we set their utility function to optimising "power" within the system, they are essentially REALIST agents/states. 
+    [Misschien aanvullen met Reward is Enough inzichten?]
+
+    * LLMs are semantic and perhaps complex stochastic parrots. They are trained upon the human corpus and semantic interpreters. They will be able to assign meaning to interactions and translate that computationally.
+    [Inzichten GENERATIVE AGENTS + ]
+
+-> Merk dat ik moeite heb met het mappen van constructivisme aan LLM agents
+
+---
+
+-RESEARCH QUESION-
+The core research question is positioned on the tension between both Realist and Constructivist theories. 
+    "Is hierarchy a functional inevitability of optimization, or a cultural artifact of semantic reasoning?"
+[REMARK] What is hierarchy? How do I measure that?
+
+The subquestions:
+1. What emergent structure do RL agents propagate?
+2. Do Semantic Agents create a different structure?
+3. How do the results of RL and LLM agents differ?
+
+HYPOTHESES
+H1: RL Agents produce competitive/"Hobbesian" hierarchies
+H2: Semantic Agents produce cooperative structures
+H3: Control LLM agents behave similarly to RL agents
+
+---
+
+-LITERATURE REVIEW-
+
+Theoretical Foundations of IR
+
+Computational Approaches to Social Phenomena
+
+LLMs as social agents
+
+
+---
+
+-METHODOLOGY-
+For an effective simulation, simplified interactions between states should be included. This first version hypothethically enables rich emergence of coalition forming, bandwagoning, hegemony. 
+[ADD DESIGN CHOICES]
+
+SIMULATION
+    STATE SPACE
+    * Resources (U)     Array with utility of each agent
+    * History (H)       Shared log of all investments, conflicts and outcomes
+
+    ACTION SPACE:       
+    * Invest [self/other]
+        - Self:     Costs I, generates V (net positive growth)
+        - Other:    Costs I, receives V (signals trust)       
+
+    * Defend [self/other]
+        - Self:     Costs D, gives multiplier M/O for next round (signals fear or threat)
+        - Other:    Costs D, gives multiplier M/O for next 2 rounds (signals commitment and alliance)
+
+    * Attack [other]
+        - Attacker vs. Defender (+ allies with active defend)
+        - P(win) = attacker_power / (attacker_power + defender_power)
+        - Winner receives T% of loser's resources
+        - All combatants pay conflict cost C
+
+    PARAMETERS:
+    * I (invest cost), V (invest value), D (defend cost)
+    * M (defend multiplier), O (offense multiplier), T (transfer rate), C (conflict cost)
+
+EXPERIMENTAL SETUP
+To ensure scientific rigor, we should not assume that our theoretical understanding is enough for an accurate computational mapping. In this thesis we use three types of agents to assure that merely using language instead of mathematics is not the only differentiator for effect. Without a control LLM agent, we can't be sure that the differences come purely from semantic reasoning.
+
+Three Condition Design
+* Pure RL agents 
+* Semantic LLM agents (constructivist prompting)
+* Control LLM agents (realist prompting)
+[Expand on each option]
+
+PARAMTER TUNING
+[Not sure about this one yet]
+I'm thinking of tuning the parameters to find interesting phase transitions. At the points where complexity arises and especially the RL agents behave in a way that seems interesting and comparable to international relations during for example the cold war, we introduce the Semantic agents and run the experiments.
+
+---
+
+REFERENCES
+1. Waltz - Theory of International Relations
+2. Wendt - Anarchy is what states make of it

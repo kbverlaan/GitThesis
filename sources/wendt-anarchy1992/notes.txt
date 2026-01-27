@@ -1,0 +1,59 @@
+WENDT - ANARCHY IS WHAT STATES MAKE OF IT 1992
+Their argument will be that we need semantic understanding for social order. We need stories and shared values that keep us from falling into anarchy. We need something to believe.
+
+I really like this view. It gives us commonality. It gives a self-righteous higher perspective on the world as well. As if we know it better than others. It seems reasonable too. In our stable democracies we do have shared values. We do have shared morality. The last few years we see radical standpoints and shifts in our commonality and we see how that impacts stability. There are many examples that show correlation between a shared story and stability. The question is if this is a causation or merely a correlation. My personal hypothesis is that we need it in some degree, but we are egoistical animals. We need social contracts to aim our selfishness into common good. Our is a social contract also a form of semantics?If we look at animals, it seems that they don’t need complex semantic reasoning to from order. Think of a pack of wolves or a pride of lions. Or is the infighting part not stable? It’s an interesting almost philosophical question.
+
+I love the central thesis:
+Does interaction effectively change identity and interests (of states), or is it rigid (and self-interested)? This is actually almost exactly mirrors my experiment! This is golden. 
+The paper itself is super interesting. Wendt tries to introduce psychology and social sociology into these economic and rational landscapes. Interesting!
+
+His 'institutions' are the mental models of states. Where realism paints them as never changing and being self-help, Wendt argues theyre formed through interaction.
+Interesting: He does say that the process of states is first and foremost concerned with the self-help or security of the self.
+
+---
+
+CORE CLAIM
+Their core claim is that interaction actually changes identity and interests (the Constructivist view).
+- Self help and power politics do not follow necessarily from anarchy. If they do, it’s because of process (interaction), not structure. 
+He breaks his argument down in three steps:
+1. Self-interested security is not a constitutive property of anarchy -> self-help is not given.
+2. Self-help and competitive power politics may be produced causually through the process of interaction
+3. Reintroducing first and second image determinants to assess their influence on identity forming
+
+
+---
+
+IMPLICATIONS FOR THESIS
+I’m thinking of the implications for my own thesis, while reading this paper. It’s clear there are two views, and my goal is to test those two views computationally. With RL the Neorealists views are baked in. We are optimising for self-help. 
+
+!! For the constructivist view, we’re using LLMs. Maybe I’m not deep enough yet, but I do not immediately see how we do that. Wendt doesn’t argue that self-help is the case, but only that it’s emergent of interaction. What do we optimise in Wendt’s view?
+
+This is an interesting quote that might suggest LLM use: “A fundamental principle of constructivist social theory is that people act toward objects, including other actors, on the basis of the meanings that the objects have for them.” 
+It’s about meaning -> something we can encode in an LLM or might be present in an LLM?
+
+On page 11 there is an interesting comparison between the types of states. Might be interesting to use for the analysis of simulation results! (Competitive (Hobbesian state of war), individualistic, cooperative). Will LLMs be the only ones that exhibit actual cooperative behaviour?
+
+
+IMPLICATION FOR SIMULATION
+Must be anarchy -> already done
+Distribution of capabilities -> utility!
+Rigid identity (RL Optimisation) vs. Changing identity (Acting using semantic history, history IS identity)
+
+How do we prompt the LLM to fit Wendt’s endogenous interests view?
+- Interpret meaning from other actions and interactions
+- Do not give them a clear role
+- Do not imbed self help!
+
+?? If realists see anarchy as a zero-sum game, and constructivists as a gaining game, how do I model it??
+-> if security a zero-sum game (we don't have to model that), its okay. That's not implicitely part of the model
+
+---
+
+CRITIQUE
+One assumption I find not enough explained is that he uses human psychology with state ideology. Is that comparison not too easily made. That is the foundation of the entire constructivist view it seems.
+
+
+QUESTIONS
+I see how the realist theories arised in the Cold War. I see how the constructivist theories arised after the Cold War. What is the current state of the debate? Were there any recent papers/articles propagating the debate?
+
+With the recent advancements of Trumps clearly neoliberal power politics, how did the collective self of NATO collapse? How does the EU collective self strengthen.
