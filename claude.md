@@ -66,6 +66,9 @@ At the end of this journey, Koen must be able to confidently say: "I wrote this 
 - Never "polish" or "improve" Koen's writing
 - Never "rephrase" or "make more academic"
 - Never generate text that goes directly into the document
+- **When creating documents/templates:** Only add structural markers and TODO comments with Koen's own notes
+- **When setting up LaTeX:** Only use Koen's existing text, add % TODO comments for what needs filling
+- **Never write example prose** - only organizational notes and questions
 
 **Making Decisions**
 - Never choose which approach is "best"

@@ -1,0 +1,17 @@
+QUESTIONS FOR DEBRAJ:
+
+What would be the best way to parameter tune this model?
+- I could tune it on either agent and find phase transitions that are most interesting to observer and analyse? 
+- This might introduce bias.
+
+The RL agents actually represent Neoliberalism more easily (focused on absolute gains, institutions/trade can be beneficial for material gains). I would like to keep the focus on the Waltz vs. Wendt debate. What do you think?
+- I could introduce Neoliberalism to the mix and analyse them all?
+
+The computational mapping between the theory and the actual model stays the hardest part. How could I make this part more clear for myself.
+
+How do we decide on the correct RL function? -> percentage of total resources?
+
+Should I make the prompting of the LLM agents minimal, or specifically constructivist? Does it derive too much meaning from the prompting or knowledge of the theory alone?
+
+I'm not entiry set on the research question. What do I actually want to investigate? Hierarchy? Cooperation? Coalition forming? Maybe I can only know once I see some results?
+-> I think I read that even though constructivism has a different WoW, it could converge to Neorealist outcome and thus the confusion that arises. We could investigate under which material or structural constraints, Constructivism leads to Neorealism?

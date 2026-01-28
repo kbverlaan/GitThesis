@@ -1,0 +1,182 @@
+\section{Research Methods}
+% =============================================================================
+% RESEARCH METHODS
+% =============================================================================
+% REQUIREMENT: Highlight WHY method is appropriate, HOW you will develop the
+%              computational model, what the model measures/outcomes
+%
+% STATUS: Good progress - structure and content developing well
+%
+% STRUCTURE:
+%   3.1 Method Justification   [IN PROGRESS - notes present, needs prose]
+%   3.2 Computational Model    [DONE - state space, action space, conflict]
+%   3.3 Agent Architectures    [DONE - RL, LLM-Constructivist, LLM-Control]
+%   3.4 Measurements           [TODO - not yet written]
+%
+% =============================================================================
+% SECTION STATUS DETAILS:
+% =============================================================================
+%
+% 3.1 METHOD JUSTIFICATION - Currently has notes, needs full prose:
+%   WRITTEN:
+%     - "Round-based repeated game representing anarchic system"
+%     - "General Sufficiency principle" note
+%     - RL justification note (materialist optimization)
+%     - LLM justification note (norm/identity formation)
+%   TODO:
+%     - Expand notes into proper paragraphs
+%     - Cite Epstein 1996 for "General Sufficiency" / minimal models
+%     - Cite Larooij & Törnberg 2025 for generative ABM framing
+%     - Explain why ABM (vs game theory, historical analysis)
+%
+% 3.2 COMPUTATIONAL MODEL DESIGN - Well developed:
+%   DONE:
+%     - State space defined (resources + history)
+%     - Action space table (Invest, Arm, Attack with targets)
+%     - Conflict resolution formula
+%   TODO:
+%     - Define parameters (I, V, D, M/O, T, C) or note "to be determined"
+%     - Clarify how "anarchy" is operationalized (no central authority)
+%     - Clarify memory: "recent interactions" - how many rounds?
+%
+% 3.3 AGENT ARCHITECTURES - Well developed:
+%   DONE:
+%     - Three agent types clearly defined
+%     - RL = neorealist (optimize relative gain)
+%     - LLM = constructivist (identity/interest update from history)
+%     - LLM-Control = neorealist prompt (isolation control)
+%   TODO:
+%     - Fill in [insert RL optimization function]
+%     - Specify which LLM(s) will be used
+%     - Address memory asymmetry (RL state vs LLM context window)
+%
+% 3.4 MEASUREMENTS - Not yet written:
+%   TODO: Choose RQ framing and add metrics subsection
+%
+% =============================================================================
+% RESEARCH QUESTION - DECISION NEEDED
+% =============================================================================
+% Your three-agent setup enables different RQs. Choose ONE:
+%
+% OPTION A: Coalition Formation
+%   RQ: "Do LLM agents form more stable coalitions than RL agents?"
+%   Metrics: coalition stability, alliance duration, reciprocity, betrayal rates
+%   Key insight: If LLM-Control ALSO forms coalitions → it's architecture
+%                If ONLY LLM-Constructivist does → it's semantic priors
+%
+% OPTION B: Hierarchy Emergence (Debraj's framing)
+%   RQ: "Is hierarchy a functional inevitability of optimization, or a
+%        cultural artifact of semantic reasoning?"
+%   Metrics: Gini coefficient, network centrality, power law fit
+%
+% OPTION C: Cooperation/Conflict Rates
+%   RQ: "Do RL and LLM agents converge to similar cooperation rates?"
+%   Metrics: attack frequency, investment ratios, total welfare
+%
+% YOUR PREDICTION: LLM-Constructivist will form more stable coalitions
+% =============================================================================
+
+\subsection{Method Justification}
+The computational model is a round-based repeated game representing an anarchic system. 
+
+%Model justification
+General Sufficiency principle -> as minimal as possible. 
+How do we produce, with as little elements as possible, the intended macro-behviour that we want to investigate.
+
+%mapping justification
+RL is a widely used technique for modelling IR theories, specifically useful for materialist views such as neorealism (as we can optimize our own resources).
+
+LLMs have shown norm copying and identity forming behaviour, similar to the core thesis of Constructivism. 
+
+%assumptions
+LLMs are actually a good representation of constructivist behaviour.
+
+
+
+\subsection{Computational Model Design}
+The \textbf{State Space} consists of an array containing the resources of every agent and the history of all recent interactions, conflicts and their outcomes. Each round, all agents choose simultaneously from the \textbf{Action Space}:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llp{10cm}@{}}
+\toprule
+\textbf{Action} & \textbf{Target} & \textbf{Effect} \\
+\midrule
+Invest & Self & Costs $I$, generates $V$ (net positive growth) \\
+Invest & Other & Costs $I$, other receives $V$ (signals trust) \\
+\midrule
+Arm & Self & Costs $D$, multiplier $M/O$ for 1 round (general threat) \\
+Arm & Other & Costs $D$, multiplier $M/O$ for 2 rounds (signals alliance) \\
+\midrule
+Attack & Other & Probabilistic conflict resolution (see below) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Conflict Resolution:} Attacker vs.\ Defender (+ allies with active defend). Win probability $P = \frac{\text{attacker power}}{\text{attacker power} + \text{defender power}}$. Winner receives $T\%$ of loser's resources; all combatants pay cost $C$.
+
+\subsection{Agent Architectures}
+The simulation is done using homogenous agent architectures for every agent.
+
+\textbf{Reinforcement Learning (RL) Agents} represent state actors in Waltz's theory of Neorealism. At it's core, the agents should be self-interested and concerned with optimizing their relative gain within the system. Computationally, this identity is translated through optimizing the following function during training:
+[insert RL optimization function]
+
+\textbf{Large-Language Model (LLM) Agents} represent state actors in Wendt's theory of Constructivism. Based on the intersubjective interpretation of shared history, LLM agents are prompted internally update their identities and interests, and choose their next action accordingly. 
+
+\textbf{Control LLM Agents} represent the state actors in Neorealistic theory, but are prompted to optimize their relative gain through their actions. These agents are specifically introduced to effectively isolate the effects of the constructivist prompting.
+
+% =============================================================================
+% TODO: Add Measurements Subsection (Section 3.4)
+% =============================================================================
+% Once you choose your RQ framing, add a \subsection{Measurements} with:
+%
+% For COALITION focus:
+%   - Coalition stability: avg duration of mutual Arm-other relationships
+%   - Reciprocity rate: P(A arms B | B armed A last round)
+%   - Betrayal rate: P(attack | previous ally)
+%
+% For HIERARCHY focus:
+%   - Gini coefficient of resources over time
+%   - Network centrality measures (who gets armed by others)
+%   - Power law fit to resource distribution
+%
+% For COOPERATION/CONFLICT focus:
+%   - Attack frequency per round
+%   - Investment ratio (invest-self vs invest-other)
+%   - Total welfare (sum of all resources)
+%
+% Also specify: number of runs, how you handle stochasticity, statistical tests
+% =============================================================================
+
+% =============================================================================
+% VALIDATION STRATEGY (informed by Larooij & Törnberg 2025)
+% =============================================================================
+% This is important framing for your thesis - generative ABMs are productive
+% when focused on macro-level patterns, not micro-level realism.
+%
+% WHAT YOU ARE NOT CLAIMING/VALIDATING:
+%   - That LLM agents "realistically" represent individual countries
+%   - That they correctly predict what states will do
+%   - Micro-level behavioral accuracy
+%
+% WHAT YOU ARE VALIDATING:
+%   1. INTERNAL THEORETICAL COHERENCE
+%      - RL agents behave consistently with neorealist assumptions
+%      - LLM agents show reasoning consistent with constructivism
+%
+%   2. MACRO-PATTERN DIFFERENCES
+%      - Different configurations produce different emergent structures
+%      - Expected: RL → power-balancing; LLM → norm-based coalitions
+%
+%   3. MECHANISM IDENTIFICATION
+%      - Trace emergent structure to theoretical mechanisms
+%
+%   4. COUNTERFACTUAL ROBUSTNESS
+%      - Patterns stable across initial conditions
+%
+% FRAMING: "Computational thought experiment" (Axelrod) testing whether
+% different theoretical mechanisms CAN produce different structures,
+% not predicting specific real-world outcomes.
+%
+% CITE: \cite{larooij2025} for this framing in your methods/discussion
+% =============================================================================

@@ -1,0 +1,83 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{booktabs}  % for cleaner tables
+\usepackage{array}     % for table column formatting
+\usepackage{titlesec}  % for section header formatting
+
+% Compact section headers for proposal format
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.5ex plus 0.5ex minus 0.2ex}{1ex plus 0.2ex}
+\titlespacing*{\subsection}{0pt}{1ex plus 0.3ex minus 0.2ex}{0.5ex plus 0.1ex}
+
+% Page layout
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% Title information
+\title{Computational Approach to Neorealism and Constructivism}
+
+\author{Koen Verlaan \\
+Master in Computational Science \\
+University of Amsterdam}
+\date{January 2026 \\ \textit{Draft Proposal \\ Version 1}}
+
+\begin{document}
+
+\maketitle
+
+% =============================================================================
+% ABSTRACT
+% =============================================================================
+% REQUIREMENT: Concise statement of intended research (~100 words)
+%   1. Problem statement: What gap are you addressing?
+%   2. Central question: What is the main question?
+%
+% STATUS: Not yet written
+%
+% TODO: Write abstract covering:
+%   - GAP: Neorealism vs Constructivism debate (30+ years) lacks computational
+%     testing; no study directly compares both frameworks in same simulation
+%   - APPROACH: Use RL agents (neorealist utility maximizers) vs LLM agents
+%     (constructivist identity/norm formation) in minimal anarchic game
+%   - QUESTION: Do different agent architectures produce different emergent
+%     macro-structures (coalitions, hierarchy, cooperation rates)?
+%   - FRAMING: "Computational thought experiment" - testing whether theoretical
+%     mechanisms CAN produce different outcomes, not predicting real-world events
+%
+% DRAFT ELEMENTS (combine into prose):
+%   - 30 years since Wendt challenged Waltz, debate unresolved
+%   - ABM used in IR but no direct neorealism vs constructivism comparison
+%   - Novel: RL as neorealist agent, LLM as constructivist agent
+%   - RQ: Do these produce different emergent structures under identical rules?
+% =============================================================================
+\begin{abstract}
+% TODO: Write your abstract here
+\end{abstract}
+
+\newpage
+
+\input{sections/1_context.tex}
+\input{sections/2_methods.tex}
+\input{sections/3_significance.tex}
+\input{sections/4_bibliography.tex}
+\input{sections/5_timeline.tex}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

@@ -9,7 +9,6 @@ University of Amsterdam
 ---
 
 -INTRODUCTION-
-% 
 After the ending of the Cold War, a debate started around the motivations of states as old paradigms couldn't explain the peaceful transition.
 The common theory was grounded in Neorealism and stated that states have fixed identities that are exogneous and homogenous: states act for survival or power accumulation. Waltz (1) elaborates on the theory of REALISM, where structure determines the outcomes.
 In 1992, Wendt (2) propagates a new claim, namely that of CONSTRUCTIVISM. He disputes the theory of Waltz by stating that states are not inherently focused on self-optimization, but that their identities and interests are formed through their interactions with others. In essence, states are not self-optimizing per se. Percieved semantic meaning of interactions determine identity and interest. States can become self-optimizing, but not because they are. Process determines the outcomes.

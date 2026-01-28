@@ -1,0 +1,84 @@
+\section{Methodology}
+
+% YOUR TEXT from proposal.txt:
+For an effective simulation, simplified interactions between states should be included. This first version hypothethically enables rich emergence of coalition forming, bandwagoning, hegemony.
+
+% TODO: [ADD DESIGN CHOICES]
+% - Why these specific actions?
+% - Why is this minimal setup sufficient?
+Use the terms of internal and external balancing taken from realism:
+- internal is building up internal economic growth our military capability (invest in self, defending in self)
+- external in entering alliances (invest in others, defending others)
+
+\subsection{Simulation Design}
+
+\subsubsection{State Space}
+
+% YOUR TEXT from proposal.txt:
+\begin{itemize}
+    \item \textbf{Resources (U):} Array with utility of each agent
+    \item \textbf{History (H):} Shared log of all investments, conflicts and outcomes
+\end{itemize}
+
+\subsubsection{Action Space}
+
+% YOUR TEXT from proposal.txt:
+\begin{enumerate}
+    \item \textbf{Invest} [self/other]
+    \begin{itemize}
+        \item Self: Costs $I$, generates $V$ (net positive growth)
+        \item Other: Costs $I$, receives $V$ (signals trust)
+    \end{itemize}
+
+    \item \textbf{Defend} [self/other]
+    \begin{itemize}
+        \item Self: Costs $D$, gives multiplier $M/O$ for next round (signals fear or threat)
+        \item Other: Costs $D$, gives multiplier $M/O$ for next 2 rounds (signals commitment and alliance)
+    \end{itemize}
+
+    \item \textbf{Attack} [other]
+    \begin{itemize}
+        \item Attacker vs. Defender (+ allies with active defend)
+        \item $P(\text{win}) = \frac{\text{attacker\_power}}{\text{attacker\_power} + \text{defender\_power}}$
+        \item Winner receives $T\%$ of loser's resources
+        \item All combatants pay conflict cost $C$
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Parameters}
+
+% YOUR TEXT from proposal.txt:
+\begin{itemize}
+    \item $I$ (investment cost), $V$ (investment value)
+    \item $D$ (defense cost), $M$ (defense multiplier), $O$ (offense multiplier)
+    \item $T$ (transfer rate), $C$ (conflict cost)
+\end{itemize}
+
+\subsection{Experimental Setup}
+
+% YOUR TEXT from proposal.txt:
+To ensure scientific rigor, we should not assume that our theoretical understanding is enough for an accurate computational mapping. In this thesis we use three types of agents to assure that merely using language instead of mathematics is not the only differentiator for effect. Without a control LLM agent, we can't be sure that the differences come purely from semantic reasoning.
+
+\subsubsection{Three Condition Design}
+
+% YOUR TEXT from proposal.txt:
+\begin{itemize}
+    \item Pure RL agents
+    \item Semantic LLM agents (constructivist prompting)
+    \item Control LLM agents (realist prompting)
+\end{itemize}
+
+% TODO: [Expand on each option]
+% For each condition, describe:
+% - Implementation details
+% - Prompt strategy (for LLM conditions)
+% - What you expect to observe
+
+\subsection{Parameter Tuning}
+
+% YOUR TEXT from proposal.txt:
+% [Not sure about this one yet]
+I'm thinking of tuning the parameters to find interesting phase transitions. At the points where complexity arises and especially the RL agents behave in a way that seems interesting and comparable to international relations during for example the cold war, we introduce the Semantic agents and run the experiments.
+
+% TODO: Resolve this - either commit to the approach or remove it
+% Question: Does this introduce bias toward RL agents?
