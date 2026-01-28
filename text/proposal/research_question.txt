@@ -1,0 +1,216 @@
+RESEARCH QUESTION FRAMING
+=========================
+Last updated: 2026-01-28 (v2 - Major revision based on confounding analysis)
+
+================================================================================
+KEY INSIGHT: THE CONFOUNDING PROBLEM
+================================================================================
+Previous framing risked confounding TWO variables:
+  1. Decision-making architecture (optimization vs semantic reasoning)
+  2. Goal structure (relative gains vs identity/norms)
+
+If divergence occurred, we couldn't tell which variable caused it.
+
+SOLUTION: Two-comparison experimental design
+  - Comparison 1: Architecture effect (RL vs LLM-Control, SAME goals)
+  - Comparison 2: Framing effect (LLM-Control vs LLM-Constructivist, SAME architecture)
+
+================================================================================
+MAIN RESEARCH QUESTION (REVISED)
+================================================================================
+"Can semantic-reasoning agents escape security dilemmas that trap
+optimization-based agents?"
+
+Or more formally:
+"When optimization-based and semantic-reasoning agents engage the same
+multi-round coordination game with identical incentive structures, do they
+produce different equilibrium behaviors? Under what material constraints
+do they converge vs. diverge?"
+
+ALTERNATIVE PHRASINGS:
+- "Does decision-making architecture (optimization vs semantic reasoning)
+   affect the ability to escape security dilemmas in multi-agent systems?"
+
+- "Under what conditions does semantic reasoning enable cooperation that
+   pure optimization cannot achieve (or vice versa)?"
+
+
+================================================================================
+EXPERIMENTAL DESIGN: TWO COMPARISONS
+================================================================================
+
+COMPARISON 1: ARCHITECTURE EFFECT
+---------------------------------
+Agents: RL vs LLM-Control
+Goal: BOTH optimize relative gains / security
+Difference: How they reason (optimization vs semantic processing)
+
+Question: Does reasoning architecture alone produce divergence?
+
+Possible findings:
+  - If RL ≈ LLM-Control: Architecture doesn't matter when goals are same
+  - If RL ≠ LLM-Control: Architecture matters even with identical goals
+
+
+COMPARISON 2: FRAMING EFFECT
+-----------------------------
+Agents: LLM-Control vs LLM-Constructivist
+Architecture: BOTH use semantic reasoning (same LLM)
+Difference: How goals are framed (relative gains vs identity/norms)
+
+Question: Does constructivist framing change outcomes?
+
+Possible findings:
+  - If LLM-Control ≈ LLM-Constructivist: Framing doesn't matter
+  - If LLM-Control ≠ LLM-Constructivist: Constructivist framing adds something
+
+
+COMBINED INTERPRETATION:
+------------------------
+| RL vs LLM-Control | LLM-Control vs Constructivist | Interpretation |
+|-------------------|-------------------------------|----------------|
+| Converge          | Converge                      | Material structure dominates all |
+| Converge          | Diverge                       | Framing matters, not architecture |
+| Diverge           | Converge                      | Architecture matters, not framing |
+| Diverge           | Diverge                       | Both architecture AND framing matter |
+
+
+================================================================================
+THEORETICAL FRAMING (COMPRESSED)
+================================================================================
+Keep IR theory but drastically compress it. Focus on ONE theoretical problem:
+
+THE SECURITY DILEMMA:
+In anarchic systems (no central authority), agents cannot perfectly
+distinguish defensive from offensive capability. This creates a tragic
+dynamic: individually rational arming leads to mutual arms races that
+leave all agents worse off.
+
+TWO COMPETING HYPOTHESES:
+
+1. OPTIMIZATION HYPOTHESIS (Materialist Logic):
+   Security dilemmas are difficult to escape through optimization.
+   Because agents cannot distinguish threats from defenses, arms races
+   emerge as equilibrium behavior. Cooperation remains fragile.
+
+2. SEMANTIC REASONING HYPOTHESIS (Ideational Logic):
+   Security dilemmas can be transcended through semantic reasoning.
+   Through repeated signaling and semantic interpretation of history,
+   agents can develop mutual trust enabling cooperation despite
+   material incentives to defect.
+
+WHY THIS MATTERS:
+- Not just about IR theory - applies to any multi-agent coordination
+- Security dilemmas appear in: international relations, market competition,
+  organizational dynamics, AI safety (multi-agent systems)
+- Testing whether reasoning architecture affects coordination outcomes
+
+
+================================================================================
+GAME DESIGN: WHY IT'S ALREADY THEORETICALLY RICH
+================================================================================
+Your game naturally embodies the security dilemma without needing to
+force IR theory onto it:
+
+| Action        | What it does                    | Theoretical significance        |
+|---------------|--------------------------------|--------------------------------|
+| Invest-Self   | Create value for yourself      | Economic growth, private gain  |
+| Transfer      | Give resources to other        | Costly signaling of trust      |
+| Arm-Self      | Build military capability      | Ambiguous: defensive or offensive? |
+| Alliance      | Arm another agent              | Commitment signal, dependence  |
+| Attack        | Seize resources through force  | Exploitation, conflict         |
+
+The ambiguity of Arm-Self IS the security dilemma:
+- I arm myself → you don't know if I'm defending or preparing to attack
+- You arm yourself in response → I interpret as threat
+- Mutual arming consumes resources → both lose vs cooperation
+- Neither can safely disarm → trapped in suboptimal equilibrium
+
+The question: Can semantic reasoning interpret Arm-Self as defensive
+and break the cycle? Can it interpret Transfer as trustworthy signal
+rather than exploitable weakness?
+
+
+================================================================================
+WHAT YOU'RE TESTING (CLARIFIED)
+================================================================================
+NOT: "Which IR theory is right?"
+NOT: "Do neorealist and constructivist agents behave differently?"
+     (This was circular - we defined them differently)
+NOT: "Can LLMs simulate states realistically?"
+
+YES: "Do optimization and semantic reasoning produce different equilibria
+      when facing identical material incentive structures?"
+YES: "Can semantic reasoning escape security dilemmas?"
+YES: "Under what parameter conditions do they converge vs diverge?"
+YES: "Which comparison (architecture vs framing) explains more variance?"
+
+
+================================================================================
+WHY THIS IS STRONGER
+================================================================================
+1. NOT CIRCULAR: Both convergence and divergence are interesting findings
+   - Convergence: Material incentives dominate reasoning differences
+   - Divergence: Reasoning architecture shapes outcomes
+
+2. ISOLATES VARIABLES: Two comparisons let you identify what matters
+   - Architecture effect (RL vs LLM-Control)
+   - Framing effect (LLM-Control vs LLM-Constructivist)
+
+3. FALSIFIABLE: Clear predictions for each comparison
+
+4. BROADLY RELEVANT: Speaks to CS, game theory, organizational behavior,
+   not just IR scholars
+
+5. COMPRESSED THEORY: Security dilemma framing is sufficient
+   - Don't need full Waltz/Wendt review
+   - Game mechanics embody the theoretical problem
+
+
+================================================================================
+METRICS (FOCUSED ON SECURITY DILEMMA DYNAMICS)
+================================================================================
+Primary metrics (security dilemma escape):
+- Arms race indicator: ratio of Arm actions to Invest actions over time
+- Cooperation emergence: sustained mutual Transfer relationships
+- Conflict rate: Attack frequency per round
+- Total welfare: sum of all resources (higher = more cooperation)
+
+Secondary metrics (mechanism identification):
+- Trust development: P(Transfer | received Transfer last round)
+- Spiral dynamics: P(Arm | other Armed) - arms race indicator
+- Alliance stability: duration of mutual Alliance relationships
+- Betrayal rate: P(Attack | previous Alliance partner)
+
+Comparison metrics:
+- Time to first stable cooperation (if achieved)
+- Time to first arms race (if occurs)
+- Equilibrium type: cooperative, arms race, mixed, cycling
+
+
+================================================================================
+ABSTRACT REVISION DIRECTION
+================================================================================
+OLD framing (too IR-heavy):
+"Thirty years since Wendt challenged Waltz... neorealism vs constructivism..."
+
+NEW framing (security dilemma focused):
+"In multi-agent systems without central authority, security dilemmas can
+trap agents in suboptimal arms races. We test whether semantic-reasoning
+agents (LLMs) can escape these dilemmas more readily than optimization-based
+agents (RL). Using a minimal coordination game with investment, arming, and
+conflict, we compare three agent configurations to isolate the effects of
+decision-making architecture from goal framing. Results inform both AI
+multi-agent coordination and theoretical debates about whether reasoning
+processes can overcome material incentive structures."
+
+
+================================================================================
+NEXT STEPS FOR PROPOSAL
+================================================================================
+1. CONTEXT: Compress IR theory to 1 paragraph, pivot to security dilemma
+2. METHODS: Restructure around two-comparison design
+3. AGENT DESCRIPTIONS: LLM-Control becomes PRIMARY comparison to RL
+4. MEASUREMENTS: Focus on security dilemma escape metrics
+5. VALIDATION: Frame as testing mechanisms, not validating agents
+6. SIGNIFICANCE: Broader relevance (beyond IR) to multi-agent coordination

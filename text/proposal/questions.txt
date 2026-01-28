@@ -15,3 +15,14 @@ Should I make the prompting of the LLM agents minimal, or specifically construct
 
 I'm not entiry set on the research question. What do I actually want to investigate? Hierarchy? Cooperation? Coalition forming? Maybe I can only know once I see some results?
 -> I think I read that even though constructivism has a different WoW, it could converge to Neorealist outcome and thus the confusion that arises. We could investigate under which material or structural constraints, Constructivism leads to Neorealism?
+
+-> parameters both produce self-help: structural constraint create selfhelp -> Waltz is right!
+-> paramters make divergent behaviour: semantic reasoning can create cooperation?
+
+How can I frame my research significance? I feel like an imposter if I say i actually have a scientific contribution.
+
+Is the theoretical background not too rich for the research question? Maybe the question should be more geared towards the theory.
+
+Do you know of any interesting research that might supplement my theoretical grounding?
+
+I especially find the sensitivity of the LLMs very challanging to validate the computational mapping with Constructivism. Logically it makes sense: LLMs show norm adherence, in-group tendency, ability to interpret intersubjective meaning. This seems okay. But how then do we prompt it? If we prompt it to be cooperative, it will be. If otherwise otherwise. Do I prompt it nothing specific? Just choose an action based on the history?

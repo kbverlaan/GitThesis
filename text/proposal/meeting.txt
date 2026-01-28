@@ -1,0 +1,10 @@
+MEETING PLANNING
+
+1. Go through the research context. What are thoughts on the theoretical framing? What are thoughts on the potential research gap?
+
+2. Go through simulation. What are thoughts on that? Is this minimal enough? Is it complex enough? What should we change?
+
+3. Go through questions.
+
+4. What about the RL -> Neorealist mapping and LLM -> Constructivist mapping. Does it make sense? Does it need better structure?
+

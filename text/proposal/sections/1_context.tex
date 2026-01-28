@@ -1,39 +1,92 @@
 \section{Research Context}
 % =============================================================================
-% RESEARCH CONTEXT
+% RESEARCH CONTEXT - MAJOR RESTRUCTURE NEEDED
 % =============================================================================
-% REQUIREMENT: Brief overview summarizing current state of knowledge,
-%              recent debates, and the "where, who, what" of research
+% STATUS: Needs restructuring to reflect new framing
 %
-% STATUS: Good foundation - covers all required elements
+% OLD STRUCTURE (IR-heavy):
+%   Para 1: Cold War → Waltz → Wendt → both valid
+%   Para 2: ABM history + recent AI
+%   Para 3: Gap + RQ
 %
-% STRUCTURE:
-%   Para 1: Neorealism origin (Waltz) - Cold War context           [DONE]
-%   Para 2: Constructivism challenge (Wendt) - USSR example        [DONE]
-%   Para 3: Current state of debate - synthesis attempts           [DONE]
-%   Para 4: Computational gap - ABM in IR, lack of LLM research    [DONE]
+% NEW STRUCTURE (security dilemma focused):
+%   Para 1: THE PROBLEM - Security dilemma in multi-agent systems
+%           - Define it: can't distinguish defense from offense
+%           - Why it matters: leads to suboptimal arms races
+%           - Where it appears: IR, market competition, AI safety
+%           - Optional: brief IR origin (Waltz, Wendt) as 1-2 sentences
 %
-% REMAINING TODOS:
-%   - Fix typo: "abilties" → "abilities"
-%   - Fix typo: "Internation" → "International"
-%   - Add citation for "single dedicated study" claim (Lustick 2000)
-%   - Consider citing Cederman 2003 for "constructivists need formal modeling"
-%   - Consider adding Larooij & Törnberg 2025 to frame generative ABM validity
+%   Para 2: THE THEORETICAL TENSION - Two competing hypotheses
+%           - Optimization hypothesis: dilemmas hard to escape, structure dominates
+%           - Semantic reasoning hypothesis: shared meanings can transcend dilemmas
+%           - This is the neorealism/constructivism debate, compressed
 %
-% CITATIONS USED: waltz1979, wendt1992, barkin2010
-% CITATIONS TO ADD: lustick2000, cederman2003 (optional)
+%   Para 3: THE GAP + APPROACH
+%           - ABM has been used to study cooperation (Axelrod, Cederman)
+%           - Recent: RL agents, LLM agents separately
+%           - Gap: no direct test of whether reasoning architecture affects
+%             ability to escape security dilemmas
+%           - Your approach: compare RL vs LLM with controlled design
 %
-% REVIEW NOTES:
-%   - Good narrative arc: historical origin → challenge → current state → gap
-%   - Clearly establishes the two theoretical positions
-%   - Identifies computational gap effectively
-%   - Could strengthen with specific citation for "only single constructivist ABM"
+%   Para 4: RESEARCH QUESTION
+%           - Clean statement of RQ
+%           - Emphasize: identical incentives, different reasoning processes
+%
+% KEY CHANGES:
+%   1. Lead with security dilemma, not IR history
+%   2. Compress Waltz/Wendt to supporting role (1-2 sentences max)
+%   3. Frame as "can semantic reasoning escape dilemmas?" not "neorealism vs constructivism"
+%   4. Emphasize broader relevance (not just IR)
+%   5. Mention two-comparison design briefly
+%
+% CITATIONS TO USE:
+%   - Security dilemma: \cite{jervis1978} (if you have it) or \cite{waltz1979}
+%   - ABM cooperation: \cite{axelrod1984}
+%   - ABM in IR: \cite{cederman1997}
+%   - RL agents: \cite{pan2025}
+%   - LLM agents: \cite{hua2023waragent}
+%   - Validation: \cite{larooij2025}
+%
+% EXAMPLE DIRECTION (don't copy, write in your voice):
+%
+%   Para 1: "In systems without central authority, agents face a fundamental
+%   coordination problem: the security dilemma. Because defensive and offensive
+%   capabilities are often indistinguishable, individually rational behavior
+%   (building defenses) triggers arms races that leave all parties worse off.
+%   This dynamic appears across domains: international relations, market
+%   competition, and increasingly, multi-agent AI systems."
+%
+%   Para 2: "Two theoretical perspectives offer competing predictions. The
+%   optimization view holds that material incentives dominate: agents facing
+%   security dilemmas will converge to arms-race equilibria regardless of how
+%   they reason. The semantic reasoning view suggests that agents capable of
+%   interpreting signals and building shared understandings can escape these
+%   dilemmas through trust-building. This tension, formalized in IR theory as
+%   the neorealism-constructivism debate (Waltz 1979, Wendt 1992), remains
+%   unresolved."
+%
+%   Para 3: "Agent-based modeling has long studied cooperation dynamics
+%   (Axelrod 1984, Cederman 1997). Recent work explores RL agents (Pan 2025)
+%   and LLM agents (Hua 2023) in strategic settings. However, no study
+%   directly tests whether reasoning architecture affects ability to escape
+%   security dilemmas under controlled conditions."
+%
+%   Para 4: "This thesis asks: Can semantic-reasoning agents escape security
+%   dilemmas that trap optimization-based agents? Using a minimal coordination
+%   game, we compare three agent configurations to isolate architecture effects
+%   from goal-framing effects."
 % =============================================================================
 
-The ending of the Cold War introduced an intellectual vacuum as existing paradigms were unable to predict its peaceful conclusion. \textbf{Neorealism}, as outlined by Kenneth Waltz \cite{waltz1979}, theorizes that states act out of self-interest, be it for survival or power accumulation, given the anarchical system that is the world stage.
+The ending of the Cold War introduced an intellectual vacuum as existing paradigms were unable to predict its peaceful conclusion. \textbf{Neorealism}, as outlined by Kenneth Waltz \cite{waltz1979}, theorizes that states act out of self-interest, be it for survival or power accumulation, given the anarchical system that is the world stage. The USSR undermining their relative gain to the US could be explained through the lens of upcoming \textbf{Constructivism}, formalized by Alexander Wendt \cite{wendt1992} in 1992 as a direct criticism on Neorealism. Instead of being rigidly self-interested through material constraints, state identities and interests are formed through interaction and are changeable. As of today, both theories are recognized to have explanatory abilities.
 
-The USSR undermining their relative gain to the US could be explained through the lens of upcoming \textbf{Constructivism}, formalized by Alexander Wendt \cite{wendt1992} in 1992 as a direct criticism on Neorealism. Instead of being rigidly self-interested through material constraints, state identities and interests are formed through interaction and are changeable.
+The utilization of ABM within the IR field has extensive applications \cite{cederman1997}. More recently both the use of RL agents \cite{pan2025} and LLM agents \cite{hua2023waragent} has been explored. However, no direct comparison between Neorealism and Constructivism has been done and computational mapping both framework to respectively RL agents and LLM agents is novel.
 
-As of today, both theories are recognized to have explanatory abilties and even a synthesis was tried \cite{barkin2010}, though fundamental differences persist.
+Research Question:
+\textit{Under what material constraints do semantic reasoning (LLM agents) and
+pure optimization (RL agents) produce divergent emergent social structures in
+an anarchic system?}
 
-Agent-based modelling (ABM) is a tried and tested technique within the Internation Relations (IR) field, but only a single dedicated study seems to exist for constructivist ABM studies. Where RL agents are widely used to model IR ABMs, LLM Agents have little, though rapidly growing research. There seems to be a gap for both dedicated neorealist vs. constructivist research, as well as LLM agent as constructivist agent.
+% TODO: Rewrite RQ to reflect new framing:
+% "Can semantic-reasoning agents escape security dilemmas that trap
+%  optimization-based agents? Under what material constraints do they
+%  converge vs. diverge?"
