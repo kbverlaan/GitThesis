@@ -1,0 +1,9 @@
+[Architecture]
+      ↓ enables
+[Capabilities]
+      ↓ manifest as
+[Observable behavior]
+      ↓ aggregated into
+[Emergent structure]
+      ↓ measured by
+[Metrics]

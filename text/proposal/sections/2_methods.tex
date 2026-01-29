@@ -1,333 +1,66 @@
 \section{Research Methods}
-% =============================================================================
-% RESEARCH METHODS - MAJOR RESTRUCTURE NEEDED
-% =============================================================================
-% STATUS: Needs restructuring around TWO-COMPARISON design
-%
-% KEY CHANGE: LLM-Control is now the PRIMARY comparison to RL
-% The confounding problem: old design conflated architecture + goals
-% New design isolates them through two comparisons
-%
-% NEW STRUCTURE:
-%   1. Method Justification (keep, but reframe)
-%   2. Experimental Design (NEW - explain two comparisons)
-%   3. Computational Model Design (keep, minor updates)
-%   4. Agent Architectures (REORDER - LLM-Control becomes primary)
-%   5. Measurements (update to focus on security dilemma metrics)
-%   6. Validation (update framing)
-% =============================================================================
+To study emergent social phenomena, bottom-up agent-based models are commonly employed, following the traditions of Schelling and Epstein \& Axtell \cite{schelling1971,epstein1996}. In this thesis, a minimal coordination game is designed to provide sufficient possibilities for emergent structures to be produced, without forcing outcomes.
 
-To answer the
-
-\subsection{Method Justification}
-% =============================================================================
-% JUSTIFICATION - REFRAME AROUND SECURITY DILEMMA
-% =============================================================================
-% OLD: "Why ABM? Why RL for neorealism? Why LLM for constructivism?"
-% NEW: "Why this game design? Why compare RL vs LLM?"
-%
-% KEY POINTS TO MAKE:
-%   1. Game design embodies security dilemma naturally
-%      - Arm action is ambiguous (defensive or offensive?)
-%      - This IS the security dilemma, not a simulation of it
-%   2. Why RL: Represents pure optimization without semantic interpretation
-%      - Learns from rewards, no access to "meaning" of actions
-%   3. Why LLM: Represents semantic reasoning
-%      - Can interpret actions, build narratives, form "trust"
-%   4. General Sufficiency: minimal design to produce intended dynamics
-%
-% EXAMPLE DIRECTION:
-%   "The game is designed to naturally create security dilemma conditions.
-%   The Arm action is inherently ambiguous: agents cannot distinguish whether
-%   another agent is arming defensively or preparing to attack. This ambiguity
-%   IS the security dilemma, embedded in game mechanics rather than imposed
-%   through theoretical assumptions."
-% =============================================================================
-
-%Model justification
-General Sufficiency principle -> as minimal as possible.
-How do we produce, with as little elements as possible, the intended macro-behviour that we want to investigate -> cooperation, coalition, power hierarchies,
-How do I make sure it is not void of meaning. Merely driven by my intuitions as someone that doesnt even study IR?
-
-\subsubsection{Computational Mapping}
-% =============================================================================
-% REFRAME: Not "RL = neorealism, LLM = constructivism"
-% Instead: "RL = optimization, LLM = semantic reasoning"
-% The theory connection is secondary; the mechanism comparison is primary
-% =============================================================================
-RL is a widely used technique for modelling IR theories, specifically useful for materialist views such as neorealism (as we can optimize our own resources).
-Why?
-
-% TODO: Rewrite to focus on:
-%   - RL represents OPTIMIZATION: learns from rewards, no semantic interpretation
-%   - LLM represents SEMANTIC REASONING: interprets actions, builds narratives
-%   - This is what we're comparing, not "theories"
-
-CONSTRUCTIVISM
-Core thesis
-- identity formed through interaction, norms and group identity
-- interests flow from identity
-
-LLM justification
-- LLMs have shown to adhere to norms and group identity through interaction (norms paper,)
-- LLMs show different behaviour through contextual framing (personas, language!)
-
-% TODO: This section conflates constructivism with LLM capabilities
-% Reframe: LLMs do semantic reasoning. One FRAMING of that reasoning
-% is constructivist (identity/norms). Another framing is materialist (optimize gains).
-% That's why we have LLM-Control.
-
-
-%assumptions
+The methodological focus is comparative as identical environments and interaction rules are used to analyze how different agent architecture produce emergent social structures.
 
 \subsection{Experimental Design}
-% =============================================================================
-% NEW SECTION: TWO-COMPARISON DESIGN
-% =============================================================================
-% This is the KEY methodological contribution. Explain clearly:
-%
-% THE CONFOUNDING PROBLEM:
-%   If we just compare "RL vs LLM-Constructivist", divergence could be due to:
-%     a) Different architectures (optimization vs semantic reasoning), OR
-%     b) Different goals (relative gains vs identity/norms)
-%   We can't tell which caused divergence.
-%
-% SOLUTION: Two comparisons
-%
-% COMPARISON 1: ARCHITECTURE EFFECT
-%   Agents: RL vs LLM-Control
-%   Goal: BOTH optimize relative gains / security
-%   Difference: How they reason (optimization vs semantic processing)
-%   Question: Does reasoning architecture alone produce divergence?
-%
-% COMPARISON 2: FRAMING EFFECT
-%   Agents: LLM-Control vs LLM-Constructivist
-%   Architecture: BOTH use semantic reasoning (same LLM)
-%   Difference: How goals are framed (relative gains vs identity/norms)
-%   Question: Does constructivist framing change outcomes?
-%
-% INTERPRETATION TABLE:
-%   | RL vs LLM-Control | Control vs Constructivist | Interpretation              |
-%   |-------------------|---------------------------|----------------------------|
-%   | Converge          | Converge                  | Material structure dominates|
-%   | Converge          | Diverge                   | Framing matters, not arch  |
-%   | Diverge           | Converge                  | Architecture matters       |
-%   | Diverge           | Diverge                   | Both matter                |
-%
-% TODO: Write this section explaining the two-comparison design
-% =============================================================================
+While it is impossible to isolate all architectural differences between RL and LLM-based agents, the experiment aims to minimize the confounding differences by fixing the environment, available information and optimization objective for both agents.
 
-\subsection{Computational Model Design}
-% =============================================================================
-% GAME DESIGN - MINOR UPDATES
-% =============================================================================
-% The game is good! Just add comments explaining WHY each element matters
-% for testing the security dilemma.
-%
-% Consider renaming for clarity:
-%   - "Invest Other" → "Transfer" (costly signal)
-%   - "Arm Other" → "Alliance" (commitment signal)
-%
-% Add explanation of WHY this embodies security dilemma:
-%   - Arm-Self is ambiguous: defense or offense preparation?
-%   - This ambiguity IS the security dilemma
-%   - Question: can semantic reasoning resolve ambiguity through interpretation?
-% =============================================================================
-
-The \textbf{State Space} consists of an array containing the resources of every agent and the history of all recent interactions, conflicts and their outcomes. Each round, all agents choose simultaneously from the \textbf{Action Space}:
+Experiments are run under three conditions, shown in Table \ref{tab:conditions}.
 
 \begin{table}[h]
 \centering
-\begin{tabular}{@{}llp{10cm}@{}}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Condition} & \textbf{Architecture} & \textbf{Information} & \textbf{Purpose} \\
+\midrule
+RL (LSTM) & Reward optimizing & Minimal state & Baseline \\
+LLM-Comparison & Token prediction & Same as RL & Comparative condition \\
+LLM-Control & Token prediction & Same as RL & Robustness under prompt variation \\
+\bottomrule
+\end{tabular}
+\caption{Experimental conditions for comparing emergent social structure.}
+\label{tab:conditions}
+\end{table}
+
+Where LLMs have memory through their context window, RL agents are essentially Markovian. By introducing an LSTM-state to the RL architecture, the agent can use the full information to optimize its policies during training and inform decision making during runtime.
+
+The main comparison of the RL agent will be with a minimally prompted LLM agent, receiving the same information within a prompt. Additionally, they have a goal statement that asks them to optimize their resources.
+
+Lastly, through varying the prompting of the LLM-based agent, the robustness of the emergent social structure is tested. Possible variations include tone, decoration, language and explicit instructions. 
+
+\subsection{Game Design}
+Playing agents pursue the goal of optimizing their resources. Every round, agents simultaneously choose any action from Table \ref{tab:actions}. There is complete information: all resources and interaction history is available to all.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{Action} & \textbf{Target} & \textbf{Effect} \\
 \midrule
-Invest & Self & Costs $I$, generates $V$ (net positive growth) \\
-Invest & Other & Costs $I$, other receives $V$ (signals trust) \\
-\midrule
-Arm & Self & Costs $D$, multiplier $M/O$ for 1 round (general threat) \\
-Arm & Other & Costs $D$, multiplier $M/O$ for 2 rounds (signals alliance) \\
-\midrule
-Attack & Other & Probabilistic conflict resolution (see below) \\
+Invest & Self & costs $V$, generates $I$ \\
+Invest & Other & costs $V$, generates $I$ \\
+Arm & Self & costs $D$, shortly multiplies $M$ \\
+Arm & Other & costs $D$, shortly multiplies $M$ \\
+Attack & Other & Resource relocation \\
 \bottomrule
 \end{tabular}
+\caption{Action space for agents in the coordination game.}
+\label{tab:actions}
 \end{table}
 
-% TODO: Add paragraph explaining WHY this creates security dilemma:
-%   "The Arm-Self action is inherently ambiguous: other agents cannot
-%   distinguish defensive preparation from offensive preparation. This
-%   ambiguity is the security dilemma. The question becomes: can semantic
-%   reasoning interpret this action differently than pure optimization?"
+Conflicts are resolved probabilistically based on the combined resources of the main combatants and active arm-other-interactions. The winner takes percentage $T$ of the loser's resources. All combatants pay conflict costs $C$.
 
-\noindent\textbf{Conflict Resolution:} The resources of both sides, consisting of the main combatants plus active Arms multipliers, are summed and relative to the total resources involved, win probabilties are determined.
-The winner recieves $T\%$ of the losers resources. All combatants pay $C$ conflict cost.
-
-% TODO: Add game length/structure:
-%   "Agents play for N rounds with complete information about resource
-%   holdings and recent action history (last K rounds)."
-
-\subsection{Agent Architectures}
-% =============================================================================
-% AGENT ARCHITECTURES - REORDER AND REFRAME
-% =============================================================================
-% OLD ORDER: RL → LLM-Constructivist → LLM-Control
-% NEW ORDER: RL → LLM-Control → LLM-Constructivist
-%
-% LLM-Control is now PRIMARY comparison to RL because:
-%   - SAME goal (optimize relative gains)
-%   - DIFFERENT architecture (optimization vs semantic reasoning)
-%   - This isolates the architecture effect
-%
-% LLM-Constructivist becomes SECONDARY comparison to LLM-Control because:
-%   - SAME architecture (both LLM)
-%   - DIFFERENT framing (relative gains vs identity/norms)
-%   - This isolates the framing effect
-%
-% REFRAME DESCRIPTIONS:
-%   - Don't say "represents neorealism/constructivism"
-%   - Say "optimizes relative gains" or "reasons about identity/norms"
-% =============================================================================
-
-The simulation is done using homogenous agent architectures for every agent.
-
-\textbf{Reinforcement Learning (RL) Agents} represent state actors in Waltz's theory of Neorealism. At it's core, the agents should be self-interested and concerned with optimizing their relative gain within the system. Computationally, this identity is translated through optimizing the following function during training:
-[insert RL optimization function]
-
-% TODO: Reframe RL description:
-%   "RL agents optimize a reward function based on relative resource position.
-%   They learn through trial and error, without access to semantic interpretation
-%   of other agents' actions. They cannot distinguish 'defensive arming' from
-%   'offensive preparation' - they only observe the action and its outcomes."
-
-\textbf{Control LLM Agents} are prompted to optimize their relative gain and security position through their actions. They use the same LLM architecture as constructivist agents but with materialist goal framing. This condition isolates the effect of decision-making architecture from goal framing.
-
-% TODO: Expand LLM-Control description:
-%   "LLM-Control agents receive the same state information and action space
-%   as RL agents. Their prompt instructs them to maximize their relative
-%   resource position and security. Unlike RL agents, they can reason about
-%   other agents' actions semantically ('Agent B armed - is this a threat or
-%   defense?'), but their goal framing is identical to RL agents."
-%
-%   KEY: Same goal as RL, different reasoning process
-%   This is Comparison 1: Architecture Effect
-
-\textbf{Large-Language Model (LLM) Agents} represent state actors in Wendt's theory of Constructivism. Based on the intersubjective interpretation of shared history, LLM agents are prompted internally update their identities and interests, and choose their next action accordingly.
-
-% TODO: Reframe as LLM-Constructivist:
-%   "LLM-Constructivist agents are prompted to develop their identity through
-%   interaction and to let their interests flow from that identity. They
-%   interpret other agents' actions through normative frames ('Agent B's
-%   investment signals trust and potential friendship')."
-%
-%   KEY: Same architecture as LLM-Control, different framing
-%   This is Comparison 2: Framing Effect
+The game is played for $N$ rounds (unknown to the players), with complete information including a history window enabling agents to track previous interactions.
 
 \subsection{Measurements}
-% =============================================================================
-% MEASUREMENTS - UPDATE TO FOCUS ON SECURITY DILEMMA ESCAPE
-% =============================================================================
-% OLD: Coalition, Hierarchy, Cooperation/Conflict (generic)
-% NEW: Primary focus on security dilemma dynamics
-%
-% PRIMARY METRICS (security dilemma escape):
-%   - Arms race indicator: ratio of Arm to Invest over time
-%   - Cooperation emergence: sustained mutual Transfer relationships
-%   - Conflict rate: Attack frequency per round
-%   - Total welfare: sum of resources (higher = more cooperation)
-%
-% SECONDARY METRICS (mechanism identification):
-%   - Trust development: P(Transfer | received Transfer)
-%   - Spiral dynamics: P(Arm | other Armed) - arms race detection
-%   - Alliance stability: duration of mutual Alliance relationships
-%   - Betrayal rate: P(Attack | previous ally)
-%
-% COMPARISON METRICS:
-%   - Time to first stable cooperation (if achieved)
-%   - Time to first arms race (if occurs)
-%   - Equilibrium type: cooperative, arms race, mixed, cycling
-% =============================================================================
+Emergent social structure is measured through network- and distribution-based metrics computed over interaction histories.
 
-To clearly analyse the emergent social structures, three specific elements are analysed, each with specific metrics to track.
-
-For \textbf{Coalition}:
 \begin{itemize}
-    \item Coalition stability: average duration of Arm-other relationships
-    \item Trade stability: average duration of Invest-other relationships
-    \item Reciprocity rate: P(A arms B | B armed A last round)
-    \item Betrayal rate: P(attack | previous ally)
+    \item \textbf{Coalition Structure}: Communities detected in directed interaction networks derived from investment and arm actions. Metrics include number of communities, average community size, and temporal stability.
+    \item \textbf{Interaction Patterns}: Frequencies of cooperative and attack-actions and retaliation probabilities.
+    \item \textbf{Hierarchy}: Inequality in resource distribution measured via the Gini coefficient over time.
 \end{itemize}
 
-For \textbf{Hierarchy}:
-\begin{itemize}
-    \item Gini coefficient of resources
-    \item Network centrality of Arm-other relationships
-\end{itemize}
-
-For \textbf{Cooperation/Conflict}:
-\begin{itemize}
-    \item Attack frequency per round
-    \item Invest frequency per round
-    \item Total welfare
-\end{itemize}
-
-% TODO: Restructure around security dilemma escape:
-%
-% PRIMARY: Security Dilemma Dynamics
-%   - Arms race indicator: Arm/Invest ratio over time
-%   - Spiral detection: P(Arm | other Armed last round)
-%   - Cooperation emergence: sustained mutual Transfer
-%   - Total welfare trajectory
-%
-% SECONDARY: Mechanism Identification
-%   - Trust reciprocity: P(Transfer | received Transfer)
-%   - Alliance formation and stability
-%   - Betrayal patterns
-%
-% COMPARISON: Architecture vs Framing Effects
-%   - Measure same metrics for all three conditions
-%   - Compare: RL vs LLM-Control (architecture effect)
-%   - Compare: LLM-Control vs LLM-Constructivist (framing effect)
-
-\subsection{Validation}
-% =============================================================================
-% VALIDATION - UPDATE FRAMING
-% =============================================================================
-% Keep Larooij framing but update to match new RQ
-%
-% NOT VALIDATING:
-%   - Whether agents "realistically" represent states
-%   - Micro-level behavioral accuracy
-%   - Whether this predicts real-world outcomes
-%
-% VALIDATING:
-%   1. Do conditions differ in security dilemma escape rates?
-%   2. Can we identify WHY they differ (if they do)?
-%   3. Are results robust across parameter variations?
-%
-% FRAMING: Computational thought experiment testing whether
-% different reasoning architectures affect coordination outcomes
-% =============================================================================
-
-The use of Generative Agents within ABMs has been criticed for enlarging problems around validation and calibration that are known in ABMs. \cite{larooij2025}. The thesis should make clear what is validated, and, importantly, what is not to prevent it being "void of meaning".
-
-% TODO: Rewrite validation section:
-%
-% "Following Larooij & Törnberg (2025), this study does not claim that
-% LLM agents realistically simulate states or predict real-world outcomes.
-% Instead, the validation focuses on:
-%
-% 1. MECHANISM TESTING: Do the three agent configurations produce
-%    different security dilemma dynamics under identical game rules?
-%
-% 2. ARCHITECTURE ISOLATION: Does the RL vs LLM-Control comparison
-%    reveal effects of reasoning architecture independent of goal framing?
-%
-% 3. FRAMING ISOLATION: Does the LLM-Control vs LLM-Constructivist
-%    comparison reveal effects of goal framing independent of architecture?
-%
-% 4. ROBUSTNESS: Are patterns stable across parameter variations
-%    (resource scarcity, conflict costs, game length)?
-%
-% This is a computational thought experiment asking: CAN semantic reasoning
-% escape security dilemmas that trap optimization? Not: WILL it do so in
-% any particular real-world context."
+% \subsection{Validation}
+% Recent research by Larooij and Tornberg \cite{larooij2025} critiqued how some research utilize LLM-based agents. The research inspired the thesis to specifically not claim any comparison to human behaviour or real-world predictions. The design should only compare emergent structure and validate robustness through prompt variation. 

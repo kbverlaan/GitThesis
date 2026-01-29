@@ -4,25 +4,17 @@ What would be the best way to parameter tune this model?
 - I could tune it on either agent and find phase transitions that are most interesting to observer and analyse? 
 - This might introduce bias.
 
-The RL agents actually represent Neoliberalism more easily (focused on absolute gains, institutions/trade can be beneficial for material gains). I would like to keep the focus on the Waltz vs. Wendt debate. What do you think?
-- I could introduce Neoliberalism to the mix and analyse them all?
+RQ
+For now the RQ is about comparing two different emergent structures. It deviates from anything explanatory that your suggestion did have. What do you think about it now?
 
-The computational mapping between the theory and the actual model stays the hardest part. How could I make this part more clear for myself.
+PROMPT SENSITIVITY!
+The biggest possible cofounding variable in this thesis is the prompting. What are best practices to create robustness in prompting?
 
-How do we decide on the correct RL function? -> percentage of total resources?
+LLM REASONING TRACES
+My intuition tells me that I can use the reasoning traces of the LLM to see if they think about norms, loyalty, trust etc. However, I've heard some criticism about the trustworthiness and scientific rigor behind these practices. What do you think?
 
-Should I make the prompting of the LLM agents minimal, or specifically constructivist? Does it derive too much meaning from the prompting or knowledge of the theory alone?
+MEMORY FOR RL AGENTS
+How can I incorporate comparable memory for the RL agents? I don't want memory to be a confounding variable.
 
-I'm not entiry set on the research question. What do I actually want to investigate? Hierarchy? Cooperation? Coalition forming? Maybe I can only know once I see some results?
--> I think I read that even though constructivism has a different WoW, it could converge to Neorealist outcome and thus the confusion that arises. We could investigate under which material or structural constraints, Constructivism leads to Neorealism?
-
--> parameters both produce self-help: structural constraint create selfhelp -> Waltz is right!
--> paramters make divergent behaviour: semantic reasoning can create cooperation?
-
-How can I frame my research significance? I feel like an imposter if I say i actually have a scientific contribution.
-
-Is the theoretical background not too rich for the research question? Maybe the question should be more geared towards the theory.
-
-Do you know of any interesting research that might supplement my theoretical grounding?
-
-I especially find the sensitivity of the LLMs very challanging to validate the computational mapping with Constructivism. Logically it makes sense: LLMs show norm adherence, in-group tendency, ability to interpret intersubjective meaning. This seems okay. But how then do we prompt it? If we prompt it to be cooperative, it will be. If otherwise otherwise. Do I prompt it nothing specific? Just choose an action based on the history?
+METRICS
+What are interesting measurements for emergent social structures?

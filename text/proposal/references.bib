@@ -1,145 +1,14 @@
 % =============================================================================
-% BIBLIOGRAPHY WITH ANNOTATIONS
+% BIBLIOGRAPHY: EMERGENT SOCIAL STRUCTURES FROM AGENT ARCHITECTURES
 % =============================================================================
-% Each entry includes a comment explaining its relevance to your thesis.
-% Categories: (1) IR Theory, (2) ABM in IR, (3) RL/MARL, (4) LLM Agents
+% Updated: 2026-01-29
+% Focus: RL vs LLM agents, cooperation dynamics, emergent social structures
 % =============================================================================
-
-
-% =============================================================================
-% CATEGORY 1: NEOREALISM-CONSTRUCTIVISM THEORETICAL DEBATE
-% =============================================================================
-% These are your foundational IR theory sources. You MUST read the primary
-% sources (Waltz, Wendt) deeply - don't rely on summaries.
-
-@book{morgenthau1978,
-  author    = {Hans J. Morgenthau},
-  title     = {Politics Among Nations: The Struggle for Power and Peace},
-  edition   = {5th Revised},
-  year      = {1978},
-  publisher = {Alfred A. Knopf},
-  address   = {New York},
-  pages     = {4--15}
-}
-% COMMENT: Classical realism predecessor to Waltz. Establishes power as central
-% concept in IR. Less relevant than Waltz for your structural focus, but useful
-% for historical context of realist tradition.
-
-@book{waltz1979,
-  author    = {Kenneth N. Waltz},
-  title     = {Theory of International Politics},
-  year      = {1979},
-  publisher = {Addison-Wesley},
-  address   = {Reading, MA}
-}
-% COMMENT: ESSENTIAL. Foundational neorealist text. Key claims: (1) anarchy +
-% distribution of capabilities determines state behavior, (2) states are
-% "functionally undifferentiated" units, (3) self-help follows from structure.
-% Your RL agents should operationalize these assumptions.
-
-@article{wendt1992,
-  author  = {Alexander Wendt},
-  title   = {Anarchy is What States Make of It: The Social Construction of Power Politics},
-  journal = {International Organization},
-  year    = {1992},
-  volume  = {46},
-  number  = {2},
-  pages   = {391--425}
-}
-% COMMENT: ESSENTIAL. The constructivist challenge to Waltz. Key claim: "Self-help
-% and power politics do not follow either logically or causally from anarchy."
-% Identities and interests are socially constructed through interaction.
-% Your LLM agents should operationalize this - identity formation through history.
-
-@article{mearsheimer1994,
-  author  = {John J. Mearsheimer},
-  title   = {The False Promise of International Institutions},
-  journal = {International Security},
-  year    = {1994},
-  volume  = {19},
-  number  = {3},
-  pages   = {5--49}
-}
-% COMMENT: Neorealist critique of institutionalism and constructivism. Argues
-% institutions have "minimal influence on state behavior." Part of the direct
-% Mearsheimer-Wendt exchange that crystallized the debate.
-
-@article{wendt1995,
-  author  = {Alexander Wendt},
-  title   = {Constructing International Politics},
-  journal = {International Security},
-  year    = {1995},
-  volume  = {20},
-  number  = {1},
-  pages   = {71--81}
-}
-% COMMENT: Wendt's response to Mearsheimer. Clarifies that constructivism shares
-% some assumptions with neorealism (states as units, systemic focus) but argues
-% neorealism is "not structural enough" - fails to examine how social structures
-% constitute identities. Good for understanding the precise disagreement.
-
-@book{katzenstein1996,
-  author    = {Peter J. Katzenstein},
-  title     = {The Culture of National Security: Norms and Identity in World Politics},
-  year      = {1996},
-  publisher = {Columbia University Press},
-  address   = {New York}
-}
-% COMMENT: Edited volume demonstrating constructivism's empirical applicability
-% to security studies. Contributors include Wendt, Finnemore, Johnston. Shows
-% how culture, norms, and identity shape national security policies.
-
-@book{finnemore1996,
-  author    = {Martha Finnemore},
-  title     = {National Interests in International Society},
-  year      = {1996},
-  publisher = {Cornell University Press},
-  address   = {Ithaca, NY}
-}
-% COMMENT: Empirical constructivist work. Key argument: interests are "not just
-% 'out there' waiting to be discovered; they are constructed through social
-% interaction." Supports endogenous interest formation in your LLM agents.
-
-@book{wendt1999,
-  author    = {Alexander Wendt},
-  title     = {Social Theory of International Politics},
-  year      = {1999},
-  publisher = {Cambridge University Press},
-  address   = {Cambridge}
-}
-% COMMENT: ESSENTIAL. Constructivism's magnum opus. Develops three "cultures of
-% anarchy": Hobbesian (enemies), Lockean (rivals), Kantian (friends). These are
-% shared ideas that shape state behavior. Won ISA Best Book of the Decade.
-% Could inform different LLM prompt conditions in your experiments.
-
-@book{mearsheimer2001,
-  author    = {John J. Mearsheimer},
-  title     = {The Tragedy of Great Power Politics},
-  year      = {2001},
-  publisher = {W.W. Norton},
-  address   = {New York}
-}
-% COMMENT: Offensive realism - argues great powers are compelled by anarchy to
-% maximize power share. Five core assumptions you could operationalize in RL:
-% (1) anarchic system, (2) offensive military potential, (3) uncertainty about
-% intentions, (4) survival as primary goal, (5) rational actors.
-
-@book{barkin2010,
-  author    = {J. Samuel Barkin},
-  title     = {Realist Constructivism: Rethinking International Relations Theory},
-  year      = {2010},
-  publisher = {Cambridge University Press},
-  address   = {Cambridge}
-}
-% COMMENT: Attempt at synthesis - combining realism's focus on power with
-% constructivism's attention to social construction. Useful for discussing
-% whether your hybrid RL-LLM approach represents a computational synthesis.
 
 
 % =============================================================================
-% CATEGORY 2: AGENT-BASED MODELING IN IR
+% CATEGORY 1: FOUNDATIONAL COOPERATION & GAME THEORY
 % =============================================================================
-% These establish ABM methodology in IR and identify the gap your thesis fills.
 
 @book{axelrod1984,
   author    = {Robert Axelrod},
@@ -148,9 +17,21 @@
   publisher = {Basic Books},
   address   = {New York}
 }
-% COMMENT: Classic. Iterated Prisoner's Dilemma tournaments showing Tit-for-Tat
-% is robust. Foundational for modeling cooperation under anarchy. Your game
-% mechanics (invest, arm, attack) relate to this tradition.
+% ESSENTIAL. Iterated Prisoner's Dilemma tournaments. Shows self-interested
+% agents CAN achieve cooperation through repeated interaction. Tit-for-Tat
+% emerges as robust. YOUR THESIS EXTENDS THIS.
+
+@article{axelrod1981,
+  author  = {Robert Axelrod and William D. Hamilton},
+  title   = {The evolution of cooperation},
+  journal = {Science},
+  year    = {1981},
+  volume  = {211},
+  number  = {4489},
+  pages   = {1390--1396}
+}
+% Original Science paper preceding the book. Demonstrates cooperation
+% through reciprocity rather than exploiting weakness.
 
 @book{axelrod1997,
   author    = {Robert Axelrod},
@@ -159,9 +40,64 @@
   publisher = {Princeton University Press},
   address   = {Princeton, NJ}
 }
-% COMMENT: Extension of cooperation work using ABM. Shows norms can emerge
-% through decentralized interactions. Relevant for your coalition formation
-% research question.
+% Extension using ABM. Shows norms can emerge through decentralized interactions.
+
+@book{nowak2006,
+  author    = {Martin A. Nowak},
+  title     = {Evolutionary Dynamics: Exploring the Equations of Life},
+  year      = {2006},
+  publisher = {Harvard University Press},
+  address   = {Cambridge, MA}
+}
+% Comprehensive treatment of evolutionary game theory.
+
+@article{nowak2006five,
+  author  = {Martin A. Nowak},
+  title   = {Five Rules for the Evolution of Cooperation},
+  journal = {Science},
+  year    = {2006},
+  volume  = {314},
+  number  = {5805},
+  pages   = {1560--1563}
+}
+% Highly cited synthesis. Five mechanisms: kin selection, direct reciprocity,
+% indirect reciprocity, network reciprocity, group selection.
+
+@book{ostrom1990,
+  author    = {Elinor Ostrom},
+  title     = {Governing the Commons: The Evolution of Institutions for Collective Action},
+  year      = {1990},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge}
+}
+% Nobel Prize work. Self-organization without central authority.
+
+@article{fehr2002altruistic,
+  author  = {Ernst Fehr and Simon G{\"a}chter},
+  title   = {Altruistic Punishment in Humans},
+  journal = {Nature},
+  year    = {2002},
+  volume  = {415},
+  number  = {6868},
+  pages   = {137--140}
+}
+% Foundational on punishment and norm enforcement.
+
+
+% =============================================================================
+% CATEGORY 2: FOUNDATIONAL AGENT-BASED MODELING
+% =============================================================================
+
+@article{schelling1971,
+  author  = {Thomas C. Schelling},
+  title   = {Dynamic Models of Segregation},
+  journal = {Journal of Mathematical Sociology},
+  year    = {1971},
+  volume  = {1},
+  number  = {2},
+  pages   = {143--186}
+}
+% FOUNDATIONAL. Complex macro-patterns from simple micro-rules.
 
 @book{epstein1996,
   author    = {Joshua M. Epstein and Robert Axtell},
@@ -170,9 +106,7 @@
   publisher = {MIT Press},
   address   = {Cambridge, MA}
 }
-% COMMENT: Foundational ABM text. "Sugarscape" model demonstrates emergent
-% social phenomena from simple rules. Supports your "General Sufficiency"
-% principle - complex outcomes from minimal mechanisms.
+% Foundational ABM text. "Sugarscape" model.
 
 @book{cederman1997,
   author    = {Lars-Erik Cederman},
@@ -181,8 +115,7 @@
   publisher = {Princeton University Press},
   address   = {Princeton, NJ}
 }
-% COMMENT: Pioneered ABM in IR. Uses Complex Adaptive Systems to study state
-% formation and balance of power. Demonstrates ABM can address core IR questions.
+% Pioneered ABM for emergent political structures.
 
 @article{cederman2002,
   author  = {Lars-Erik Cederman},
@@ -193,54 +126,44 @@
   number  = {Suppl 3},
   pages   = {7296--7303}
 }
-% COMMENT: GeoSim model - states as territorial organizations with power from
-% extractable resources. Shows balance of power can emerge endogenously.
-% Results were parameter-dependent - a methodological caution for your work.
+% GeoSim model. Results were parameter-dependent.
 
-@article{lustick2000,
-  author  = {Ian S. Lustick},
-  title   = {Agent-based modelling of collective identity: testing constructivist theory},
-  journal = {Journal of Artificial Societies and Social Simulation},
-  year    = {2000},
-  volume  = {3},
-  number  = {1}
+@article{bonabeau2002,
+  author  = {Eric Bonabeau},
+  title   = {Agent-based modeling: Methods and techniques for simulating human systems},
+  journal = {Proceedings of the National Academy of Sciences},
+  year    = {2002},
+  volume  = {99},
+  number  = {Suppl 3},
+  pages   = {7280--7287}
 }
-% COMMENT: IMPORTANT. The ONLY dedicated constructivist ABM study. Operationalized
-% identities as agent "repertoires" with activation rules. Found tipping/cascade
-% effects with exclusivist identities. Acknowledged "highly stylized" - you can
-% argue LLMs offer richer identity representation.
-
-@article{cederman2003,
-  author  = {Lars-Erik Cederman and Christopher Daase},
-  title   = {Endogenizing Corporate Identities: The Next Step in Constructivist IR Theory},
-  journal = {European Journal of International Relations},
-  year    = {2003},
-  volume  = {9},
-  number  = {1},
-  pages   = {5--35}
-}
-% COMMENT: Argues constructivists need formal modeling tools MORE than rationalists
-% because they study dynamic, complex processes. Call has gone largely unanswered
-% until now - positions your thesis as filling this gap.
-
-@article{earnest2008,
-  author  = {David C. Earnest},
-  title   = {Coordination in Large Numbers: An Agent-Based Model of International Negotiations},
-  journal = {International Studies Quarterly},
-  year    = {2008},
-  volume  = {52},
-  number  = {2},
-  pages   = {363--382}
-}
-% COMMENT: ABM applied to international negotiations. Found path histories matter
-% for cooperation outcomes - supports importance of memory/history in your model.
+% Influential ABM methodology overview.
 
 
 % =============================================================================
-% CATEGORY 3: REINFORCEMENT LEARNING AND MULTI-AGENT RL
+% CATEGORY 3: REINFORCEMENT LEARNING - FOUNDATIONS
 % =============================================================================
-% These support your RL agent methodology and its appropriateness for
-% modeling neorealist rational-strategic behavior.
+
+@book{sutton2018,
+  author    = {Richard S. Sutton and Andrew G. Barto},
+  title     = {Reinforcement Learning: An Introduction},
+  edition   = {2nd},
+  year      = {2018},
+  publisher = {MIT Press},
+  address   = {Cambridge, MA}
+}
+% THE foundational RL textbook.
+
+@article{mnih2015,
+  author  = {Volodymyr Mnih and Koray Kavukcuoglu and David Silver and Andrei A. Rusu and Joel Veness and Marc G. Bellemare and Alex Graves and Martin Riedmiller and Andreas K. Fidjeland and Georg Ostrovski and Stig Petersen and Charles Beattie and Amir Sadik and Ioannis Antonoglou and Helen King and Dharshan Kumaran and Daan Wierstra and Shane Legg and Demis Hassabis},
+  title   = {Human-level control through deep reinforcement learning},
+  journal = {Nature},
+  year    = {2015},
+  volume  = {518},
+  number  = {7540},
+  pages   = {529--533}
+}
+% DQN paper. ~35,000 citations.
 
 @article{silver2021reward,
   author  = {David Silver and Satinder Singh and Doina Precup and Richard S. Sutton},
@@ -250,86 +173,151 @@
   volume  = {299},
   pages   = {103535}
 }
-% COMMENT: Argues reward maximization is sufficient for general intelligence.
-% Supports using RL agents as pure utility maximizers for neorealist modeling.
+% Argues reward maximization is sufficient for intelligence.
 
-@article{dehkordi2023,
-  author  = {Mojtaba Aghaei Dehkordi and others},
-  title   = {Using Machine Learning for Agent Specifications in Agent-Based Models and Simulations: A Critical Review and Guidelines},
-  journal = {Journal of Artificial Societies and Social Simulation},
-  year    = {2023},
-  volume  = {26},
-  number  = {1}
-}
-% COMMENT: Comprehensive review finding 38/71 ABM applications (54%) use RL for
-% behavioral specifications. RL improves "accuracy of behavioral modeling."
-% Validates your methodological choice.
+
+% =============================================================================
+% CATEGORY 4: MULTI-AGENT RL & COOPERATION DYNAMICS
+% =============================================================================
 
 @inproceedings{leibo2017,
-  author    = {Joel Z. Leibo and Vinicius Zambaldi and Marc Lanctot and Janusz Marber and Thore Graepel},
+  author    = {Joel Z. Leibo and Vinicius Zambaldi and Marc Lanctot and Janusz Marecki and Thore Graepel},
   title     = {Multi-agent Reinforcement Learning in Sequential Social Dilemmas},
   booktitle = {Proceedings of the 16th International Conference on Autonomous Agents and Multiagent Systems (AAMAS)},
   year      = {2017},
   pages     = {464--473}
 }
-% COMMENT: Applied Deep Q-Networks to Markov games. Found conflict emerges from
-% competition over shared resources. Sequential structure affects cooperation.
-% Directly relevant to your game design.
+% ESSENTIAL. Cooperation "changes dramatically as a function of environmental
+% parameters" - identical manipulations have opposite effects across payoff
+% structures. Supports claim that MARL cooperation is parameter-sensitive.
 
-@article{tampuu2017,
-  author  = {Ardi Tampuu and Tambet Matiisen and Dorian Kodelja and Ilya Kuzovkin and Kristjan Korjus and Juhan Aru and Jaan Aru and Raul Vicente},
-  title   = {Multiagent cooperation and competition with deep reinforcement learning},
-  journal = {PLOS ONE},
-  year    = {2017},
-  volume  = {12},
-  number  = {4},
-  pages   = {e0172395}
+@article{lowe2017,
+  author       = {Ryan Lowe and
+                  Yi Wu and
+                  Aviv Tamar and
+                  Jean Harb and
+                  Pieter Abbeel and
+                  Igor Mordatch},
+  title        = {Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments},
+  journal      = {CoRR},
+  volume       = {abs/1706.02275},
+  year         = {2017},
+  url          = {http://arxiv.org/abs/1706.02275},
+  eprinttype    = {arXiv},
+  eprint       = {1706.02275},
+  timestamp    = {Tue, 02 Apr 2024 15:05:11 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/LoweWTHAM17.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
-% COMMENT: Showed competitive RL agents learn efficient scoring; collaborative
-% agents find optimal cooperation. Behavior determined by reward structure.
-% Supports your design where RL reward function embodies neorealist assumptions.
 
-@article{ning2024,
-  author  = {Ming Ning and Shichao Xie},
-  title   = {A Survey on Multi-Agent Reinforcement Learning and Its Application},
-  journal = {Journal of Automation and Intelligence},
-  year    = {2024},
-  volume  = {3},
-  pages   = {73--91}
+@InProceedings{langosco2022,
+  title = 	 {Goal Misgeneralization in Deep Reinforcement Learning},
+  author =       {Langosco, Lauro Langosco Di and Koch, Jack and Sharkey, Lee D and Pfau, Jacob and Krueger, David},
+  booktitle = 	 {Proceedings of the 39th International Conference on Machine Learning},
+  pages = 	 {12004--12019},
+  year = 	 {2022},
+  editor = 	 {Chaudhuri, Kamalika and Jegelka, Stefanie and Song, Le and Szepesvari, Csaba and Niu, Gang and Sabato, Sivan},
+  volume = 	 {162},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {17--23 Jul},
+  publisher =    {PMLR},
+  pdf = 	 {https://proceedings.mlr.press/v162/langosco22a/langosco22a.pdf},
+  url = 	 {https://proceedings.mlr.press/v162/langosco22a.html},
+  abstract = 	 {We study <em>goal misgeneralization</em>, a type of out-of-distribution robustness failure in reinforcement learning (RL). Goal misgeneralization occurs when an RL agent retains its capabilities out-of-distribution yet pursues the wrong goal. For instance, an agent might continue to competently avoid obstacles, but navigate to the wrong place. In contrast, previous works have typically focused on capability generalization failures, where an agent fails to do anything sensible at test time.We provide the first explicit empirical demonstrations of goal misgeneralization and present a partial characterization of its causes.}
 }
-% COMMENT: Recent comprehensive MARL survey. Notes MARL is "notoriously sample-
-% inefficient, often requiring millions of interactions." Important limitation
-% to acknowledge in your methods.
 
-@article{pan2025,
-  author  = {Yi Pan},
-  title   = {Reinforcement Learning-Based Optimization and Simulation Modeling of International Relations Interaction Strategies},
-  journal = {Journal of Combinatorial Mathematics and Combinatorial Computing},
-  year    = {2025},
-  volume  = {127b},
-  pages   = {9423--9441}
+@article{pan2022,
+  author       = {Alexander Pan and
+                  Kush Bhatia and
+                  Jacob Steinhardt},
+  title        = {The Effects of Reward Misspecification: Mapping and Mitigating Misaligned
+                  Models},
+  journal      = {CoRR},
+  volume       = {abs/2201.03544},
+  year         = {2022},
+  url          = {https://arxiv.org/abs/2201.03544},
+  eprinttype    = {arXiv},
+  eprint       = {2201.03544},
+  timestamp    = {Thu, 20 Jan 2022 14:21:35 +0100},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2201-03544.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
-% COMMENT: Most direct IR application of RL. Found: close economic links reduce
-% conflict; high cooperation gains lead to cooperative strategies. Supports
-% liberal interdependence computationally. Doesn't address neorealism-constructivism.
+
+
+@article{hernandezleal2019,
+  author  = {Pablo Hernandez-Leal and Bilal Kartal and Matthew E. Taylor},
+  title   = {A Survey and Critique of Multiagent Deep Reinforcement Learning},
+  journal = {Autonomous Agents and Multi-Agent Systems},
+  year    = {2019},
+  volume  = {33},
+  number  = {6},
+  pages   = {750--797}
+}
+% Comprehensive MARL survey.
+
+
+@article{akella2024,
+  author  = {Akella and others},
+  title   = {Decentralized Reward Shaping for Multi-Agent Reinforcement Learning},
+  journal = {arXiv preprint arXiv:2511.00034},
+  year    = {2024}
+}
+% Identifies "fundamental coordination limitations" in MARL.
+% Decentralized reward shaping achieves -24.20 vs. MAPPO's +1.92.
+
 
 
 % =============================================================================
-% CATEGORY 4: LLM-BASED AGENTS AND SOCIAL SIMULATION
+% CATEGORY 5: LLM AGENTS - FOUNDATIONS
 % =============================================================================
-% These support your LLM agent methodology and its appropriateness for
-% modeling constructivist normative/identity-based reasoning.
 
-@article{park2023generative,
-  author  = {Joon Sung Park and Joseph C. O'Brien and Carrie J. Cai and Meredith Ringel Morris and Percy Liang and Michael S. Bernstein},
-  title   = {Generative Agents: Interactive Simulacra of Human Behavior},
-  journal = {arXiv preprint arXiv:2304.03442},
+@inproceedings{park2023generative,
+  author    = {Joon Sung Park and Joseph C. O'Brien and Carrie J. Cai and Meredith Ringel Morris and Percy Liang and Michael S. Bernstein},
+  title     = {Generative Agents: Interactive Simulacra of Human Behavior},
+  booktitle = {Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST)},
+  year      = {2023}
+}
+% LANDMARK. 25 agents autonomously spread party invitations, coordinated
+% activities, formed relationships from single seed instruction.
+
+@article{park2024simulacra,
+  author  = {Joon Sung Park and others},
+  title   = {Generative Agent Simulations of 1,000 People},
+  journal = {arXiv preprint arXiv:2411.10109},
+  year    = {2024}
+}
+% Agents replicating real individuals matched 85% of survey responses
+% (vs. humans' own 2-week replication baseline).
+
+@article{wei2022chain,
+  author  = {Jason Wei and Xuezhi Wang and Dale Schuurmans and Maarten Bosma and Brian Ichter and Fei Xia and Ed Chi and Quoc V. Le and Denny Zhou},
+  title   = {Chain-of-Thought Prompting Elicits Reasoning in Large Language Models},
+  journal = {Advances in Neural Information Processing Systems},
+  year    = {2022},
+  volume  = {35},
+  pages   = {24824--24837}
+}
+% Foundational on LLM reasoning.
+
+@article{wei2023incontext,
+  author  = {Jason Wei and others},
+  title   = {Larger language models do in-context learning differently},
+  journal = {Google Research},
   year    = {2023}
 }
-% COMMENT: ESSENTIAL. Landmark study - 25 LLM agents showed emergent social
-% behaviors (party planning, relationship formation) without explicit programming.
-% Demonstrates LLMs can produce complex social dynamics - key for constructivist
-% identity formation claims.
+% LLMs use "semantic prior knowledge from pre-training to predict labels";
+% large models can override priors when contradicting input-label mappings.
+
+@article{wang2024survey,
+  author  = {Lei Wang and Chen Ma and Xueyang Feng and Zeyu Zhang and Hao Yang and Jingsen Zhang and Zhiyuan Chen and Jiakai Tang and Xu Chen and Yankai Lin and Wayne Xin Zhao and Zhewei Wei and Ji-Rong Wen},
+  title   = {A Survey on Large Language Model based Autonomous Agents},
+  journal = {Frontiers of Computer Science},
+  year    = {2024},
+  volume  = {18},
+  number  = {6},
+  pages   = {186345}
+}
+% Comprehensive LLM agents survey.
 
 @article{gao2024,
   author  = {Chen Gao and others},
@@ -338,38 +326,42 @@
   year    = {2024},
   publisher = {Nature}
 }
-% COMMENT: Comprehensive survey of LLM-ABM integration. Covers architectures,
-% applications, challenges. Good methodological foundation.
+% LLM-ABM integration survey.
 
-@article{hua2023waragent,
-  author  = {Wenyue Hua and others},
-  title   = {WarAgent: Simulating World Wars with Large Language Models},
-  journal = {arXiv preprint arXiv:2311.17227},
-  year    = {2023}
-}
-% COMMENT: IMPORTANT. Simulated WWI, WWII, Warring States with LLM country agents.
-% Successfully replicated macro outcomes (alliance formations, war sequences).
-% Shows LLMs can model state behavior in IR contexts. Doesn't ground in theory.
 
-@article{liang2025unbench,
-  author  = {Yueyang Liang and others},
-  title   = {UNBench: Instructing Large Language Models to be Political Scientists},
-  journal = {arXiv preprint arXiv:2502.14122},
-  year    = {2025}
-}
-% COMMENT: First benchmark for LLMs in political science using UN Security Council
-% records. GPT-4o achieved 0.597 accuracy on adoption prediction. Shows LLM
-% capabilities and limitations in IR domain.
+% =============================================================================
+% CATEGORY 6: LLM SOCIAL BEHAVIOR - NORMS & IDENTITY
+% =============================================================================
 
-@inproceedings{rivera2024,
-  author    = {Juan-Pablo Rivera and others},
-  title     = {Escalation Risks from Language Models in Military and Diplomatic Decision-Making},
-  booktitle = {ACM Conference on Fairness, Accountability, and Transparency (FAccT)},
-  year      = {2024}
+@article{ashery2025,
+  author  = {Amir F. Ashery and Luca Maria Aiello and Andrea Baronchelli},
+  title   = {Emergent social conventions and collective bias in LLM populations},
+  journal = {Science Advances},
+  year    = {2025},
+  volume  = {11},
+  number  = {20},
+  pages   = {eadu9368}
 }
-% COMMENT: Stanford HAI study - all 5 LLMs showed escalation patterns in wargames,
-% some leading to nuclear use. First study using IR escalation literature to
-% evaluate LLM behavior. Caution for your simulations.
+% Universal naming conventions emerged spontaneously; tipping points for
+% norm change identified.
+
+@inproceedings{yuan2024norms,
+  author    = {Yifan Yuan and others},
+  title     = {Measuring Social Norms of Large Language Models},
+  booktitle = {Findings of NAACL},
+  year      = {2024},
+  pages     = {650--699}
+}
+% LLMs performed near human levels on 12,383 social norm questions.
+
+@inproceedings{frisch2024personality,
+  author    = {Isabel Frisch and Mario Giulianelli},
+  title     = {LLM Agents in Interaction: Measuring Personality Consistency},
+  booktitle = {PERSONALIZE Workshop, ACL},
+  year      = {2024},
+  pages     = {102--111}
+}
+% Identity/personality consistency in LLM agents.
 
 @article{horiguchi2024,
   author  = {Tomonori Horiguchi and Takashi Ikegami},
@@ -377,9 +369,7 @@
   journal = {arXiv preprint arXiv:2409.00993},
   year    = {2024}
 }
-% COMMENT: IMPORTANT for constructivism. LLM agents spontaneously generate norms
-% AND metanorms (punishing those who don't punish cheaters) through conversation.
-% Strong evidence for constructivist norm emergence via LLMs.
+% LLM agents spontaneously generate norms AND metanorms.
 
 @article{leng2023,
   author  = {Yancheng Leng and Jianhui Yuan},
@@ -387,74 +377,177 @@
   journal = {arXiv preprint arXiv:2312.15198},
   year    = {2023}
 }
-% COMMENT: Found LLMs display direct/indirect reciprocity, social welfare
-% considerations, and GROUP IDENTITY EFFECTS. Higher-capacity models show
-% stronger identity effects. Directly supports LLM-constructivist mapping.
+% Reciprocity, social welfare, GROUP IDENTITY EFFECTS.
 
 
 % =============================================================================
-% CATEGORY 5: COMPUTATIONAL IR METHODOLOGY & GENERATIVE ABM VALIDATION
+% CATEGORY 7: LLM COOPERATION IN GAMES
 % =============================================================================
-% These establish the methodological gap AND how to properly position
-% generative agent research (crucial for defending your approach).
 
-@article{larooij2025,
-  author  = {Maik Larooij and Petter Törnberg},
-  title   = {Can Generative AI Agents Represent Us? A Study on the Validity of Large Language Model-Based Agents},
-  journal = {arXiv preprint},
+@article{akata2023,
+  author  = {Elif Akata and Lion Schulz and Julian Coda-Forno and Seong Joon Oh and Matthias Bethge and Eric Schulz},
+  title   = {Playing repeated games with Large Language Models},
+  journal = {arXiv preprint arXiv:2305.16867},
+  year    = {2023}
+}
+% LLMs in game-theoretic settings. Different patterns than humans.
+
+@article{akata2025,
+  author  = {Elif Akata and others},
+  title   = {LLM Cooperation Biases Exceed Human Baselines},
+  journal = {Nature Human Behaviour},
   year    = {2025}
 }
-% COMMENT: CRITICAL FOR YOUR METHODOLOGY FRAMING. Larooij & Törnberg identify
-% validation challenges for generative ABMs but argue they can be productive when:
-%   1. Focus on MACRO-LEVEL PATTERNS (like Schelling) not micro-level realism
-%   2. Aim for EXPLANATION/UNDERSTANDING not accurate prediction
-%   3. Test COUNTERFACTUALS ("what-if" scenarios)
-%   4. Study LLM LIMITATIONS themselves
-%
-% YOUR THESIS FITS THIS FRAMEWORK PERFECTLY:
-%   - You test theoretical mechanisms (neorealism vs constructivism) not
-%     whether individual "states" behave realistically
-%   - You ask "CAN materialist optimization produce hierarchy?" not
-%     "WILL China attack Taiwan?"
-%   - You compare three configurations as counterfactuals
-%   - You don't need LLMs to perfectly simulate humans; you need them to
-%     represent normative reasoning consistent with constructivist theory
-%
-% USE THIS TO FRAME YOUR VALIDATION STRATEGY:
-%   NOT validating: micro-level realism of individual agent decisions
-%   VALIDATING: (1) internal theoretical coherence - do RL agents behave
-%               consistently with neorealist assumptions? Do LLMs show
-%               norm-based reasoning consistent with constructivism?
-%               (2) macro-pattern differences - do different configurations
-%               produce different emergent structures?
-%               (3) mechanism identification - what interaction patterns
-%               precede hierarchy formation?
+% Cooperation biases exceeding human baselines.
 
-@article{unver2018,
-  author  = {H. Akin Unver},
-  title   = {Computational International Relations: What Can Programming, Coding and Internet Research Do for the Discipline?},
-  journal = {All Azimuth: A Journal of Foreign Policy and Peace},
-  year    = {2018},
-  volume  = {7},
-  number  = {2},
-  pages   = {157--182}
+@article{brookins2023,
+  author  = {Philip Brookins and Jason Matthew DeBacker},
+  title   = {Playing Games with GPT: What Can We Learn About a Large Language Model from Canonical Strategic Games?},
+  journal = {SSRN},
+  year    = {2023}
 }
-% COMMENT: IMPORTANT. Identifies "vast methodological gap" in computational IR.
-% Methods remain underdeveloped compared to other computational social sciences.
-% Directly motivates your thesis contribution.
+% LLM behavior in canonical games.
 
-@article{pepinsky2005,
-  author  = {Thomas B. Pepinsky},
-  title   = {From Agents to Outcomes: Simulation in International Relations},
-  journal = {European Journal of International Relations},
-  year    = {2005},
-  volume  = {11},
-  number  = {3},
-  pages   = {367--394}
+@article{fontana2024,
+  author  = {Nicol{\`o} Fontana and Francesco Pierri and Luca Maria Aiello},
+  title   = {Nicer Than Humans: How do Large Language Models Behave in the Prisoner's Dilemma?},
+  journal = {arXiv preprint arXiv:2406.13605},
+  year    = {2024}
 }
-% COMMENT: Critiques IR simulations for treating agents as rational maximizers
-% without theoretical justification. Notes need to incorporate ideational factors.
-% Positions your work as addressing this critique through LLM agents.
+% LLMs often MORE cooperative than humans.
+
+@article{phelps2023,
+  author  = {Steve Phelps and Yvan I. Russell},
+  title   = {Investigating Emergent Goal-Like Behaviour in Large Language Models Using Experimental Economics},
+  journal = {arXiv preprint arXiv:2305.07970},
+  year    = {2023}
+}
+% Experimental economics methods for LLM behavior.
+
+@article{lu2025cultural,
+  title={Cultural tendencies in generative AI},
+  author={Lu, Jackson G. and Song, Lesley Luyang and Zhang, Lu Doris},
+  journal={Nature Human Behaviour},
+  volume={9},
+  pages={2360--2369},
+  year={2025},
+  publisher={Nature Publishing Group},
+  doi={10.1038/s41562-025-02242-1}
+}
+
+
+% =============================================================================
+% CATEGORY 8: LLM THEORY OF MIND & SEMANTIC PRIORS
+% =============================================================================
+
+@article{kosinski2024,
+  author  = {Michal Kosinski},
+  title   = {Evaluating Large Language Models in Theory of Mind Tasks},
+  journal = {Proceedings of the National Academy of Sciences},
+  year    = {2024},
+  volume  = {121},
+  number  = {45},
+  pages   = {e2405460121}
+}
+% GPT-4 solved 75% of false-belief tasks; capability "may have spontaneously
+% emerged as a byproduct of improving language skills."
+
+@article{strachan2024,
+  author  = {James W. A. Strachan and others},
+  title   = {Testing theory of mind in large language models and humans},
+  journal = {Nature Human Behaviour},
+  year    = {2024},
+  volume  = {8},
+  pages   = {1285--1295}
+}
+% GPT-4 at/above human levels on indirect requests, false beliefs, irony.
+% NOTE: Also identifies competence-performance gap.
+
+@article{zhao2024tom,
+  author  = {Zhao and others},
+  title   = {Systematic Failures in Complex Narratives Requiring Deep Theory of Mind},
+  journal = {Findings of ACL},
+  year    = {2024}
+}
+% Limitations: failures in complex narratives requiring deep ToM.
+
+@inproceedings{piper2024narrative,
+  author    = {Andrew Piper and Sunyam Bagga},
+  title     = {Using Large Language Models for Understanding Narrative Discourse},
+  booktitle = {6th Workshop on Narrative Understanding, EMNLP},
+  year      = {2024},
+  pages     = {37--46}
+}
+% Narrative interpretation capabilities.
+
+
+% =============================================================================
+% CATEGORY 9: LLM IN STRATEGIC/POLITICAL CONTEXTS
+% =============================================================================
+
+@article{hua2023waragent,
+  author  = {Wenyue Hua and others},
+  title   = {WarAgent: Simulating World Wars with Large Language Models},
+  journal = {arXiv preprint arXiv:2311.17227},
+  year    = {2023}
+}
+% WWI, WWII simulations. Replicated alliance formations, war sequences.
+
+@inproceedings{rivera2024,
+  author    = {Juan-Pablo Rivera and others},
+  title     = {Escalation Risks from Language Models in Military and Diplomatic Decision-Making},
+  booktitle = {ACM Conference on Fairness, Accountability, and Transparency (FAccT)},
+  year      = {2024}
+}
+% All 5 LLMs showed escalation patterns in wargames.
+
+@article{mukobi2023,
+  author  = {Gabriel Mukobi and Hannah Erlebach and Niklas Lauffer and Lewis Hammond and Alan Chan and Jesse Clifton},
+  title   = {Welfare Diplomacy: Benchmarking Language Model Cooperation},
+  journal = {arXiv preprint arXiv:2310.08901},
+  year    = {2023}
+}
+% Diplomacy game benchmark.
+
+
+% =============================================================================
+% CATEGORY 10: RL vs LLM COMPARISONS
+% =============================================================================
+
+@inproceedings{li2023tom,
+  author    = {Huao Li and others},
+  title     = {Theory of Mind for Multi-Agent Collaboration via Large Language Models},
+  booktitle = {EMNLP},
+  year      = {2023},
+  pages     = {180--192}
+}
+% ONLY paper directly comparing LLM and MARL in same cooperative environment.
+% LIMITATION: Variables not properly isolated - LLMs brought pre-trained
+% knowledge while RL trained from scratch; resources incomparable.
+% YOUR THESIS ADDRESSES THIS GAP.
+
+@article{fan2022minedojo,
+  author  = {Linxi Fan and Guanzhi Wang and Yunfan Jiang and Ajay Mandlekar and Yuncong Yang and Haoyi Zhu and Andrew Tang and De-An Huang and Yuke Zhu and Anima Anandkumar},
+  title   = {MineDojo: Building Open-Ended Embodied Agents with Internet-Scale Knowledge},
+  journal = {Advances in Neural Information Processing Systems},
+  year    = {2022},
+  volume  = {35},
+  pages   = {18343--18362}
+}
+% LLMs guiding RL agents.
+
+@article{hu2023language,
+  author  = {Edward Hu and Philip Torr and Adel Bibi},
+  title   = {Language Instructed Reinforcement Learning for Human-AI Coordination},
+  journal = {International Conference on Machine Learning},
+  year    = {2023}
+}
+% LLM + RL for coordination.
+
+
+% =============================================================================
+% CATEGORY 11: NETWORK ANALYSIS & COALITION DYNAMICS
+% =============================================================================
 
 @article{hafner2009,
   author  = {Emilie M. Hafner-Burton and Miles Kahler and Alexander H. Montgomery},
@@ -465,14 +558,64 @@
   number  = {3},
   pages   = {559--592}
 }
-% COMMENT: Introduces network analysis methods to IR. Relevant for your coalition
-% formation metrics - network centrality, alliance structures, etc.
+% Network analysis methods.
+
+@book{jackson2008,
+  author    = {Matthew O. Jackson},
+  title     = {Social and Economic Networks},
+  year      = {2008},
+  publisher = {Princeton University Press},
+  address   = {Princeton, NJ}
+}
+% Network formation and dynamics.
+
+@article{watts1998,
+  author  = {Duncan J. Watts and Steven H. Strogatz},
+  title   = {Collective dynamics of 'small-world' networks},
+  journal = {Nature},
+  year    = {1998},
+  volume  = {393},
+  number  = {6684},
+  pages   = {440--442}
+}
+% Foundational network science.
 
 
 % =============================================================================
-% TODO: Additional sources to find
+% CATEGORY 12: VALIDATION & METHODOLOGY
 % =============================================================================
-% - Source for "constructivism as base for recent IR case studies" claim
-% - Schmidt & Wight 2023 debate on whether neorealism requires rationality
-% - Jackson 2020 "Applying Realist Constructivism" if you discuss synthesis
+
+@article{larooij2025,
+  author  = {Maik Larooij and Petter T{\"o}rnberg},
+  title   = {Can Generative AI Agents Represent Us? A Study on the Validity of Large Language Model-Based Agents},
+  journal = {arXiv preprint},
+  year    = {2025}
+}
+% CRITICAL FOR METHODOLOGY. Generative ABMs productive when:
+%   1. Focus on MACRO-LEVEL PATTERNS not micro-level realism
+%   2. Aim for EXPLANATION not prediction
+%   3. Test COUNTERFACTUALS
+%   4. Study LLM LIMITATIONS
+
+@article{flache2017,
+  author  = {Andreas Flache and Michael M{\"a}s and Thomas Feliciani and Edmund Chattoe-Brown and Guillaume Deffuant and Sylvie Huet and Jan Lorenz},
+  title   = {Models of Social Influence: Towards the Next Frontiers},
+  journal = {Journal of Artificial Societies and Social Simulation},
+  year    = {2017},
+  volume  = {20},
+  number  = {4}
+}
+% ABM validation challenges.
+
+@article{axtell2022,
+  author  = {Robert L. Axtell and J. Doyne Farmer},
+  title   = {Agent-Based Modeling in Economics and Finance: Past, Present, and Future},
+  journal = {Journal of Economic Literature},
+  year    = {2022}
+}
+% Authoritative ABM methodology review.
+
+
+% =============================================================================
+% END OF BIBLIOGRAPHY
 % =============================================================================
