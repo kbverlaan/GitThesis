@@ -4,3 +4,6 @@ https://www.taylorfrancis.com/books/oa-edit/10.4324/9781003326861/seeing-like-pl
 prompt sensitivity!
 
 [2] I. D. Zarz, J. D. Curt, G. Roig, P. Manzoni, and C. Calafate, “Emergent Cooperation and Strategy Adaptation in Multi-Agent Systems: An Extended Coevolutionary Theory with LLMs,” Electronics, Jun. 2023, doi: 10.3390/electronics12122722.
+
+https://link.springer.com/chapter/10.1007/978-3-031-82039-7_4#Sec8
+DOMINANCE HIERARCHY IN RL

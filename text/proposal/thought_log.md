@@ -236,6 +236,124 @@ The game naturally enables emergent structures without forcing them:
 
 ---
 
+## 2026-01-29: Conceptual Discipline Review
+
+### Session Overview
+Full review of proposal using new conceptual discipline protocol. Focus on removing overclaims, anthropomorphic language, and ensuring operational definitions.
+
+---
+
+### Review Protocol Added to CLAUDE.md
+
+Added structured review rubric with three dimensions:
+- **A. Conceptual Sharpness** (0-10): Are concepts unambiguous? No term serving multiple roles?
+- **B. Methodological Discipline** (0-10): Mechanics over interpretation? No causality overclaims?
+- **C. CLS Alignment** (0-10): Clearly computational science? About structure, not performance?
+
+Key principle: Evaluate text as a **causal model**, not as prose.
+
+---
+
+### Major Changes Made
+
+**Context Section (8/10)**
+- Removed "qualitatively different" — unmeasurable
+- Changed "capabilities of language-conditioned decision making" → neutral architecture description
+- Made RL and LLM descriptions symmetrical: both "pretrained", both "make decisions"
+
+**Methods Section (7.5/10)**
+- Removed anthropomorphic language from Game Design: "trust needs to be built", "norms need to be established", "alliance", "threat signaling" — all gone
+- Operationalized coalition: "Communities detected in directed interaction networks derived from investment and arm actions"
+- Removed "betrayal rate" → "retaliation probabilities"
+- Removed Validation subsection (save for thesis, not ready for proposal)
+- Fixed "distinct" → removed (presupposes result)
+
+**Significance Section (8/10)**
+- Removed "complex social behaviour" — undefined
+- Removed "clearly enable" — causal overclaim
+- Added concrete contribution: "first direct comparative study in a controlled environment"
+
+**Title**
+- Old: "How Agent Architecture Shapes Emergent Social Structures" — causal overclaim
+- New: "Comparing Emergent Social Structures in RL and LLM-based Agents" — descriptive
+
+**Abstract**
+- Commented out — contains old framing, needs rewrite to match new proposal
+
+---
+
+### Key Insight: Descriptive vs Explanatory
+
+The thesis is **descriptive**, not explanatory:
+- **Claim**: We observe whether there are differences in emergent structures
+- **No claim**: We cannot explain *why* those differences exist
+- **No claim**: We do not attribute differences to "semantic priors" or "capabilities"
+
+This is scientifically honest. The experiment compares outcomes; it cannot isolate mechanisms.
+
+---
+
+### Forbidden Terms Identified
+
+In methods sections, these terms signal problems:
+- "semantic priors" — interpretive, not mechanistic
+- "reasoning" without functional definition
+- "trust", "alliance", "norms" as explanatory concepts
+- "enable X that Y cannot" — causal overclaim
+- "isolate" unless mathematically literal
+
+---
+
+### Questions for Supervisor Meeting (2026-01-30)
+
+1. **RL citation**: Which paper shows RL producing emergent social structures? (Leibo et al. 2017? Baker et al. 2019? Need to verify)
+
+2. **Supervisor's framing**: "Is hierarchy a functional inevitability of optimization, or a cultural artifact of semantic reasoning?" — This is stronger but riskier. Discuss whether to adopt.
+
+3. **Null result meaning**: If RL and LLM produce identical structures, what does that tell us?
+
+4. **LSTM vs context window**: Is this a fair comparison? What are we actually controlling for?
+
+5. **Sample size**: How many runs needed? Convergence testing approach.
+
+---
+
+### Answers Prepared
+
+| Question | Answer |
+|----------|--------|
+| Why this game? | No existing game combines coalition + cooperation + conflict + hierarchy |
+| Null result? | Interesting — pretraining biases don't affect emergence at this level |
+| LSTM vs context? | Same information, different representation — that difference is inherent |
+| Sample size? | Convergence testing — add runs until variance stabilizes |
+| Meaningful difference? | Statistical tests (t-test, Mann-Whitney, effect sizes) |
+| Why RL as baseline? | RL gives stabler outcomes; LLM too prompt-sensitive for baseline |
+
+---
+
+### Final Scores
+
+| Section | Score |
+|---------|-------|
+| Context | 8/10 |
+| Methods | 7.5/10 |
+| Significance | 8/10 |
+| Title | 8/10 |
+| **Total** | **7.5-8/10** |
+
+Solid for first supervisor meeting. Conceptually clean, no overclaims, defensible methodology.
+
+---
+
+### Remaining Work
+
+- [ ] Add citations (Park et al. for LLM, TBD for RL)
+- [ ] Rewrite lijn 26-30 (flow issues, not conceptual)
+- [ ] Consider: abstract rewrite after supervisor feedback
+- [ ] RL paper: check Leibo et al. 2017 "Multi-agent RL in Sequential Social Dilemmas"
+
+---
+
 ## Future Log Entries
 
 (Add entries as the thesis progresses)
