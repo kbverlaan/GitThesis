@@ -1,0 +1,115 @@
+\chapter{Methods} % Chapter 3
+\label{Methods}
+
+% =============================================================================
+% METHODS (10-15 pages)
+% Rubric: Methods (20% of Report)
+% "Were the methods described in such a way that the study could be repeated
+%  and that the results could be understood properly? Was a justification
+%  given for the choice of methods?"
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% SECTION 1: Experimental Design Overview
+% -----------------------------------------------------------------------------
+\section{Experimental Design}
+% TODO: High-level description of comparative methodology
+% TODO: Justify comparative approach - why compare RL vs LLM?
+% TODO: Describe the three conditions (from proposal Table 1):
+%       1. RL (LSTM) - baseline
+%       2. LLM-Comparison - same information as RL
+%       3. LLM-Control - prompt variation for robustness
+
+\subsection{Controlled Comparison Rationale}
+% TODO: What variables are held constant across conditions?
+%       - Environment (game rules)
+%       - Available information
+%       - Optimization objective (resource maximization)
+% TODO: What differs? Only the agent architecture
+% TODO: Acknowledge: cannot isolate ALL architectural differences
+
+% -----------------------------------------------------------------------------
+% SECTION 2: Game Design
+% -----------------------------------------------------------------------------
+\section{Coordination Game Design}
+% TODO: Justify game choice - why this minimal coordination game?
+% TODO: Game mechanics from proposal:
+%       - Agents pursue resource optimization
+%       - Simultaneous action selection each round
+
+\subsection{Action Space}
+% TODO: Define all actions (from proposal Table 2):
+%       - Invest (self/other): costs V, generates I
+%       - Arm (self/other): costs D, multiplies M
+%       - Attack (other): resource relocation
+% TODO: Why these specific actions? What social structures can they produce?
+
+\subsection{Conflict Resolution}
+% TODO: Probabilistic resolution based on combined resources
+% TODO: Winner takes percentage T of loser's resources
+% TODO: All combatants pay conflict costs C
+% TODO: Specify all parameter values (V, I, D, M, T, C, N)
+
+\subsection{Information Structure}
+% TODO: Complete information - all resources visible
+% TODO: History window for tracking previous interactions
+% TODO: N rounds (unknown to players) - why?
+
+% -----------------------------------------------------------------------------
+% SECTION 3: Agent Implementations
+% -----------------------------------------------------------------------------
+\section{Agent Architectures}
+
+\subsection{RL Agent (LSTM)}
+% TODO: Policy network architecture
+% TODO: LSTM for temporal information (addressing Markovian limitation)
+% TODO: Training procedure - how many episodes, reward function
+% TODO: Hyperparameters
+
+\subsection{LLM Agent}
+% TODO: Which LLM (model, version, API)?
+% TODO: Prompt structure for comparison condition
+%       - What information is provided?
+%       - Goal statement (optimize resources)
+% TODO: Prompt variations for control condition
+%       - Tone, decoration, language, explicit instructions
+
+% -----------------------------------------------------------------------------
+% SECTION 4: Metrics
+% -----------------------------------------------------------------------------
+\section{Measurement of Emergent Social Structure}
+% TODO: Operationalize "emergent social structure"
+% TODO: Justify each metric choice
+
+\subsection{Coalition Structure}
+% TODO: Community detection algorithm (which one?)
+% TODO: Directed interaction networks from investment/arm actions
+% TODO: Metrics: number of communities, average size, temporal stability
+
+\subsection{Interaction Patterns}
+% TODO: Cooperation frequency (investment actions)
+% TODO: Aggression frequency (attack actions)
+% TODO: Retaliation probability - how computed?
+
+\subsection{Hierarchy}
+% TODO: Gini coefficient over resource distribution
+% TODO: Temporal dynamics of inequality
+
+% -----------------------------------------------------------------------------
+% SECTION 5: Experimental Protocol
+% -----------------------------------------------------------------------------
+\section{Experimental Protocol}
+% TODO: How many simulation runs per condition?
+% TODO: Number of agents per simulation
+% TODO: Number of rounds per simulation
+% TODO: Statistical tests for comparing conditions
+% TODO: Sensitivity analysis plan
+
+% -----------------------------------------------------------------------------
+% SECTION 6: Implementation Details
+% -----------------------------------------------------------------------------
+\section{Implementation}
+% TODO: Programming language, libraries, frameworks
+% TODO: Computational resources used
+% TODO: Code availability statement
+% NOTE: Rubric asks "Did the student demonstrate programming skills?"

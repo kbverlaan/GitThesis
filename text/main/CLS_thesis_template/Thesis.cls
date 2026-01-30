@@ -73,6 +73,7 @@
 %----------------------------------------------------------------------------------------
 %	MARGINS
 %----------------------------------------------------------------------------------------
+\RequirePackage{vmargin} % Required for setmarginsrb
 \setmarginsrb  { 1.5in}  % left margin
                         { 0.6in}  % top margin
                         { 1.0in}  % right margin
