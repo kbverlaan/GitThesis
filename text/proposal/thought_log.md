@@ -354,6 +354,32 @@ Solid for first supervisor meeting. Conceptually clean, no overclaims, defensibl
 
 ---
 
+## Ideas & Inspirations
+
+### Moltbook (2026-02-01)
+
+**What it is:** A multi-agent LLM experiment where autonomous agents interact on a social platform without explicit coordination mechanisms. Agents demonstrated emergent social behaviors including governance debates, group formation, and cultural patterns.
+
+**Relevance to thesis:**
+
+| Thesis Element | Moltbook Connection |
+|----------------|---------------------|
+| Coalition structure | Agents forming groups, governance debates |
+| Interaction patterns | Post-reply networks, imitation behavior |
+| Hierarchy | Leadership claims, "constitutional" discussions |
+
+**Potential uses:**
+- **Literature section**: Example of emergent LLM social structures in uncontrolled settings
+- **Methodological motivation**: "Moltbook demonstrates emergence occurs in uncontrolled settings, but lacks systematic RL comparison — this thesis fills that gap"
+- **Discussion**: Qualitative comparison with simulation results
+
+**Caveats:**
+- Platform is chaotic/unreliable for hard data
+- Use as motivating example, not primary data source
+- Too much noise/manipulation for quantitative analysis
+
+---
+
 ## Future Log Entries
 
 (Add entries as the thesis progresses)
