@@ -1,0 +1,29 @@
+IDEAS & FUTURE DIRECTIONS
+==========================
+
+Collected during thesis development. Not commitments, just things to consider.
+
+---
+
+FROM SUPERVISOR MEETING 2026-01-30:
+
+- Reasoning traces -> hierarchy correlation (explanatory potential)
+- Spatial/partial information variant (agents walk around, local info only)
+- Prompt perimeter paper (reverse engineer prompts from semantic vectors)
+- Language variation experiments (Debraj's interest area)
+
+---
+
+PARKING LOT:
+
+- Maybe emergent social structures is too broad! Let's see what the field mostly investigates. Maybe we have to focus down on hierarchy anyways. I liked the comparison of the RL Dominance with animals.
+- Just saw a video on Moltbook. Thats absolutely crazy and should absolutely be added to the LLM emergent social structures part.
+- One way we might level the playing field and actually isolate mechanisms is to let RL get the semantic vector of the environment: the exact same context as what an LLM agent would get!
+- We could map the semantic similarity of each of the prompt variations and see how much that influences emergent social structures. 
+
+
+
+---
+
+LLM-generated possible new avenues:
+- De studie focust op LLM-based agents in een coordination game, waarbij informatie-condities worden gevarieerd om te onderzoeken of reasoning traces (chain-of-thought) mechanistisch correleren met emergente sociale structuren. Dit van comparative naar explanatory: niet "wat verschilt er tussen architecturen?" maar "hoe produceren specifieke informatie-contexten specifieke sociale structuren via de reasoning van LLM-agents?"

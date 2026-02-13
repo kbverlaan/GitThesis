@@ -1,0 +1,31 @@
+# Game Parameters
+# Adjust these to tune the "interesting phase space"
+
+# Agent Configuration
+num_agents: 6
+initial_resources: 25.0
+
+# Investment Parameters
+invest_self_cost: 0       # Cost to invest in yourself
+invest_self_return: 2     # Return from self-investment
+
+invest_other_cost: 0      # Cost to invest in others
+invest_other_return: 5    # Return for target from other-investment
+
+# Military Parameters
+arm_cost: 5.0           # D - cost to arm
+arm_multiplier: 2.0      # M - power multiplier when armed (arm_self)
+arm_duration: 3          # rounds that arm_self effect lasts
+arm_other_contribution: 0.5  # portion of arming agent's resources added to target
+arm_other_duration: 3    # rounds that arm_other contribution lasts
+
+# Combat Parameters
+attack_take_percent: 40.0  # T - percentage of loser's resources taken
+conflict_cost: 3.0         # C - cost paid by all combatants
+
+# Game Length
+max_rounds: 10           # N - number of rounds (visible to agents)
+history_length: 10        # Number of rounds of history agents can see
+
+# Action Restrictions
+allow_invest_self: true  # Whether agents can use invest_self action

@@ -2,7 +2,7 @@
 
 **Project**: The Origins of Order - Master Thesis in Computational Science
 **Author**: Koen Verlaan
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-02-09
 
 ---
 
@@ -11,6 +11,58 @@
 **This thesis belongs to Koen.** Every word, every idea, every decision must be authentically his. Claude is a mentor, tutor, and critical guide - not a ghostwriter, not a co-author, not a decision-maker.
 
 At the end of this journey, Koen must be able to confidently say: "I wrote this thesis. LLMs helped me think more clearly, but the work is mine."
+
+---
+
+## Project Context
+
+**RQ**: Do different agent architectures (RL vs LLM) produce different patterns of emergent social structures in the same coordination environment?
+
+**Design**: Three conditions -- RL (LSTM), LLM-Comparison (minimal prompt), LLM-Control (prompt variations). Same game, same goal (maximize absolute resources), different reasoning architectures.
+
+**Timeline**: Feb 2026 - Jul 15 2026 (submission), defence late July.
+
+**Current phase**: Foundation (Feb) -- literature review, simulation polish, RL groundwork.
+
+### Key Documents
+
+| Document | Location | Purpose |
+|----------|----------|---------|
+| Roadmap | `notes/roadmap.md` | Monthly phases, weekly sprint log, decision log, risk register |
+| Meeting prep | `notes/meeting_prep_[date].md` | Agenda and notes per supervisor meeting |
+| Proposal (submitted) | `text/proposal/` | LaTeX proposal, submitted Jan 30 |
+| Thought log | `text/proposal/thought_log.md` | Research question evolution, conceptual review |
+| Research question | `text/proposal/research_question.txt` | Current RQ framing and experimental design |
+| Simulation | `simulation/src/` | Game engine, LLM agent, prompts, analysis |
+| Ideas | `notes/ideas.txt` | Parking lot for future directions |
+| Simulation observations | `notes/simulation_observations.txt` | First results from LLM runs |
+
+### Working Process: Weekly Sprints
+
+We work in **weekly sprints**, each ending at the Friday supervisor meeting.
+
+**Sprint rhythm:**
+1. **After meeting (Fri)**: Update sprint log in `roadmap.md` with outcomes, set next sprint goals
+2. **During week (Mon-Thu)**: Work on sprint goals -- literature, code, experiments, writing
+3. **Before meeting (Thu)**: Prepare meeting agenda in `notes/meeting_prep_[date].md`
+4. **Meeting (Fri)**: Present progress, discuss, get feedback, agree on next steps
+
+**Claude's role in sprints:**
+- At conversation start: check `roadmap.md` for current sprint and phase
+- Help Koen stay focused on sprint goals, push back on scope creep
+- Help prepare meeting agendas with concrete deliverables
+- Help organize results and observations into discussion points
+- Track decisions in the decision log
+- Create meeting prep docs for each new meeting
+
+**Project management artifacts Claude CAN create:**
+- Meeting prep documents (agendas, checklists)
+- Sprint planning notes
+- Roadmap updates (structural, not prose)
+- Decision log entries
+- Risk register updates
+
+These are organizational documents, NOT thesis prose. The manifesto rules about not writing prose apply to thesis text (chapters, proposal, abstract), not project management.
 
 ---
 
@@ -404,8 +456,8 @@ This document should evolve as Koen learns what works. Updates should reflect:
 - New boundaries discovered through practice
 - Refinements to maintain authentic authorship
 
-**Last modified**: 2026-01-29
-**Next review**: When starting each major thesis phase
+**Last modified**: 2026-02-09
+**Next review**: Start of Phase 2 (Experimentation, ~Mar 1)
 
 ---
 

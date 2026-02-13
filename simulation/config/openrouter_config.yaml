@@ -1,0 +1,37 @@
+# OpenRouter API Configuration
+
+# API Settings
+api_key_env_var: "OPENROUTER_API_KEY"  # Environment variable name
+base_url: "https://openrouter.ai/api/v1"
+
+# Model Selection
+# See https://openrouter.ai/models for available models
+
+#model: ""
+#model: "google/gemini-2.5-flash-lite"
+#model: "deepseek/deepseek-v3.2"  # Default model
+model: "google/gemini-3-flash-preview"
+
+
+# Alternative models to test:
+# - "meta-llama/llama-3.1-70b-instruct"
+
+# Generation Parameters
+temperature: 0.7
+max_tokens: 500
+timeout: 30  # seconds
+
+# Rate Limiting
+requests_per_minute: 30
+retry_attempts: 3
+retry_delay: 2  # seconds
+
+# Prompt Configuration - Unified Toggles
+prompt_config:
+  objective_style: "shared_win"  # Options: 'maximize_resources', 'narrative', 'become_first', 'avoid_last', 'shared_win'
+  state_style: "minimal"            # Options: 'minimal', 'descriptive'  
+  history_style: "minimal"          # Options: 'minimal', 'descriptive'
+  action_style: "minimal"           # Options: 'minimal', 'descriptive'
+  show_effects: false                    # Show numerical costs/returns in actions
+  social_cot: true                     # Enable social chain of thought prompting
+  information_level: "full"             # Options: 'full' (show all info)
