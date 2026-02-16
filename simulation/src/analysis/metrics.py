@@ -294,3 +294,169 @@ def coalition_stability(history: List[Dict]) -> float:
         jaccard_similarities.append(jaccard)
 
     return np.mean(jaccard_similarities) if jaccard_similarities else 0.0
+
+
+def theil_t_index(resources: Dict[str, float]) -> float:
+    """
+    Compute Theil T index (Theil's entropy measure) of resource inequality.
+
+    Formula: T = (1/n) * sum(x_i/mean * ln(x_i/mean)) for x_i > 0
+
+    The Theil index measures inequality using information theory. It ranges
+    from 0 (perfect equality) to ln(n) (maximum inequality). Values closer
+    to 0 indicate more equal distributions.
+
+    Args:
+        resources: dict of agent_id -> resource amount
+
+    Returns:
+        Theil T index (float >= 0). Returns 0.0 if resources empty or all zero.
+    """
+    values = np.array([v for v in resources.values() if v > 0])
+
+    if len(values) == 0:
+        return 0.0
+
+    mean = values.mean()
+    if mean == 0:
+        return 0.0
+
+    # T = (1/n) * sum((x_i / mean) * ln(x_i / mean))
+    ratios = values / mean
+    return np.mean(ratios * np.log(ratios))
+
+
+def atkinson_index(resources: Dict[str, float], epsilon: float = 1.0) -> float:
+    """
+    Compute Atkinson index of resource inequality.
+
+    The Atkinson index is a welfare-based inequality measure with parameter
+    epsilon controlling inequality aversion. Higher epsilon = more sensitive
+    to changes at the lower end of distribution.
+
+    For epsilon=1: A = 1 - (geometric_mean / arithmetic_mean)
+    For other epsilon: A = 1 - (1/mean) * ((1/n) * sum(x_i^(1-eps)))^(1/(1-eps))
+
+    Args:
+        resources: dict of agent_id -> resource amount
+        epsilon: inequality aversion parameter (default: 1.0)
+                epsilon=0 means no aversion, higher values = more aversion
+
+    Returns:
+        Atkinson index in [0, 1]. 0 = perfect equality, 1 = maximum inequality.
+        Returns 0.0 if resources empty or all zero.
+    """
+    values = np.array([v for v in resources.values() if v > 0])
+
+    if len(values) == 0:
+        return 0.0
+
+    mean = values.mean()
+    if mean == 0:
+        return 0.0
+
+    if epsilon == 1.0:
+        # Special case: geometric mean formula
+        # A = 1 - (geometric_mean / arithmetic_mean)
+        geometric_mean = np.exp(np.mean(np.log(values)))
+        return 1.0 - (geometric_mean / mean)
+    else:
+        # General case
+        # A = 1 - (1/mean) * ((1/n) * sum(x_i^(1-eps)))^(1/(1-eps))
+        powered = values ** (1 - epsilon)
+        ede = (np.mean(powered)) ** (1 / (1 - epsilon))  # equally distributed equivalent
+        return 1.0 - (ede / mean)
+
+
+def cooperation_rate_timeseries(history: List[Dict]) -> List[float]:
+    """
+    Compute cooperation rate per round (not cumulative).
+
+    Returns a timeseries showing how cooperation rate evolves round-by-round.
+    Each value is the cooperation ratio for that specific round.
+
+    Args:
+        history: list of round dicts, each with 'actions' key
+
+    Returns:
+        List of floats, one per round. Each is the cooperation_ratio for that round.
+        Empty list if history is empty.
+    """
+    timeseries = []
+
+    for round_dict in history:
+        invest_other_count = 0
+        meaningful_count = 0
+
+        for action_dict in round_dict.get('actions', []):
+            action_type = action_dict.get('action', '')
+            if action_type not in ('no_action', 'do_nothing'):
+                meaningful_count += 1
+                if action_type == 'invest_other':
+                    invest_other_count += 1
+
+        if meaningful_count == 0:
+            rate = 0.0
+        else:
+            rate = invest_other_count / meaningful_count
+
+        timeseries.append(rate)
+
+    return timeseries
+
+
+def fc_variance_across_runs(run_histories: List[List[Dict]]) -> Dict:
+    """
+    Compute variance of cooperation rate across runs at each round.
+
+    For experiments with multiple runs at the same condition, this measures
+    how much cooperation rate varies across runs at each time point.
+    High variance indicates unstable/unpredictable dynamics.
+
+    Args:
+        run_histories: list of histories, each from a different run at same condition.
+                      Each history is a list of round dicts with 'actions' key.
+
+    Returns:
+        dict with:
+        - 'per_round_variance': list of variance values, one per round index
+        - 'mean_variance': mean variance across all rounds (float)
+        - 'peak_variance_round': round index with highest variance (int)
+
+        Returns empty dict with zeros if < 2 runs or no rounds.
+    """
+    if len(run_histories) < 2:
+        return {
+            'per_round_variance': [],
+            'mean_variance': 0.0,
+            'peak_variance_round': 0
+        }
+
+    # Get cooperation rate timeseries for each run
+    timeseries_per_run = [cooperation_rate_timeseries(hist) for hist in run_histories]
+
+    if not timeseries_per_run or len(timeseries_per_run[0]) == 0:
+        return {
+            'per_round_variance': [],
+            'mean_variance': 0.0,
+            'peak_variance_round': 0
+        }
+
+    # Find minimum length (in case runs have different lengths)
+    min_length = min(len(ts) for ts in timeseries_per_run)
+
+    # Compute variance at each round index
+    per_round_variance = []
+    for round_idx in range(min_length):
+        rates_at_round = [ts[round_idx] for ts in timeseries_per_run]
+        variance = np.var(rates_at_round)
+        per_round_variance.append(variance)
+
+    mean_variance = np.mean(per_round_variance) if per_round_variance else 0.0
+    peak_variance_round = int(np.argmax(per_round_variance)) if per_round_variance else 0
+
+    return {
+        'per_round_variance': per_round_variance,
+        'mean_variance': float(mean_variance),
+        'peak_variance_round': peak_variance_round
+    }

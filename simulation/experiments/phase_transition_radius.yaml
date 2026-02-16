@@ -1,6 +1,6 @@
 name: phase_transition_radius
 description: "Origins Exp 1a: How does interaction radius affect emergent social structure?"
-reps: 10
+reps: 20
 base_params:
   num_agents: 10
   initial_resources: 25.0
@@ -15,7 +15,7 @@ base_params:
   arm_other_duration: 3
   attack_take_percent: 40.0
   conflict_cost: 0.0
-  max_rounds: 15
+  max_rounds: 50
   history_length: 10
   allow_invest_self: false
   initial_distribution: "equal"
@@ -24,4 +24,4 @@ base_params:
   interaction_radius: 2
 sweep:
   param: "interaction_radius"
-  values: [1, 2, 3, 4, 5, 6, 7, 8]
+  values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

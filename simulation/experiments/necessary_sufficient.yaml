@@ -1,6 +1,6 @@
 name: necessary_sufficient
 description: "Origins Exp 3: Factorial design — which capabilities are necessary for emergent cooperation?"
-reps: 10
+reps: 20
 base_params:
   num_agents: 10
   initial_resources: 25.0
@@ -15,7 +15,7 @@ base_params:
   arm_other_duration: 3
   attack_take_percent: 40.0
   conflict_cost: 0.0
-  max_rounds: 15
+  max_rounds: 50
   history_length: 10
   allow_invest_self: false
   initial_distribution: "equal"

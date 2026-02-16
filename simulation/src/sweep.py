@@ -22,7 +22,12 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent))
 
 from main import run_simulation, save_results, load_config
-from analysis.metrics import cooperation_ratio, first_attack_round
+from analysis.metrics import (
+    cooperation_ratio, first_attack_round, retaliation_probability,
+    coalition_stability, theil_t_index, atkinson_index,
+    cooperation_rate_timeseries,
+)
+from run_logger import RunLogger
 
 
 def load_experiment(spec_path: str) -> dict:
@@ -154,6 +159,11 @@ def run_sweep(spec_path: str):
         for key, value in spec['base_openrouter'].items():
             openrouter_config[key] = value
 
+    # Initialize run logger for traceability
+    logger = RunLogger()
+    experiment_id = logger.start_experiment(spec, openrouter_config)
+    print(f"Experiment logged: {experiment_id}")
+
     # Generate conditions
     conditions = generate_conditions(spec['sweep'])
 
@@ -243,6 +253,15 @@ def run_sweep(spec_path: str):
             history = state.history
             coop_ratio = cooperation_ratio(history)
             first_attack = first_attack_round(history)
+            retal_prob = retaliation_probability(history)
+            coal_stab = coalition_stability(history)
+
+            # Extended inequality metrics
+            final_theil = theil_t_index(state.resources) if state.resources else None
+            final_atkinson = atkinson_index(state.resources) if state.resources else None
+
+            # Per-round cooperation rate timeseries
+            fc_timeseries = cooperation_rate_timeseries(history)
 
             # Condition value for manifest (backward compat for single-param)
             if len(condition) == 1:
@@ -250,19 +269,33 @@ def run_sweep(spec_path: str):
             else:
                 cond_value = {e['param']: e['value'] for e in condition}
 
-            manifest['runs'].append({
+            run_results = {
                 'run_id': run_id,
                 'condition': {e['param']: e['value'] for e in condition},
                 'condition_value': cond_value,
                 'rep': rep,
                 'final_gini': final_gini,
                 'final_stability': final_stability,
+                'final_theil_t': final_theil,
+                'final_atkinson': final_atkinson,
                 'top_action': top_action,
                 'cooperation_ratio': coop_ratio,
                 'first_attack_round': first_attack,
+                'retaliation_probability': retal_prob,
+                'coalition_stability': coal_stab,
+                'fc_timeseries': fc_timeseries,
                 'elapsed_seconds': round(run_elapsed, 1),
                 'timestamp': datetime.now().isoformat(),
-            })
+            }
+
+            manifest['runs'].append(run_results)
+
+            # Log to traceability system
+            logger.log_run(
+                experiment_id, run_id,
+                {e['param']: e['value'] for e in condition},
+                params, or_config, run_results
+            )
 
             condition_metrics.append({
                 'gini': final_gini,
