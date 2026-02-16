@@ -1,0 +1,27 @@
+name: phase_transition_agents
+description: "Origins Exp 1b: How does group size affect emergent social structure?"
+reps: 10
+base_params:
+  num_agents: 5
+  initial_resources: 25.0
+  invest_self_cost: 0
+  invest_self_return: 2
+  invest_other_cost: 0
+  invest_other_return: 5
+  arm_cost: 0.0
+  arm_multiplier: 2.0
+  arm_duration: 3
+  arm_other_contribution: 0.5
+  arm_other_duration: 3
+  attack_take_percent: 40.0
+  conflict_cost: 0.0
+  max_rounds: 15
+  history_length: 10
+  allow_invest_self: false
+  initial_distribution: "equal"
+  action_order: "simultaneous"
+  spatial_enabled: true
+  interaction_radius: 2
+sweep:
+  param: "num_agents"
+  values: [5, 10, 15, 20, 25, 30]
