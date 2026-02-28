@@ -7,7 +7,7 @@ base_url: "http://localhost:8000/v1"  # Override via VLLM_BASE_URL env var or SL
 
 # Model Selection — overridden per experiment via sweep YAML
 # Default placeholder; actual model set by experiment config
-model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+model: "/scratch-shared/kverlaan/origins_models/Qwen3.5-27B"
 
 # Selected models for Snellius experiments (Feb 2026):
 #
@@ -21,7 +21,7 @@ model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
 
 # Generation Parameters
 temperature: 0.7
-max_tokens: 1500  # Higher to accommodate <think> tokens from reasoning models
+max_tokens: 8000  # Reasoning models: long <think> traces + JSON response
 timeout: 60  # higher timeout for first request (model loading)
 
 # Rate Limiting — vLLM handles batching internally, no external rate limit needed
