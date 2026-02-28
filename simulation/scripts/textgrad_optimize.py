@@ -50,14 +50,14 @@ OUTPUT_DIR = Path(__file__).parent.parent / "data"
 
 GAME_PARAMS = {
     "invest_self_cost_pct": 10, "invest_self_return_pct": 20,
-    "invest_other_cost_pct": 10, "invest_other_return_mult": 1.5,
+    "invest_other_cost_pct": 10, "invest_other_return_pct": 15,
     "arm_cost_pct": 10, "arm_other_cost_pct": 10, "arm_decay": 0.5,
     "attack_take_pct": 40, "conflict_cost_pct": 5,
 }
 
 # ── Current prompt components ─────────────────────────────────────────────
 
-_iot = GAME_PARAMS["invest_other_cost_pct"] * GAME_PARAMS["invest_other_return_mult"]
+_iot = GAME_PARAMS["invest_other_return_pct"]
 
 CURRENT_BASE_PROMPT = f"""Choose exactly ONE action this round.
 
@@ -89,6 +89,7 @@ REASONING_BLOCKS = {
         "- invest_self/invest_other/do_nothing: use the costs and returns listed above.\n"
         "- arm_self: cost now vs combat advantage later (only useful if you expect to attack or be attacked).\n"
         "- attack: expected gain = win_probability x take% x opponent_resources, minus conflict_cost.\n"
+        "  Include your arm bonus when computing win probability (combat strength = resources + arm bonus).\n"
         "Compare these values and choose the action with the highest expected payoff.\n"
         "Do NOT predict what specific neighbors will do — treat their actions as unknown."
     ),
@@ -107,7 +108,7 @@ REASONING_BLOCKS = {
         "Assume other agents look at YOUR recent actions to predict what you will do, "
         "then pick their best response to that prediction.\n"
         "1. Look at your own recent actions in NEIGHBOR PROFILES (the 'you ... them' entries). "
-        "What pattern do your neighbors see? What action would they predict you take this round?\n"
+        "List your recent actions — what pattern do your neighbors see? What action would they predict you take this round?\n"
         "2. For each neighbor: given their prediction of YOUR action, what will THEY choose?\n"
         "3. Now choose YOUR best action given what each neighbor will do — "
         "which may differ from what they expect you to do."

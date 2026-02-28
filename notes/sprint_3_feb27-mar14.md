@@ -61,7 +61,7 @@
 - production_design.md gearchiveerd (verouderd door Qwen switch)
 - Roadmap + sprint 3 aangemaakt
 
-### Fri Feb 28
+### Fri Feb 28 (continued) + Sat Mar 1
 - Qwen 3.5-27B test job succesvol: 8/10 scenarios pass, 2 fixed (max_tokens 8000→16000)
 - Throughput benchmark: sequential 1417s vs concurrent 244s = **5.8x speedup** (234 tok/s)
 - L3 prompt herschreven — nu echte recursieve reasoning ("they think I think")
@@ -80,6 +80,20 @@
 
 ---
 
+### Fri Feb 28 (evening)
+- **Persistent agent memory implemented** (`src/agents/memory.py`)
+  - Sliding window own action history + per-neighbor observation summaries
+  - Information is local: only see what's in your radius, incoming actions always known
+  - Stale entries persist with "last seen round X" marker
+  - Backwards compatible: `memory.enabled: false` → old god-view neighbor profiles
+- Tested with scripted 5-round simulation (test_memory.py) — spatial isolation works correctly
+- Tested with real LLM calls (test_memory_integration.py) — 3 agents, 3 rounds, gemini-flash-lite
+- Fixed 3 bugs: off-by-one in seen count, combat outcomes leaking to defender's action log, resource "0" for never-seen agents
+- Committed: `3f316f9`
+- Memory comparison experiment created: `experiments/memory_comparison.yaml`
+  - Qwen 3.5-27B, 10 agents, 20 rounds, L1 reasoning, memory on vs off, 3 reps
+  - Submit script: `snellius/submit_memory_comparison.sh`
+
 ## Decisions This Sprint
 | Date | Decision | Reasoning |
 |------|----------|-----------|
@@ -92,8 +106,36 @@
 | Feb 28 | TextGrad evalueert instruction clarity, NIET reasoning depth | Scoring van "juiste" reasoning output = confound. Evaluator checkt alleen of prompt helder is. |
 | Feb 28 | Opus 4.6 als TextGrad evaluator (niet Sonnet) | Beter in beoordelen subtiele instructie-onduidelijkheden. Meerkosten ~$1. |
 | Feb 28 | Embedding time series analyse (Debraj suggestie) | prompt+response → text-embedding-3-small → UMAP/PCA. Geen extra logging nodig — _traces.json bevat alles. |
+| Feb 28 | Persistent agent memory (local observations) | Replace god-view neighbor profiles with accumulated local observations. Agents only know what they see/experience. Potential methodological contribution (no game-theory LLM paper has systematic memory architecture). |
+| Feb 28 | Unified engine+prompt params (%-based) | Engine rewritten to match prompt exactly. Same param names: `invest_self_cost_pct`, `invest_other_return_mult`, `arm_cost_pct`, `arm_decay`, etc. No more dual param sets. All costs/returns are % of actor's resources. |
+| Feb 28 | Additive arm bonus + ×0.5 decay | Engine now matches prompt: arm_self spends 10% → that amount becomes additive combat bonus. strength = resources + arm_bonus. Bonus halves each round. Old: multiplicative (resources × multiplier) with fixed duration. |
+| Feb 28 | invest_other_return_pct (not mult) | Changed from multiplier to direct %: target gets invest_other_return_pct% of your resources. Cleaner, sweepable. Default 15%. |
+| Feb 28 | arm_other_cost_pct separate from arm_cost_pct | Split arming cost for self vs other — can now sweep independently. Default both 10%. |
+| Feb 28 | Two-stage screening sweeps (final) | Stage 1: 9 OAT sweeps × L1+L3 × 2 reps = 132 runs. 3 focus metrics: cooperation ratio, Gini, E-I index. Stage 2: factorial on top 2-3 params at production scale. |
+| Feb 28 | invest_self ON but tiny (+2% net) | invest_self_cost=10%, return=12%. Available but dominated by invest_other (15% to target). Tests whether agents still use it. |
+| Feb 28 | Memory comparison runs cancelled | Old engine params (absolute, not %), agents did 99% do_nothing. Wasted SBU. Memory sweep included in nightrun with correct params. |
 
 ---
+
+### Fri Feb 28 — Engine Rewrite + Nightrun Design
+- **Engine rewrite: unified params + additive arms + decay**
+  - Discovered prompt-engine mismatch: prompt described %-based additive arms with decay, engine used absolute multiplicative with fixed duration
+  - Engine completely rewritten to match prompt. Single set of param names: `invest_self_cost_pct`, `invest_other_return_mult`, `arm_cost_pct`, `arm_decay`, etc.
+  - `GameState.arm_bonuses: Dict[str, float]` replaces `active_arms: Dict[str, int]` + `arm_coalitions`
+  - Combat: `strength = resources + arm_bonus` (additive). Arm bonus decays ×0.5/round.
+  - invest_other: target gets cost × return_mult (1.5 default) → 15% of investor's resources. More rewarding to target than invest_self is to actor.
+  - Test: `test_percentage_economy.py` — 10 tests pass (invest, arm, decay, stacking, combat, observation)
+  - `game_params.yaml` + `main.py` updated to unified params
+- **Memory clarity eval**: Fixed deployment issues (model name, Py3.9, API key, reasoning traces via model_extra). Job 20186098 shows 8-10/10 on memory parsing.
+- **Night run Stage 1 configs** (9 OAT sweeps, 132 runs, ~13K SBU):
+  - Conflict theta: conflict_cost_pct [0,5,10,20] + attack_take_pct [20,40,60,80]
+  - Arming theta: arm_cost_pct (self) [0,5,10,20] + arm_other_cost_pct [0,5,10,20]
+  - Cooperation theta: invest_other_return_pct [10,15,25] + invest_other_cost_pct [5,10,20]
+  - Spatial: interaction_radius [1,2,3]
+  - Toggles: invest_self [on,off] + memory [on,off]
+  - All × L1+L3 × 2 reps. Focus metrics: cooperation ratio, Gini, E-I index.
+  - Submit: `snellius/submit_qwen_nightrun.sh` (17 array tasks)
+- **Memory comparison cancelled** — ran with old absolute params, 99% do_nothing. Memory now tested in nightrun with correct % params.
 
 ## Snellius Jobs
 | Job ID | Description | Status |
@@ -105,6 +147,17 @@
 | 20149449 | Test Qwen 3.5-27B (10 scenarios) | ✅ DONE — 8/10 pass, 2 fixed |
 | 20149957 | Throughput + L3 prompt test | ✅ DONE — 5.8x speedup, L3 recursive reasoning confirmed |
 | 20151816 | TextGrad instruction clarity optimization | 🔄 RUNNING — Stage 1 Epoch 2/3 |
+| 20179410 | Memory comparison: on vs off × 3 reps (Qwen 3.5-27B, L1) | ❌ CANCELLED — old engine params, 99% do_nothing |
+| 20186098 | Memory clarity eval (with thinking traces) | 🔄 RUNNING |
+| 20194059 | Nightrun: conflict_cost_pct sweep | 🔄 SUBMITTED |
+| 20194062 | Nightrun: attack_take_pct sweep | 🔄 SUBMITTED |
+| 20194064 | Nightrun: arm_cost_pct (self) sweep | 🔄 SUBMITTED |
+| 20194075 | Nightrun: arm_other_cost_pct sweep | 🔄 SUBMITTED |
+| 20194078 | Nightrun: invest_other_return_pct sweep | 🔄 SUBMITTED |
+| 20194080 | Nightrun: invest_other_cost_pct sweep | 🔄 SUBMITTED |
+| 20194084 | Nightrun: interaction_radius sweep | 🔄 SUBMITTED |
+| 20194086 | Nightrun: invest_self on/off | 🔄 SUBMITTED |
+| 20194088 | Nightrun: memory on/off | 🔄 SUBMITTED |
 
 ---
 
@@ -112,3 +165,4 @@
 - 75K extra SBU goedgekeurd — compute geen bottleneck meer
 - Alle Gemma 2 resultaten zijn exploratory — moeten gevalideerd worden op Qwen
 - Random walk nog actief — utility movement komt in Phase 2
+- Sequential action_order runs ~30x slower (no parallel LLM calls) — may need more time

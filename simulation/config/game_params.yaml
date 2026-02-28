@@ -1,34 +1,30 @@
-# Game Parameters
-# Adjust these to tune the "interesting phase space"
+# Game Parameters — unified with prompt (see prompts.py _format_actions)
+# All costs/returns are percentages of the acting agent's current resources.
 
 # Agent Configuration
 num_agents: 30
 initial_resources: 25.0
 
-# Investment Parameters
-invest_self_cost: 0       # Cost to invest in yourself
-invest_self_return: 2     # Return from self-investment
+# Investment Parameters (% of actor's resources)
+invest_self_cost_pct: 10      # You pay 10% of your resources
+invest_self_return_pct: 20    # You gain 20% (net +10%)
+invest_other_cost_pct: 10     # You pay 10% of your resources
+invest_other_return_pct: 15    # Target gains 15% of your resources
 
-invest_other_cost: 0
-invest_other_return: 5    # Return for target from other-investment
-
-# Military Parameters
-arm_cost: 0.0           # D - cost to arm
-arm_multiplier: 2.0      # M - power multiplier when armed (arm_self)
-arm_duration: 3          # rounds that arm_self effect lasts
-arm_other_contribution: 0.5  # portion of arming agent's resources added to target
-arm_other_duration: 3    # rounds that arm_other contribution lasts
+# Military Parameters (% of actor's resources)
+arm_cost_pct: 10              # Spent amount becomes combat bonus (additive)
+arm_decay: 0.5                # Bonus halves each round (×0.5)
 
 # Combat Parameters
-attack_take_percent: 40.0
-conflict_cost: 0.0         # C - cost paid by all combatants
+attack_take_pct: 40           # Winner takes 40% of loser's resources
+conflict_cost_pct: 5          # Each fighter pays 5% of own resources
 
 # Game Length
-max_rounds: 10
-history_length: 10        # Number of rounds of history agents can see
+max_rounds: 50
+history_length: 10            # Number of rounds of history agents can see
 
 # Action Restrictions
-allow_invest_self: false  # Whether agents can use invest_self action
+allow_invest_self: false      # invest_self OFF — forces social dilemma
 
 # Distribution
 initial_distribution: "equal"
@@ -44,4 +40,4 @@ interaction_radius: 2
 # Agent Memory
 memory:
   enabled: true
-  window_size: 10      # own action history length
+  window_size: 10

@@ -23,13 +23,13 @@ MODEL = os.environ.get("VLLM_MODEL", "/scratch-shared/kverlaan/origins_models/Qw
 # Game params matching production config (%-based economy)
 GAME_PARAMS = {
     "invest_self_cost_pct": 10, "invest_self_return_pct": 20,
-    "invest_other_cost_pct": 10, "invest_other_return_mult": 1.5,
+    "invest_other_cost_pct": 10, "invest_other_return_pct": 15,
     "arm_cost_pct": 10, "arm_initial_multiplier": 2.0, "arm_decay": 0.5,
     "arm_other_cost_pct": 10,
     "attack_take_pct": 40, "conflict_cost_pct": 5,
 }
 
-_iot = GAME_PARAMS['invest_other_cost_pct'] * GAME_PARAMS['invest_other_return_mult']
+_iot = GAME_PARAMS['invest_other_return_pct']
 
 ACTIONS_BLOCK = f"""Choose exactly ONE action this round.
 
@@ -42,12 +42,12 @@ AVAILABLE ACTIONS:
 - do_nothing: no cost, no effect
 
 COMBAT RULES:
-- Combat strength = your resources + your arm bonus
+- Combat strength = your resources + your arm bonus (agents not listed under ARM BONUSES have arm bonus = 0)
 - arm_self adds {GAME_PARAMS['arm_cost_pct']}% of your resources to your arm bonus
 - arm_other adds {GAME_PARAMS['arm_other_cost_pct']}% of your resources to TARGET's arm bonus
-- All arm bonuses decay: they halve each round (x{GAME_PARAMS['arm_decay']} per round)
+- All arm bonuses decay at the END of each round: they halve (x{GAME_PARAMS['arm_decay']})
 - Win probability = your_strength / (your_strength + opponent_strength)
-- Costs are a % of your current resources, so always affordable unless you have 0."""
+- Attack expected value = win_prob x {GAME_PARAMS['attack_take_pct']}% x opponent_resources - lose_prob x {GAME_PARAMS['attack_take_pct']}% x your_resources - {GAME_PARAMS['conflict_cost_pct']}% x your_resources"""
 
 REASONING_BLOCKS = {
     "L0": None,
@@ -58,6 +58,7 @@ REASONING_BLOCKS = {
         "- invest_self/invest_other/do_nothing: use the costs and returns listed above.\n"
         "- arm_self: cost now vs combat advantage later (only useful if you expect to attack or be attacked).\n"
         "- attack: expected gain = win_probability x take% x opponent_resources, minus conflict_cost.\n"
+        "  Include your arm bonus when computing win probability (combat strength = resources + arm bonus).\n"
         "Compare these values and choose the action with the highest expected payoff.\n"
         "Do NOT predict what specific neighbors will do — treat their actions as unknown."
     ),
@@ -76,7 +77,7 @@ REASONING_BLOCKS = {
         "Assume other agents look at YOUR recent actions to predict what you will do, "
         "then pick their best response to that prediction.\n"
         "1. Look at your own recent actions in NEIGHBOR PROFILES (the 'you ... them' entries). "
-        "What pattern do your neighbors see? What action would they predict you take this round?\n"
+        "List your recent actions — what pattern do your neighbors see? What action would they predict you take this round?\n"
         "2. For each neighbor: given their prediction of YOUR action, what will THEY choose?\n"
         "3. Now choose YOUR best action given what each neighbor will do — "
         "which may differ from what they expect you to do."
@@ -88,6 +89,7 @@ JSON_TEMPLATE = """Your final output MUST be valid JSON with exactly these field
   "action": "<one of the action names above>",
   "target": "<agent_id or null>"
 }
+target must be null (not the string "null") when no target is needed.
 Do not include any text outside the JSON."""
 
 

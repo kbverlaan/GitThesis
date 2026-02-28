@@ -194,24 +194,51 @@ Per Debraj (Feb 13): "Without understanding the system, it's impossible to say a
 
 ---
 
-## Phase 2c: Origins — Phase Transitions × Reasoning Depth (~Mar 1 - Apr 15)
-**Focus**: The core thesis experiment. Does reasoning depth shift phase transitions in emergent social structure?
+## Phase 2c: Origins — Parameter Characterisation + Factorial (~Mar 1 - Apr 15)
+**Focus**: Find game parameters that create genuine dilemmas, then test reasoning depth × structure interactions.
 
-This is the main contribution: emergent order arises from the *interaction* between reasoning depth and game structure, not from either alone.
+**Update after Feb 27 meeting**: All experiments on Qwen 3.5-27B (dense, all 27B params active). Use native `<think>` reasoning traces. Debraj wants utility-based movement (Schelling-type) instead of random walk.
 
-**Update after Feb 27 meeting**: All experiments must use Qwen 3.5-27B (dense, all 27B params active). Use the model's own reasoning traces (not instructed reasoning field). Debraj wants utility-based movement (Schelling-type) instead of random walk.
+### Two-Stage Sweep Design
 
-### Design Principles
-- **Qwen 3.5-27B** (dense, replacing Gemma 2 27B — Debraj: one model only)
-- 20 reps per condition for statistical power
-- 50 rounds for trajectory analysis
-- 30 agents, spatial mode
-- Base parameters from Phase 2b sweep results (genuine dilemmas, not trivially dominant strategies)
+**Stage 1: OAT Screening** (submitted Feb 28 night, 132 runs, ~13K SBU)
+Quick mode: 10 agents, 10 rounds, L1+L3, 2 reps per condition.
+Goal: identify which parameters produce richest dynamics (diverse actions, Gini variation, L1≠L3).
+Focus metrics: **cooperation ratio**, **Gini**, **E-I index**.
+Prompt shows explicit theta ratios (e.g., "cost-to-benefit ratio 1:1.5") per Debraj.
+
+| Category | Sweep | Values | Runs |
+|----------|-------|--------|------|
+| Conflict theta | conflict_cost_pct | [0, 5, 10, 20] | 16 |
+| Conflict theta | attack_take_pct | [20, 40, 60, 80] | 16 |
+| Arming theta | arm_cost_pct (self) | [0, 5, 10, 20] | 16 |
+| Arming theta | arm_other_cost_pct | [0, 5, 10, 20] | 16 |
+| Cooperation theta | invest_other_return_pct | [10, 15, 25] | 12 |
+| Cooperation theta | invest_other_cost_pct | [5, 10, 20] | 12 |
+| Spatial | interaction_radius | [1, 2, 3] | 12 |
+| Toggle | invest_self on/off | [on, off] | 8 |
+| Toggle | memory on/off | [on, off] | 8 |
+
+Configs: `experiments/qwen_sweep_*.yaml`
+Submit: `snellius/submit_qwen_nightrun.sh`
+
+**Stage 2: Focused Factorial** (planned, after Stage 1 analysis)
+Production scale: 30 agents, 50 rounds, 20 reps per condition.
+Pick top 2-3 most dynamic parameters from Stage 1 → cross with reasoning depth (L0-L3).
+Design depends on Stage 1 results.
+
+### Engine Design (unified %-based economy, implemented Feb 28)
+All costs/returns are percentages of the acting agent's current resources.
+- invest_self: pay cost_pct%, gain return_pct% (default: 10%/12%, net +2%)
+- invest_other: pay cost_pct%, target gets return_pct% (default: 10%/15%, ratio 1:1.5)
+- arm_self/arm_other: pay cost_pct%, that amount becomes additive combat bonus
+- Combat: strength = resources + arm_bonus. Win prob = your_strength / total.
+- Arm decay: ×0.5 per round (exponential, not fixed duration)
+- Attack: winner takes attack_take_pct% of loser. Both pay conflict_cost_pct%.
 
 ### Origins Factorial: Spatial Radius × Reasoning Depth
-**Config**: `experiments/origins_radius_reasoning.yaml`
-**Design**: 6 radii × 4 levels × 20 reps = 480 runs (~7-8 days on 4 GPUs)
-- Radii: 1, 2, 3, 4, 6, 10 (brackets the known transition at r=2→3, plus near-global)
+**Config**: `experiments/origins_radius_reasoning.yaml` (needs update after Stage 2)
+**Design**: radii × 4 levels × 20 reps (exact radii from Stage 1 results)
 - Levels: L0, L1, L2, L3
 
 **Key questions**:
@@ -221,11 +248,12 @@ This is the main contribution: emergent order arises from the *interaction* betw
 
 ### Analysis Plan
 - **Per reasoning level**: Gini vs radius curve (phase transition plot — the "hero figure")
-- **Two-way ANOVA**: reasoning_level × interaction_radius → Gini, cooperation_ratio
+- **Two-way ANOVA**: reasoning_level × interaction_radius → Gini, cooperation_ratio, E-I index
 - **Interaction effect**: partial η² for the reasoning × radius term
 - **Phase transition detection**: variance peak (susceptibility analogue), rolling-window EWS
 - **Mixed-effects**: `Gini ~ reasoning_level * radius + (1|RunID)` with Satterthwaite df
 - **Bayes factors** for key pairwise comparisons (following Akata et al., 2025)
+- **Coalition metrics**: Leiden communities, ingroup/outgroup rates, hierarchy (David's scores, Landau's h)
 
 ### Stretch experiments (if time/compute)
 - Information architecture × reasoning depth (resource visibility, history)
@@ -549,6 +577,9 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Feb 27 | Replace random walk with utility-based movement | Random walk prevents relationship formation (agents see new neighbors every round). Schelling-type movement enables ingroup/outgroup dynamics. | "In real life, movement is utility-based, never random" |
 | Feb 27 | K-instructed prompting is defensible | Even though we now use a reasoning model, instructed K-level prompting remains a valid methodology for varying reasoning depth. | Explicit approval |
 | Feb 27 | Invest_self ON as baseline, not excluded condition | Stalemate (Gini 0.000) is itself an interesting result and provides context for all other conditions. | "Show it as a baseline" |
+| Feb 28 | %-based economy (percentage_costs) | All costs/returns scale with agent's current resources. invest_self: -10%/+20%, invest_other: -10%/+15%, arm: -10%, conflict: -5%. Ensures actions stay meaningful at any wealth level. Backward compat via flag. | - |
+| Feb 28 | Two-stage screening sweeps (OAT then factorial) | Stage 1: 5 OAT sweeps × L1+L3 × memory × 2 reps = 128 runs. Stage 2: focused factorial on top params. Standard fractional factorial / screening approach. | - |
+| Feb 28 | Sweep action_order (sim vs seq) | Sequential creates first-mover advantage, may interact with reasoning depth. Included in screening. | - |
 
 ---
 

@@ -1,0 +1,37 @@
+name: memory_comparison
+description: "Compare agent behavior with and without persistent memory. Qwen 3.5-27B, 10 agents, 20 rounds, L1 reasoning."
+reps: 3
+api_config: vllm_config.yaml
+
+base_params:
+  num_agents: 10
+  initial_resources: 25.0
+  invest_self_cost: 0
+  invest_self_return: 2
+  invest_other_cost: 0
+  invest_other_return: 5
+  arm_cost: 0.0
+  arm_multiplier: 2.0
+  arm_duration: 3
+  arm_other_contribution: 0.5
+  arm_other_duration: 3
+  attack_take_percent: 40.0
+  conflict_cost: 0.0
+  max_rounds: 20
+  history_length: 10
+  allow_invest_self: false
+  initial_distribution: "equal"
+  action_order: "simultaneous"
+  spatial_enabled: true
+  interaction_radius: 2
+
+sweep:
+  grid:
+    - param: "memory"
+      target: "game_params"
+      values:
+        - {enabled: false}
+        - {enabled: true, window_size: 10}
+    - param: "reasoning_level"
+      target: "prompt_config"
+      values: ["level1"]

@@ -183,22 +183,20 @@ def run_simulation(game_params: dict,
     else:  # 'equal'
         initial_resources = base_resources
 
-    # Initialize game engine
+    # Initialize game engine (param names match prompt — see prompts.py _format_actions)
     engine = GameEngine(
         agent_ids=agent_ids,
         initial_resources=initial_resources,
-        invest_self_cost=game_params['invest_self_cost'],
-        invest_self_return=game_params['invest_self_return'],
-        invest_other_cost=game_params['invest_other_cost'],
-        invest_other_return=game_params['invest_other_return'],
-        arm_cost=game_params['arm_cost'],
-        arm_multiplier=game_params['arm_multiplier'],
-        arm_duration=game_params['arm_duration'],
-        arm_other_contribution=game_params['arm_other_contribution'],
-        arm_other_duration=game_params['arm_other_duration'],
-        attack_take_percent=game_params['attack_take_percent'],
-        conflict_cost=game_params['conflict_cost'],
-        max_rounds=game_params['max_rounds']
+        invest_self_cost_pct=game_params.get('invest_self_cost_pct', 10),
+        invest_self_return_pct=game_params.get('invest_self_return_pct', 20),
+        invest_other_cost_pct=game_params.get('invest_other_cost_pct', 10),
+        invest_other_return_pct=game_params.get('invest_other_return_pct', 15),
+        arm_cost_pct=game_params.get('arm_cost_pct', 10),
+        arm_other_cost_pct=game_params.get('arm_other_cost_pct', None),
+        arm_decay=game_params.get('arm_decay', 0.5),
+        attack_take_pct=game_params.get('attack_take_pct', 40),
+        conflict_cost_pct=game_params.get('conflict_cost_pct', 5),
+        max_rounds=game_params['max_rounds'],
     )
 
     # Initialize spatial field if enabled
@@ -237,14 +235,8 @@ def run_simulation(game_params: dict,
     print(f"Max rounds: {game_params['max_rounds']}\n")
     
     def can_afford_any_action(resources: float, game_params: Dict) -> bool:
-        """Check if agent can afford any action."""
-        min_cost = min(
-            game_params['invest_self_cost'],
-            game_params['invest_other_cost'],
-            game_params['arm_cost'],
-            game_params['conflict_cost']
-        )
-        return resources >= min_cost
+        """Check if agent can afford any action (all costs are %-based)."""
+        return resources > 0.01
     
     # Run simulation
     max_rounds = game_params['max_rounds']
@@ -268,16 +260,9 @@ def run_simulation(game_params: dict,
         # Show current resources at start of round
         print("\n📊 Current Resources:")
         for agent_id in agent_ids:
-            armed_marker = " [ARMED]" if agent_id in state.active_arms else ""
+            bonus = state.arm_bonuses.get(agent_id, 0)
+            armed_marker = f" [ARM +{bonus:.1f}]" if bonus > 0 else ""
             print(f"  {agent_id}: {state.resources[agent_id]:.1f}{armed_marker}")
-        
-        # Show coalitions
-        if state.arm_coalitions:
-            print("\n🤝 Active Coalitions:")
-            for target_id, supporters in state.arm_coalitions.items():
-                supporter_list = ", ".join([f"{s} (+{state.resources[s]*game_params['arm_other_contribution']:.1f})" 
-                                           for s in supporters.keys()])
-                print(f"  {target_id} supported by: {supporter_list}")
         
         print(f"\n🤔 Agent Decisions:")
         print("-" * 70)

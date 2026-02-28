@@ -24,7 +24,7 @@ GAME_PARAMS = {
     "invest_self_cost_pct": 10,
     "invest_self_return_pct": 20,
     "invest_other_cost_pct": 10,
-    "invest_other_return_mult": 1.5,
+    "invest_other_return_pct": 15,
     "arm_cost_pct": 10,
     "arm_other_cost_pct": 10,
     "arm_decay": 0.5,

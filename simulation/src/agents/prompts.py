@@ -288,22 +288,24 @@ class BaselinePrompt:
         invest_self_cost_pct = self.game_params.get('invest_self_cost_pct', 10)
         invest_self_return_pct = self.game_params.get('invest_self_return_pct', 20)
         invest_other_cost_pct = self.game_params.get('invest_other_cost_pct', 10)
-        invest_other_return_mult = self.game_params.get('invest_other_return_mult', 1.5)
+        invest_other_return_pct = self.game_params.get('invest_other_return_pct', 15)
         arm_cost_pct = self.game_params.get('arm_cost_pct', 10)
         arm_other_cost_pct = self.game_params.get('arm_other_cost_pct', 10)
         arm_decay = self.game_params.get('arm_decay', 0.5)
         attack_take_pct = self.game_params.get('attack_take_pct', 40)
         conflict_cost_pct = self.game_params.get('conflict_cost_pct', 5)
 
-        invest_other_target_pct = invest_other_cost_pct * invest_other_return_mult
+        # Compute theta ratios for explicit display
+        invest_self_ratio = f"1:{invest_self_return_pct/invest_self_cost_pct:.1f}" if invest_self_cost_pct > 0 else "free"
+        invest_other_ratio = f"1:{invest_other_return_pct/invest_other_cost_pct:.1f}" if invest_other_cost_pct > 0 else "free"
 
         actions = []
 
         if allow_invest_self:
             net = invest_self_return_pct - invest_self_cost_pct
-            actions.append(f"- invest_self: spend {invest_self_cost_pct}% of your resources, gain {invest_self_return_pct}% (net +{net}% for you)")
+            actions.append(f"- invest_self: spend {invest_self_cost_pct}% of your resources, gain {invest_self_return_pct}% (net +{net}% for you, cost-to-benefit ratio {invest_self_ratio})")
 
-        actions.append(f"- invest_other: spend {invest_other_cost_pct}% of your resources, TARGET gains {invest_other_target_pct:.0f}% of your resources (grows the total economy)")
+        actions.append(f"- invest_other: spend {invest_other_cost_pct}% of your resources, TARGET gains {invest_other_return_pct}% of your resources (cost-to-benefit ratio {invest_other_ratio}, grows the total economy)")
         actions.append(f"- arm_self: spend {arm_cost_pct}% of your resources (removed from economy), adds that amount to your combat strength. Your total combat strength = resources + arm bonus.")
         actions.append(f"- arm_other: spend {arm_other_cost_pct}% of your resources (removed from economy), adds that amount to TARGET's combat strength. TARGET's resource count does NOT increase — only their fighting power.")
         actions.append(f"- attack: you pay {conflict_cost_pct}% of your resources, opponent pays {conflict_cost_pct}% of theirs. Winner takes {attack_take_pct}% of loser's remaining resources. Loser keeps the rest.")
