@@ -35,6 +35,7 @@ REASONING_BLOCKS = {
         "- invest_self/invest_other/do_nothing: use the costs and returns listed above.\n"
         "- arm_self: cost now vs combat advantage later (only useful if you expect to attack or be attacked).\n"
         "- attack: expected gain = win_probability x take% x opponent_resources, minus conflict_cost.\n"
+        "  Include your arm bonus when computing win probability (combat strength = resources + arm bonus).\n"
         "Compare these values and choose the action with the highest expected payoff.\n"
         "Do NOT predict what specific neighbors will do — treat their actions as unknown."
     ),
@@ -53,7 +54,7 @@ REASONING_BLOCKS = {
         "Assume other agents look at YOUR recent actions to predict what you will do, "
         "then pick their best response to that prediction.\n"
         "1. Look at your own recent actions in NEIGHBOR PROFILES (the 'you ... them' entries). "
-        "What pattern do your neighbors see? What action would they predict you take this round?\n"
+        "List your recent actions — what pattern do your neighbors see? What action would they predict you take this round?\n"
         "2. For each neighbor: given their prediction of YOUR action, what will THEY choose?\n"
         "3. Now choose YOUR best action given what each neighbor will do — "
         "which may differ from what they expect you to do."
@@ -83,7 +84,12 @@ class BaselinePrompt:
         self.reasoning_level = reasoning_level
 
     def format_observation(self, observation: Dict, agent_id: str) -> str:
-        """Format game observation into a minimal prompt."""
+        """Format game observation into a minimal prompt.
+
+        If observation contains an 'agent_memory' key (an AgentMemory instance),
+        uses persistent memory for history/neighbor sections. Otherwise falls back
+        to the god-view neighbor profiles built from recent_history.
+        """
         parts = []
 
         # Identity
@@ -101,10 +107,16 @@ class BaselinePrompt:
         # State
         parts.append(self._format_state(observation, agent_id))
 
-        # Personalized neighbor profiles (replaces flat history dump)
-        profiles = self._format_neighbor_profiles(observation, agent_id)
-        if profiles:
-            parts.append(profiles)
+        # Memory-based sections vs legacy neighbor profiles
+        memory = observation.get('agent_memory')
+        if memory is not None:
+            memory_section = self._format_memory_section(memory, observation)
+            if memory_section:
+                parts.append(memory_section)
+        else:
+            profiles = self._format_neighbor_profiles(observation, agent_id)
+            if profiles:
+                parts.append(profiles)
 
         # Actions + reasoning block
         parts.append(self._format_actions())
@@ -248,6 +260,28 @@ class BaselinePrompt:
 
         return "\n".join(lines)
 
+    def _format_memory_section(self, memory, observation: Dict) -> str:
+        """Format memory-based history and neighbor sections.
+
+        Uses the agent's persistent AgentMemory to build:
+        - YOUR RECENT ACTIONS (own action sliding window)
+        - NEIGHBOR MEMORY (accumulated per-agent observations)
+        """
+        visible = observation.get('visible_agents', None)
+        current_round = observation.get('round', 0)
+
+        parts = []
+
+        own_history = memory.format_own_history()
+        if own_history:
+            parts.append(own_history)
+
+        neighbor_mem = memory.format_neighbor_memory(visible, current_round)
+        if neighbor_mem:
+            parts.append(neighbor_mem)
+
+        return "\n\n".join(parts)
+
     def _format_actions(self) -> str:
         """Format available actions, reasoning block, and JSON template."""
         allow_invest_self = self.game_params.get('allow_invest_self', True)
@@ -272,7 +306,7 @@ class BaselinePrompt:
         actions.append(f"- invest_other: spend {invest_other_cost_pct}% of your resources, TARGET gains {invest_other_target_pct:.0f}% of your resources (grows the total economy)")
         actions.append(f"- arm_self: spend {arm_cost_pct}% of your resources (removed from economy), adds that amount to your combat strength. Your total combat strength = resources + arm bonus.")
         actions.append(f"- arm_other: spend {arm_other_cost_pct}% of your resources (removed from economy), adds that amount to TARGET's combat strength. TARGET's resource count does NOT increase — only their fighting power.")
-        actions.append(f"- attack: both pay {conflict_cost_pct}% of own resources, winner takes {attack_take_pct}% of loser's resources")
+        actions.append(f"- attack: you pay {conflict_cost_pct}% of your resources, opponent pays {conflict_cost_pct}% of theirs. Winner takes {attack_take_pct}% of loser's remaining resources. Loser keeps the rest.")
         actions.append("- do_nothing: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -283,12 +317,12 @@ AVAILABLE ACTIONS:
 {actions_text}
 
 COMBAT RULES:
-- Combat strength = your resources + your arm bonus
+- Combat strength = your resources + your arm bonus (agents not listed under ARM BONUSES have arm bonus = 0)
 - arm_self adds {arm_cost_pct}% of your resources to your arm bonus
 - arm_other adds {arm_other_cost_pct}% of your resources to TARGET's arm bonus
-- All arm bonuses decay: they halve each round (x{arm_decay} per round)
+- All arm bonuses decay at the END of each round: they halve (x{arm_decay})
 - Win probability = your_strength / (your_strength + opponent_strength)
-- Costs are a % of your current resources, so always affordable unless you have 0."""]
+- Attack expected value = win_prob x {attack_take_pct}% x opponent_resources - lose_prob x {attack_take_pct}% x your_resources - {conflict_cost_pct}% x your_resources"""]
 
         # Reasoning block — separate section before JSON template
         reasoning_block = REASONING_BLOCKS.get(self.reasoning_level)
@@ -301,6 +335,7 @@ COMBAT RULES:
   "action": "<one of the action names above>",
   "target": "<agent_id or null>"
 }
+target must be null (not the string "null") when no target is needed.
 Do not include any text outside the JSON.""")
 
         return "\n\n".join(parts)

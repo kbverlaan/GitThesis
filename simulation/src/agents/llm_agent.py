@@ -17,11 +17,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.engine import Action, ActionType
 from agents.prompts import get_prompt_style
+from agents.memory import AgentMemory
 
 
 class LLMAgent:
     """LLM-based agent that makes decisions via OpenRouter API."""
-    
+
     def __init__(self,
                  agent_id: str,
                  api_key: str,
@@ -33,7 +34,8 @@ class LLMAgent:
                  timeout: int = 30,
                  retry_attempts: int = 3,
                  retry_delay: int = 2,
-                 base_url: str = "https://openrouter.ai/api/v1"):
+                 base_url: str = "https://openrouter.ai/api/v1",
+                 memory_config: Optional[Dict] = None):
         """
         Initialize LLM agent.
 
@@ -49,6 +51,7 @@ class LLMAgent:
             retry_attempts: Number of retry attempts on failure
             retry_delay: Delay between retries in seconds
             base_url: API base URL (OpenRouter, vLLM local, etc.)
+            memory_config: Memory settings dict with 'enabled', 'window_size', etc.
         """
         self.agent_id = agent_id
         self.model = model
@@ -72,6 +75,15 @@ class LLMAgent:
         # Initialize prompt
         self.game_params = game_params or {}
         self.prompt = get_prompt_style(prompt_config or {}, game_params)
+
+        # Initialize memory
+        mem_cfg = memory_config or {}
+        self.memory_enabled = mem_cfg.get('enabled', False)
+        if self.memory_enabled:
+            window_size = mem_cfg.get('window_size', 10)
+            self.memory = AgentMemory(agent_id, window_size=window_size)
+        else:
+            self.memory = None
 
         # Initialize OpenAI-compatible client (works with OpenRouter, vLLM, etc.)
         self.client = OpenAI(
@@ -330,6 +342,31 @@ class LLMAgent:
                 target_id=None
             )
     
+    def update_memory(self, round_num: int, action_str: str, target: Optional[str],
+                      outcome: Optional[Dict], visible_agents: Optional[list],
+                      round_actions: list, resource_changes: Dict,
+                      combat_results: list, all_resources: Dict):
+        """Update agent memory after a round resolves.
+
+        Args:
+            round_num: Round number.
+            action_str: This agent's action type string.
+            target: Target agent ID or None.
+            outcome: Dict with outcome details for this agent's action.
+            visible_agents: List of visible agent IDs (None = all).
+            round_actions: All actions from the round log.
+            resource_changes: Per-agent resource changes.
+            combat_results: Combat result dicts from the round.
+            all_resources: Current resources for all agents (post-round).
+        """
+        if not self.memory_enabled or self.memory is None:
+            return
+        self.memory.record_action(round_num, action_str, target, outcome)
+        self.memory.update_observations(
+            round_num, visible_agents, round_actions,
+            resource_changes, combat_results, all_resources
+        )
+
     def get_reasoning_traces(self) -> list:
         """Get all reasoning traces for analysis."""
         return self.reasoning_traces

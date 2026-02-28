@@ -40,3 +40,8 @@ action_order: "simultaneous"
 spatial_enabled: true
 # grid_size: auto  # defaults to ceil(sqrt(num_agents * 4))
 interaction_radius: 2
+
+# Agent Memory
+memory:
+  enabled: true
+  window_size: 10      # own action history length

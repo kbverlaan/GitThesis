@@ -213,7 +213,8 @@ def run_simulation(game_params: dict,
     # Initialize LLM agents
     agents = {}
     prompt_config = openrouter_config.get('prompt_config', {})
-    
+    memory_config = game_params.get('memory', {})
+
     for agent_id in agent_ids:
         agents[agent_id] = LLMAgent(
             agent_id=agent_id,
@@ -226,7 +227,8 @@ def run_simulation(game_params: dict,
             timeout=openrouter_config['timeout'],
             retry_attempts=openrouter_config['retry_attempts'],
             retry_delay=openrouter_config['retry_delay'],
-            base_url=base_url
+            base_url=base_url,
+            memory_config=memory_config
         )
     
     print(f"Initialized {len(agents)} LLM agents")
@@ -299,6 +301,10 @@ def run_simulation(game_params: dict,
                     for aid in [agent_id] + neighbors
                 }
                 observation['interaction_radius'] = spatial_field.interaction_radius
+            # Inject memory into observation for prompt formatting
+            if agents[agent_id].memory is not None:
+                observation['agent_memory'] = agents[agent_id].memory
+
             action = agents[agent_id].select_action(observation)
 
             agent_traces = agents[agent_id].get_reasoning_traces()
@@ -419,8 +425,51 @@ def run_simulation(game_params: dict,
 
         stability_str = f"{metrics['action_stability']:.0%}" if metrics['action_stability'] is not None else "n/a"
         print(f"\n  Metrics: Gini={metrics['gini']:.3f}  Palma={metrics['palma']:.2f}  Stability={stability_str}")
+
+        # Update agent memories
+        if memory_config.get('enabled', False):
+            post_resources = dict(updated_state.resources)
+            round_actions = round_result.get('actions', [])
+            resource_changes = round_result.get('resource_changes', {})
+            combat_results = round_result.get('combat_results', [])
+
+            # Build per-agent action/outcome map from round_result
+            agent_action_map = {}  # agent_id -> (action_str, target)
+            for a in round_actions:
+                agent_action_map[a['agent']] = (a.get('action', 'no_action'), a.get('target'))
+
+            # Build per-agent outcome from resource changes and combat results
+            agent_outcomes = {}  # agent_id -> outcome dict
+            for a in round_actions:
+                aid = a['agent']
+                outcome = {}
+                rc = resource_changes.get(aid, 0.0)
+                if abs(rc) > 0.001:
+                    outcome['resource_change'] = rc
+                # Only attach combat_won to the attacker's action outcome
+                # (defenders had a different action; their defense is passive)
+                for combat in combat_results:
+                    if combat['attacker'] == aid:
+                        outcome['combat_won'] = (combat['winner'] == aid)
+                agent_outcomes[aid] = outcome
+
+            for aid in agent_ids:
+                action_str, target = agent_action_map.get(aid, ('no_action', None))
+                visible = spatial_field.get_neighbors(aid) if spatial_field else None
+                agents[aid].update_memory(
+                    round_num=round_num,
+                    action_str=action_str,
+                    target=target,
+                    outcome=agent_outcomes.get(aid, {}),
+                    visible_agents=visible,
+                    round_actions=round_actions,
+                    resource_changes=resource_changes,
+                    combat_results=combat_results,
+                    all_resources=post_resources
+                )
+
         print()
-    
+
     elapsed = time.time() - start_time
     
     # Collect all reasoning traces
