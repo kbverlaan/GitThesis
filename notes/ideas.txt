@@ -1,29 +1,57 @@
 IDEAS & FUTURE DIRECTIONS
 ==========================
 
-Collected during thesis development. Not commitments, just things to consider.
+Not commitments — things to consider for thesis or follow-up work.
 
 ---
 
-FROM SUPERVISOR MEETING 2026-01-30:
+## Directly Relevant to Current Design
 
-- Reasoning traces -> hierarchy correlation (explanatory potential)
-- Spatial/partial information variant (agents walk around, local info only)
-- Prompt perimeter paper (reverse engineer prompts from semantic vectors)
-- Language variation experiments (Debraj's interest area)
+THINKING BUDGET AS CONTINUOUS VARIABLE:
+  Qwen3.5 supports thinking_budget parameter natively. Could replace discrete
+  L0-L3 with continuous reasoning depth (0 / 512 / 2048 / 8192 tokens).
+  Same weights, same prompt, only depth changes — clean manipulation.
+  Pro: finer-grained, no prompt confound. Con: less interpretable, harder to
+  connect to K-level theory (Zhang et al.).
+
+MIXED REASONING LEVELS (from Kuusela & Roy comparison):
+  Agents with different reasoning depths in the same game (e.g., 15 L0 + 15 L2).
+  Do deeper reasoners dominate or get exploited by naïve cooperators?
+  Tests ecological validity — in reality not everyone reasons equally deep.
+
+STREAK ANALYSIS (from Kuusela & Roy):
+  Geometric distributions of peace/attack streaks per reasoning level.
+  Does deeper reasoning break peace streaks faster? Cheap to add to analysis.
+
+SURPASS SCENARIO:
+  Start 1 agent with 2x resources, measure when others attack. Does reasoning
+  depth lower the threshold for preventive conflict?
 
 ---
 
-PARKING LOT:
+## Possible Paper Directions
 
-- Maybe emergent social structures is too broad! Let's see what the field mostly investigates. Maybe we have to focus down on hierarchy anyways. I liked the comparison of the RL Dominance with animals.
-- Just saw a video on Moltbook. Thats absolutely crazy and should absolutely be added to the LLM emergent social structures part.
-- One way we might level the playing field and actually isolate mechanisms is to let RL get the semantic vector of the environment: the exact same context as what an LLM agent would get!
-- We could map the semantic similarity of each of the prompt variations and see how much that influences emergent social structures. 
+REASONING vs EMERGENCE — CAUSAL LINK:
+  Is individual reasoning causally linked to emergent structure, or epiphenomenal?
+  Unique to LLMs: RL Q-values ARE behavior, but LLM traces CLAIM to explain it.
+  Preliminary finding (Gemma 2, Feb 18): reasoning language differs systematically
+  between high/low Gini runs even with identical action distributions. Subtle
+  reasoning differences compound over 50 rounds → Matthew Effect at reasoning level.
 
-
+SEMANTIC ABLATION (Dubey et al. 2018):
+  Masked ("Action A"), Reversed ("attack"→"cooperate"), Minimal (numbers only).
+  Tests how much emergent structure depends on linguistic priors vs game mechanics.
+  Consistent with Arch Exp 1+2 finding (η²=0.90 for framing).
 
 ---
 
-LLM-generated possible new avenues:
-- De studie focust op LLM-based agents in een coordination game, waarbij informatie-condities worden gevarieerd om te onderzoeken of reasoning traces (chain-of-thought) mechanistisch correleren met emergente sociale structuren. Dit van comparative naar explanatory: niet "wat verschilt er tussen architecturen?" maar "hoe produceren specifieke informatie-contexten specifieke sociale structuren via de reasoning van LLM-agents?"
+## Parking Lot
+
+- Spatial/partial information variant (agents walk around, local info only) [Debraj, Jan 30]
+- Language variation experiments [Debraj interest area]
+- RL with semantic vectors (same context as LLM agents) — level the playing field
+- Moltbook video — add to lit review on emergent social structures
+
+---
+
+*Last updated: 2026-02-28*

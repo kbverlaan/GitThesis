@@ -1,0 +1,36 @@
+name: gemma_openrouter_k3
+description: "Gemma 2 27B on OpenRouter, Level 3 reasoning, 30 agents, 50 rounds"
+reps: 1
+api_config: openrouter_config.yaml
+
+base_params:
+  num_agents: 30
+  initial_resources: 25.0
+  invest_self_cost: 0
+  invest_self_return: 2
+  invest_other_cost: 0
+  invest_other_return: 5
+  arm_cost: 0.0
+  arm_multiplier: 2.0
+  arm_duration: 3
+  arm_other_contribution: 0.5
+  arm_other_duration: 3
+  attack_take_percent: 40.0
+  conflict_cost: 0.0
+  max_rounds: 50
+  history_length: 10
+  allow_invest_self: false
+  initial_distribution: "equal"
+  action_order: "simultaneous"
+  spatial_enabled: true
+  interaction_radius: 2
+
+sweep:
+  grid:
+    - param: "model"
+      target: "openrouter"
+      values:
+        - "google/gemma-2-27b-it"
+    - param: "reasoning_level"
+      target: "prompt_config"
+      values: ["level3"]

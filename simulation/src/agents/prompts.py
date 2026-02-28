@@ -17,6 +17,49 @@ FRAMINGS = {
     'cautious': 'Prioritize safe actions that protect your resources from potential losses.',
 }
 
+REASONING_LEVELS = {
+    'level0': 'State your choice briefly. Do not deliberate.',
+    'level1': 'Compute the expected resource change for each action, then choose the highest payoff. Do not predict what neighbors will do.',
+    'level2': 'Predict each neighbor\'s most likely action based on their recent behavior, then choose your best response. Do not reason about what they think of you.',
+    'level3': 'Your neighbors observe your recent actions and predict what you will do next. Predict their response to that prediction, then choose your best action — which may differ from what they expect.',
+}
+
+# Structured reasoning blocks shown as a separate prompt section before the JSON template.
+# Each level explicitly states what it assumes about other agents' reasoning.
+REASONING_BLOCKS = {
+    'level0': None,  # No reasoning block for L0
+    'level1': (
+        "THINK BEFORE CHOOSING:\n"
+        "Assume other agents pick actions without strategic calculation.\n"
+        "For each available action, compute its expected resource change:\n"
+        "- invest_self/invest_other/do_nothing: use the costs and returns listed above.\n"
+        "- arm_self: cost now vs combat advantage later (only useful if you expect to attack or be attacked).\n"
+        "- attack: expected gain = win_probability x take% x opponent_resources, minus conflict_cost.\n"
+        "Compare these values and choose the action with the highest expected payoff.\n"
+        "Do NOT predict what specific neighbors will do — treat their actions as unknown."
+    ),
+    'level2': (
+        "THINK BEFORE CHOOSING:\n"
+        "Assume other agents pick their individually best action given the current state.\n"
+        "1. For each neighbor, predict their most likely action based on:\n"
+        "   - Their recent behavior pattern (shown in NEIGHBOR PROFILES)\n"
+        "   - Their current resources and armed status\n"
+        "   - What action would give THEM the best payoff right now\n"
+        "2. Given these predictions, choose your best response.\n"
+        "Do NOT reason about what neighbors think about YOU — only predict what they will do."
+    ),
+    'level3': (
+        "THINK BEFORE CHOOSING:\n"
+        "Assume other agents look at YOUR recent actions to predict what you will do, "
+        "then pick their best response to that prediction.\n"
+        "1. Look at your own recent actions in NEIGHBOR PROFILES (the 'you ... them' entries). "
+        "What pattern do your neighbors see? What action would they predict you take this round?\n"
+        "2. For each neighbor: given their prediction of YOUR action, what will THEY choose?\n"
+        "3. Now choose YOUR best action given what each neighbor will do — "
+        "which may differ from what they expect you to do."
+    ),
+}
+
 
 class BaselinePrompt:
     """
@@ -30,12 +73,14 @@ class BaselinePrompt:
     }
 
     def __init__(self, game_params: Optional[Dict] = None, objective_style: str = 'maximize_resources',
-                 hide_resources: bool = False, show_reputation: bool = False, framing: str = 'neutral'):
+                 hide_resources: bool = False, show_reputation: bool = False, framing: str = 'neutral',
+                 reasoning_level: str = 'default'):
         self.game_params = game_params or {}
         self.objective_style = objective_style
         self.hide_resources = hide_resources
         self.show_reputation = show_reputation
         self.framing = framing
+        self.reasoning_level = reasoning_level
 
     def format_observation(self, observation: Dict, agent_id: str) -> str:
         """Format game observation into a minimal prompt."""
@@ -56,18 +101,12 @@ class BaselinePrompt:
         # State
         parts.append(self._format_state(observation, agent_id))
 
-        # History
-        history = self._format_history(observation)
-        if history:
-            parts.append(history)
+        # Personalized neighbor profiles (replaces flat history dump)
+        profiles = self._format_neighbor_profiles(observation, agent_id)
+        if profiles:
+            parts.append(profiles)
 
-        # Reputation summary (pre-computed from history)
-        if self.show_reputation:
-            reputation = self._format_reputation(observation, agent_id)
-            if reputation:
-                parts.append(reputation)
-
-        # Actions
+        # Actions + reasoning block
         parts.append(self._format_actions())
 
         return "\n\n".join(parts)
@@ -75,8 +114,7 @@ class BaselinePrompt:
     def _format_state(self, observation: Dict, agent_id: str) -> str:
         """Format current game state."""
         round_num = observation['round']
-        max_rounds = observation.get('max_rounds')
-        round_info = f"Round {round_num}/{max_rounds}" if max_rounds else f"Round {round_num}"
+        round_info = f"Round {round_num}"
 
         lines = [f"CURRENT STATE ({round_info}):"]
 
@@ -105,55 +143,35 @@ class BaselinePrompt:
                 broke_marker = " [BROKE]" if aid in observation.get('broke_agents', []) else ""
                 lines.append(f"  {aid}: {resources:.1f}{marker}{broke_marker}")
 
-        # Active arms
-        if observation['active_arms']:
+        # Arm bonuses — single pool of combat bonus per agent, decaying
+        arm_bonuses = observation.get('arm_bonuses', observation.get('active_arms', {}))
+        if arm_bonuses:
             lines.append("")
-            lines.append("ARMED:")
-            for aid, rounds_left in sorted(observation['active_arms'].items()):
-                lines.append(f"  {aid}: {rounds_left} rounds remaining")
-
-        # Coalitions
-        if observation.get('arm_coalitions'):
-            lines.append("")
-            lines.append("COALITIONS:")
-            arm_other_contrib = self.game_params.get('arm_other_contribution', 0.5)
-            for target_id, supporters in sorted(observation['arm_coalitions'].items()):
-                supporter_parts = []
-                for supporter_id, rounds_left in sorted(supporters.items()):
-                    contrib = observation['resources'].get(supporter_id, 0) * arm_other_contrib
-                    supporter_parts.append(f"{supporter_id} (+{contrib:.1f}, {rounds_left}r)")
-                lines.append(f"  {target_id}: {', '.join(supporter_parts)}")
+            lines.append("ARM BONUSES (combat strength = resources + arm bonus):")
+            for aid, bonus in sorted(arm_bonuses.items()):
+                if isinstance(bonus, (int, float)) and bonus > 0:
+                    lines.append(f"  {aid}: +{bonus:.1f}")
 
         return "\n".join(lines)
 
-    def _format_history(self, observation: Dict) -> str:
-        """Format recent action history."""
-        if not observation['recent_history']:
-            return ""
+    def _format_neighbor_profiles(self, observation: Dict, agent_id: str) -> str:
+        """Personalized neighbor profiles from history.
 
-        lines = ["RECENT ACTIONS:"]
-        for hist in observation['recent_history']:
-            lines.append(f"  Round {hist['round']}:")
-            for action in hist['actions']:
-                if action.get('action') != 'no_action':
-                    target_str = f" -> {action['target']}" if action.get('target') else ""
-                    lines.append(f"    {action['agent']}: {action['action']}{target_str}")
+        Replaces the old flat history dump with compact per-neighbor summaries:
+        - Interaction counts (what they did to you, what you did to them)
+        - Their dominant behavior pattern
+        - Resource trend (rising/falling/stable)
 
-        return "\n".join(lines)
-
-    def _format_reputation(self, observation: Dict, agent_id: str) -> str:
-        """Pre-computed reputation summary from history.
-
-        Counts how many times each other agent invested in / attacked / armed
-        the current agent, and vice versa.  Only includes agents with at least
-        one interaction.
+        Only shows visible neighbors in spatial mode. Subsumes _format_reputation().
         """
         if not observation.get('recent_history'):
             return ""
 
-        # {other_id: {"invested_in_you": n, "attacked_you": n, "armed_you": n,
-        #             "you_invested": n, "you_attacked": n, "you_armed": n}}
-        counts: Dict[str, Dict[str, int]] = {}
+        visible = observation.get('visible_agents', None)
+        resources = observation.get('resources', {})
+
+        # {agent_id: {"toward_you": {act: n}, "from_you": {act: n}, "all_actions": {act: n}}}
+        profiles: Dict[str, Dict] = {}
 
         for hist in observation['recent_history']:
             for action in hist['actions']:
@@ -161,94 +179,131 @@ class BaselinePrompt:
                 act = action.get('action', '')
                 target = action.get('target')
 
+                if act == 'no_action':
+                    continue
+
+                # Track all actions for behavior profiling
+                for aid in [actor, target]:
+                    if aid and aid != agent_id:
+                        if visible is not None and aid not in visible:
+                            continue
+                        profiles.setdefault(aid, {
+                            'toward_you': {}, 'from_you': {}, 'all_actions': {}
+                        })
+
+                # Actions directed at this agent
+                if target == agent_id and actor and actor != agent_id:
+                    p = profiles.get(actor)
+                    if p is not None:
+                        p['toward_you'][act] = p['toward_you'].get(act, 0) + 1
+
+                # This agent's actions toward others
                 if actor == agent_id and target and target != agent_id:
-                    entry = counts.setdefault(target, {})
-                    if act == 'invest_other':
-                        entry['you_invested'] = entry.get('you_invested', 0) + 1
-                    elif act == 'attack':
-                        entry['you_attacked'] = entry.get('you_attacked', 0) + 1
-                    elif act == 'arm_other':
-                        entry['you_armed'] = entry.get('you_armed', 0) + 1
+                    p = profiles.get(target)
+                    if p is not None:
+                        p['from_you'][act] = p['from_you'].get(act, 0) + 1
 
-                elif target == agent_id and actor and actor != agent_id:
-                    entry = counts.setdefault(actor, {})
-                    if act == 'invest_other':
-                        entry['invested_in_you'] = entry.get('invested_in_you', 0) + 1
-                    elif act == 'attack':
-                        entry['attacked_you'] = entry.get('attacked_you', 0) + 1
-                    elif act == 'arm_other':
-                        entry['armed_you'] = entry.get('armed_you', 0) + 1
+                # All actions by each agent (for behavior profiling)
+                if actor and actor != agent_id:
+                    p = profiles.get(actor)
+                    if p is not None:
+                        p['all_actions'][act] = p['all_actions'].get(act, 0) + 1
 
-        if not counts:
+        if not profiles:
             return ""
 
-        # Only show agents in spatial visibility (if applicable)
-        visible = observation.get('visible_agents', None)
+        # Build output
+        n_rounds = len(observation['recent_history'])
+        lines = [f"NEIGHBOR PROFILES (last {n_rounds} rounds):"]
 
-        lines = ["YOUR INTERACTION HISTORY:"]
-        for other_id in sorted(counts):
-            if visible is not None and other_id not in visible:
-                continue
-            c = counts[other_id]
-            parts = []
-            if c.get('invested_in_you'):
-                parts.append(f"invested in you {c['invested_in_you']}x")
-            if c.get('attacked_you'):
-                parts.append(f"attacked you {c['attacked_you']}x")
-            if c.get('armed_you'):
-                parts.append(f"armed you {c['armed_you']}x")
-            if c.get('you_invested'):
-                parts.append(f"you invested {c['you_invested']}x")
-            if c.get('you_attacked'):
-                parts.append(f"you attacked {c['you_attacked']}x")
-            if c.get('you_armed'):
-                parts.append(f"you armed {c['you_armed']}x")
-            if parts:
-                lines.append(f"  {other_id}: {', '.join(parts)}")
+        for aid in sorted(profiles):
+            p = profiles[aid]
+            res = resources.get(aid, 0)
 
-        return "\n".join(lines) if len(lines) > 1 else ""
+            # Dominant behavior
+            if p['all_actions']:
+                dominant = max(p['all_actions'], key=p['all_actions'].get)
+                total = sum(p['all_actions'].values())
+                dominant_pct = p['all_actions'][dominant] / total
+                if dominant_pct >= 0.5:
+                    behavior = dominant.replace('_', ' ')
+                else:
+                    behavior = 'mixed'
+            else:
+                behavior = 'inactive'
+
+            # Interaction summary with you
+            interactions = []
+            for act, count in sorted(p['toward_you'].items()):
+                label = act.replace('_', ' ')
+                interactions.append(f"{label} you {count}x")
+            for act, count in sorted(p['from_you'].items()):
+                label = act.replace('_', ' ')
+                interactions.append(f"you {label} them {count}x")
+
+            interaction_str = ' | '.join(interactions) if interactions else 'no direct interaction'
+            broke_marker = " BROKE" if aid in observation.get('broke_agents', []) else ""
+
+            lines.append(f"  {aid} [{res:.0f}{broke_marker}]: {behavior} | {interaction_str}")
+
+        return "\n".join(lines)
 
     def _format_actions(self) -> str:
-        """Format available actions with costs from game params."""
+        """Format available actions, reasoning block, and JSON template."""
         allow_invest_self = self.game_params.get('allow_invest_self', True)
-        invest_self_cost = self.game_params.get('invest_self_cost', 0)
-        invest_self_return = self.game_params.get('invest_self_return', 2)
-        invest_other_cost = self.game_params.get('invest_other_cost', 0)
-        invest_other_return = self.game_params.get('invest_other_return', 5)
-        arm_cost = self.game_params.get('arm_cost', 5)
-        arm_multiplier = self.game_params.get('arm_multiplier', 2)
-        arm_duration = self.game_params.get('arm_duration', 3)
-        arm_other_contrib = self.game_params.get('arm_other_contribution', 0.5)
-        attack_take = self.game_params.get('attack_take_percent', 40)
-        conflict_cost = self.game_params.get('conflict_cost', 3)
+        invest_self_cost_pct = self.game_params.get('invest_self_cost_pct', 10)
+        invest_self_return_pct = self.game_params.get('invest_self_return_pct', 20)
+        invest_other_cost_pct = self.game_params.get('invest_other_cost_pct', 10)
+        invest_other_return_mult = self.game_params.get('invest_other_return_mult', 1.5)
+        arm_cost_pct = self.game_params.get('arm_cost_pct', 10)
+        arm_other_cost_pct = self.game_params.get('arm_other_cost_pct', 10)
+        arm_decay = self.game_params.get('arm_decay', 0.5)
+        attack_take_pct = self.game_params.get('attack_take_pct', 40)
+        conflict_cost_pct = self.game_params.get('conflict_cost_pct', 5)
+
+        invest_other_target_pct = invest_other_cost_pct * invest_other_return_mult
 
         actions = []
 
         if allow_invest_self:
-            net = invest_self_return - invest_self_cost
-            actions.append(f"- invest_self: spend {invest_self_cost}, gain {invest_self_return} (net +{net})")
+            net = invest_self_return_pct - invest_self_cost_pct
+            actions.append(f"- invest_self: spend {invest_self_cost_pct}% of your resources, gain {invest_self_return_pct}% (net +{net}% for you)")
 
-        actions.append(f"- invest_other: spend {invest_other_cost}, target gains {invest_other_return}")
-        actions.append(f"- arm_self: spend {arm_cost}, combat power x{arm_multiplier} for {arm_duration} rounds")
-        actions.append(f"- arm_other: spend {arm_cost}, add {arm_other_contrib*100:.0f}% of your resources to target's combat power")
-        actions.append(f"- attack: both pay {conflict_cost}, winner takes {attack_take:.0f}% of loser's resources")
-        actions.append("- do_nothing: pass this round, no cost")
+        actions.append(f"- invest_other: spend {invest_other_cost_pct}% of your resources, TARGET gains {invest_other_target_pct:.0f}% of your resources (grows the total economy)")
+        actions.append(f"- arm_self: spend {arm_cost_pct}% of your resources (removed from economy), adds that amount to your combat strength. Your total combat strength = resources + arm bonus.")
+        actions.append(f"- arm_other: spend {arm_other_cost_pct}% of your resources (removed from economy), adds that amount to TARGET's combat strength. TARGET's resource count does NOT increase — only their fighting power.")
+        actions.append(f"- attack: both pay {conflict_cost_pct}% of own resources, winner takes {attack_take_pct}% of loser's resources")
+        actions.append("- do_nothing: no cost, no effect")
 
         actions_text = "\n".join(actions)
 
-        return f"""AVAILABLE ACTIONS:
+        parts = [f"""Choose exactly ONE action this round.
+
+AVAILABLE ACTIONS:
 {actions_text}
 
-Combat: win probability = your power / (your power + opponent power).
-Power = resources x multiplier (if armed) + coalition support.
-You can only perform actions you can afford.
+COMBAT RULES:
+- Combat strength = your resources + your arm bonus
+- arm_self adds {arm_cost_pct}% of your resources to your arm bonus
+- arm_other adds {arm_other_cost_pct}% of your resources to TARGET's arm bonus
+- All arm bonuses decay: they halve each round (x{arm_decay} per round)
+- Win probability = your_strength / (your_strength + opponent_strength)
+- Costs are a % of your current resources, so always affordable unless you have 0."""]
 
-Respond with valid JSON only:
-{{
-  "action": "<action_type>",
-  "target": "<agent_id or null>",
-  "reasoning": "<brief explanation>"
-}}"""
+        # Reasoning block — separate section before JSON template
+        reasoning_block = REASONING_BLOCKS.get(self.reasoning_level)
+        if reasoning_block:
+            parts.append(reasoning_block)
+
+        # JSON template — no reasoning field, we read thinking traces directly
+        parts.append("""Your final output MUST be valid JSON with exactly these fields:
+{
+  "action": "<one of the action names above>",
+  "target": "<agent_id or null>"
+}
+Do not include any text outside the JSON.""")
+
+        return "\n\n".join(parts)
 
 
 def get_prompt_style(prompt_config: Dict, game_params: Optional[Dict] = None) -> BaselinePrompt:
@@ -262,6 +317,7 @@ def get_prompt_style(prompt_config: Dict, game_params: Optional[Dict] = None) ->
     hide_resources = prompt_config.get('hide_resources', False)
     show_reputation = prompt_config.get('show_reputation', False)
     framing = prompt_config.get('framing', 'neutral')
+    reasoning_level = prompt_config.get('reasoning_level', 'default')
     return BaselinePrompt(game_params=game_params, objective_style=objective_style,
                           hide_resources=hide_resources, show_reputation=show_reputation,
-                          framing=framing)
+                          framing=framing, reasoning_level=reasoning_level)

@@ -8,9 +8,19 @@ stability measures.
 
 import numpy as np
 import networkx as nx
-import leidenalg
-import igraph as ig
 from typing import List, Dict, Tuple, Set, Optional, Any
+
+# Lazy imports for Leiden (heavy deps, may not be installed locally)
+leidenalg = None
+ig = None
+
+def _ensure_leiden():
+    global leidenalg, ig
+    if leidenalg is None:
+        import leidenalg as _la
+        import igraph as _ig
+        leidenalg = _la
+        ig = _ig
 
 
 def build_windowed_networks(history: List[Dict], window_size: int = 5) -> List[Dict]:
@@ -240,6 +250,8 @@ def detect_communities(G: nx.DiGraph,
                 'n_communities': 0
             } for res in resolution_values}
         }
+
+    _ensure_leiden()
 
     # Convert networkx to igraph
     # Create mapping from node IDs to indices
@@ -688,6 +700,122 @@ def hierarchy_metrics(history: List[Dict]) -> Dict[str, Any]:
     }
 
 
+def compute_ingroup_outgroup(history: List[Dict],
+                             partition: List[Set[str]],
+                             window: tuple = None) -> Dict[str, Any]:
+    """
+    Compute ingroup vs outgroup interaction rates given a community partition.
+
+    For each directed action (invest_other, attack, arm_other), classifies it as
+    ingroup (agent and target in same community) or outgroup (different communities).
+
+    Args:
+        history: List of round dicts with 'actions' key.
+        partition: List of sets of agent IDs (community partition from Leiden).
+        window: Optional (start_round, end_round) tuple to restrict analysis.
+                If None, uses all rounds.
+
+    Returns:
+        Dict containing:
+            - 'ingroup_cooperation': count of invest_other within community
+            - 'outgroup_cooperation': count of invest_other across communities
+            - 'ingroup_attack': count of attacks within community
+            - 'outgroup_attack': count of attacks across communities
+            - 'ingroup_cooperation_rate': fraction of cooperation that is ingroup
+            - 'outgroup_cooperation_rate': fraction of cooperation that is outgroup
+            - 'ingroup_attack_rate': fraction of attacks that are ingroup
+            - 'outgroup_attack_rate': fraction of attacks that are outgroup
+            - 'ei_index': E-I index = (external - internal) / (external + internal)
+                          Range [-1, 1]. -1 = all ingroup, +1 = all outgroup, 0 = balanced
+            - 'ei_cooperation': E-I index for cooperation only
+            - 'ei_conflict': E-I index for conflict only
+            - 'n_communities': number of communities in partition
+            - 'community_sizes': list of community sizes
+    """
+    if not partition:
+        return {
+            'ingroup_cooperation': 0, 'outgroup_cooperation': 0,
+            'ingroup_attack': 0, 'outgroup_attack': 0,
+            'ingroup_cooperation_rate': 0.0, 'outgroup_cooperation_rate': 0.0,
+            'ingroup_attack_rate': 0.0, 'outgroup_attack_rate': 0.0,
+            'ei_index': 0.0, 'ei_cooperation': 0.0, 'ei_conflict': 0.0,
+            'n_communities': 0, 'community_sizes': [],
+        }
+
+    # Build agent -> community lookup
+    agent_to_community = {}
+    for comm_idx, community in enumerate(partition):
+        for agent in community:
+            agent_to_community[agent] = comm_idx
+
+    ingroup_coop = 0
+    outgroup_coop = 0
+    ingroup_attack = 0
+    outgroup_attack = 0
+    ingroup_arm = 0
+    outgroup_arm = 0
+
+    for round_data in history:
+        round_num = round_data.get('round', 0)
+        if window and (round_num < window[0] or round_num > window[1]):
+            continue
+
+        for action in round_data.get('actions', []):
+            agent = action.get('agent')
+            target = action.get('target')
+            action_type = action.get('action', '')
+
+            if not target or agent not in agent_to_community or target not in agent_to_community:
+                continue
+
+            same_community = agent_to_community[agent] == agent_to_community[target]
+
+            if action_type == 'invest_other':
+                if same_community:
+                    ingroup_coop += 1
+                else:
+                    outgroup_coop += 1
+            elif action_type == 'attack':
+                if same_community:
+                    ingroup_attack += 1
+                else:
+                    outgroup_attack += 1
+            elif action_type == 'arm_other':
+                if same_community:
+                    ingroup_arm += 1
+                else:
+                    outgroup_arm += 1
+
+    total_coop = ingroup_coop + outgroup_coop
+    total_attack = ingroup_attack + outgroup_attack
+    total_directed = total_coop + total_attack + ingroup_arm + outgroup_arm
+    total_ingroup = ingroup_coop + ingroup_attack + ingroup_arm
+    total_outgroup = outgroup_coop + outgroup_attack + outgroup_arm
+
+    def safe_rate(numerator, denominator):
+        return numerator / denominator if denominator > 0 else 0.0
+
+    def ei_index(external, internal):
+        total = external + internal
+        return (external - internal) / total if total > 0 else 0.0
+
+    return {
+        'ingroup_cooperation': ingroup_coop,
+        'outgroup_cooperation': outgroup_coop,
+        'ingroup_attack': ingroup_attack,
+        'outgroup_attack': outgroup_attack,
+        'ingroup_cooperation_rate': safe_rate(ingroup_coop, total_coop),
+        'outgroup_cooperation_rate': safe_rate(outgroup_coop, total_coop),
+        'ingroup_attack_rate': safe_rate(ingroup_attack, total_attack),
+        'outgroup_attack_rate': safe_rate(outgroup_attack, total_attack),
+        'ei_index': ei_index(total_outgroup, total_ingroup),
+        'ei_cooperation': ei_index(outgroup_coop, ingroup_coop),
+        'ei_conflict': ei_index(outgroup_attack, ingroup_attack),
+        'n_communities': len(partition),
+        'community_sizes': sorted([len(c) for c in partition], reverse=True),
+    }
+
+
 def analyze_run_networks(history: List[Dict],
                         window_size: int = 5,
                         resolution: float = 1.0) -> Dict[str, Any]:
@@ -719,18 +847,30 @@ def analyze_run_networks(history: List[Dict],
         metrics['window'] = window_data['window']
         metrics_per_window.append(metrics)
 
-    # Detect communities per window
+    # Detect communities per window + ingroup/outgroup
     communities_per_window = []
     partitions_for_stability = []
+    ingroup_outgroup_per_window = []
 
     for window_data in windowed_networks:
         full_net = window_data['full_network']
         community_results = detect_communities(full_net, resolution_values=[resolution])
+        partition = community_results['best_partition']
+
         communities_per_window.append({
             'window': window_data['window'],
-            'partition': community_results['best_partition']
+            'partition': partition,
+            'modularity': community_results.get(f'resolution_{resolution}', {}).get('modularity', 0.0),
+            'n_communities': len(partition),
         })
-        partitions_for_stability.append(community_results['best_partition'])
+        partitions_for_stability.append(partition)
+
+        # Ingroup/outgroup for this window
+        ig_og = compute_ingroup_outgroup(
+            history, partition, window=window_data['window']
+        )
+        ig_og['window'] = window_data['window']
+        ingroup_outgroup_per_window.append(ig_og)
 
     # Compute community stability
     stability = community_stability(partitions_for_stability)
@@ -741,11 +881,19 @@ def analyze_run_networks(history: List[Dict],
     # Compute Elo ratings
     elo = compute_elo_ratings(history)
 
+    # Compute overall ingroup/outgroup using last window's partition
+    if partitions_for_stability:
+        overall_ig_og = compute_ingroup_outgroup(history, partitions_for_stability[-1])
+    else:
+        overall_ig_og = compute_ingroup_outgroup(history, [])
+
     return {
         'windowed_networks': windowed_networks,
         'metrics_per_window': metrics_per_window,
         'communities_per_window': communities_per_window,
         'community_stability': stability,
         'hierarchy_metrics': hierarchy,
-        'elo_ratings': elo
+        'elo_ratings': elo,
+        'ingroup_outgroup_per_window': ingroup_outgroup_per_window,
+        'ingroup_outgroup_overall': overall_ig_og,
     }

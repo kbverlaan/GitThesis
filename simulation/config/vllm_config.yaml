@@ -1,0 +1,40 @@
+# vLLM Configuration for Snellius / local inference
+# Use this as base config when running with local vLLM server
+
+# API Settings — no API key needed for vLLM
+api_key_env_var: ""
+base_url: "http://localhost:8000/v1"  # Override via VLLM_BASE_URL env var or SLURM script
+
+# Model Selection — overridden per experiment via sweep YAML
+# Default placeholder; actual model set by experiment config
+model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+
+# Selected models for Snellius experiments (Feb 2026):
+#
+# 1× A100 80GB:
+# - "Qwen/Qwen3-30B-A3B-Instruct-2507"        (30B/3B MoE, Apache 2.0)
+# - "Qwen/QwQ-32B"                              (32B dense reasoning, Apache 2.0)
+#
+# 2-4× A100 80GB (tensor parallelism):
+# - "Qwen/Qwen3-235B-A22B-Instruct-2507"       (235B/22B MoE, Apache 2.0)
+# - "XiaomiMiMo/MiMo-V2-Flash"                  (309B/15B MoE, MIT)
+
+# Generation Parameters
+temperature: 0.7
+max_tokens: 1500  # Higher to accommodate <think> tokens from reasoning models
+timeout: 60  # higher timeout for first request (model loading)
+
+# Rate Limiting — vLLM handles batching internally, no external rate limit needed
+requests_per_minute: 1000
+retry_attempts: 3
+retry_delay: 5  # seconds (longer for potential model loading delays)
+
+# Prompt Configuration — same as OpenRouter
+prompt_config:
+  objective_style: "maximize_resources"
+  state_style: "descriptive"
+  history_style: "descriptive"
+  action_style: "descriptive"
+  show_effects: false
+  social_cot: true
+  information_level: "full"

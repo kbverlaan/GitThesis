@@ -5,6 +5,7 @@ Uses configurable prompt styles for different experimental conditions.
 
 import os
 import json
+import re
 import time
 import sys
 from typing import Dict, Optional
@@ -15,13 +16,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.engine import Action, ActionType
-from agents.prompts import get_prompt_style, UnifiedPrompt
+from agents.prompts import get_prompt_style
 
 
 class LLMAgent:
     """LLM-based agent that makes decisions via OpenRouter API."""
     
-    def __init__(self, 
+    def __init__(self,
                  agent_id: str,
                  api_key: str,
                  model: str,
@@ -31,13 +32,14 @@ class LLMAgent:
                  max_tokens: int = 500,
                  timeout: int = 30,
                  retry_attempts: int = 3,
-                 retry_delay: int = 2):
+                 retry_delay: int = 2,
+                 base_url: str = "https://openrouter.ai/api/v1"):
         """
         Initialize LLM agent.
-        
+
         Args:
             agent_id: Unique identifier for this agent
-            api_key: OpenRouter API key
+            api_key: OpenRouter API key (use "none" for local vLLM)
             model: Model identifier (e.g., "deepseek/deepseek-v3.2")
             prompt_config: Dictionary with prompt toggles (objective_style, state_style, etc.)
             game_params: Game parameters dict
@@ -46,27 +48,39 @@ class LLMAgent:
             timeout: Request timeout in seconds
             retry_attempts: Number of retry attempts on failure
             retry_delay: Delay between retries in seconds
+            base_url: API base URL (OpenRouter, vLLM local, etc.)
         """
         self.agent_id = agent_id
         self.model = model
         self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.timeout = timeout
+        # Thinking models need more tokens for reasoning + JSON response
+        model_lower = model.lower()
+        self.is_thinking_model = any(t in model_lower for t in ["qwq", "qwen3"])
+        if self.is_thinking_model and max_tokens < 2048:
+            self.max_tokens = 2048
+        else:
+            self.max_tokens = max_tokens
+        # Thinking models need longer timeout (long reasoning chains)
+        # 4096 tokens at ~30 tok/s worst case = ~136s; 240s gives safe margin
+        if self.is_thinking_model and timeout < 240:
+            self.timeout = 240
+        else:
+            self.timeout = timeout
         self.retry_attempts = retry_attempts
         self.retry_delay = retry_delay
-        
-        # Initialize unified prompt
+
+        # Initialize prompt
+        self.game_params = game_params or {}
         self.prompt = get_prompt_style(prompt_config or {}, game_params)
-        # Initialize unified prompt
-        self.prompt = get_prompt_style(prompt_config or {}, game_params)
-        
-        # Initialize OpenRouter client (OpenAI-compatible)
+
+        # Initialize OpenAI-compatible client (works with OpenRouter, vLLM, etc.)
         self.client = OpenAI(
             api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
+            base_url=base_url
         )
         
         self.reasoning_traces = []
+        self._visible_agents = None
     
     def _format_observation(self, observation: Dict) -> str:
         """
@@ -77,29 +91,40 @@ class LLMAgent:
     def _parse_response(self, response_text: str) -> Optional[Dict]:
         """
         Parse LLM response to extract action.
-        
+
+        Handles <think>...</think> blocks from reasoning models (Qwen3, QwQ, MiMo):
+        extracts thinking content separately, then strips it before JSON parsing.
+
         Returns:
-            Dictionary with action, target, and reasoning, or None if parsing fails
+            Dictionary with action, target, reasoning, and thinking, or None if parsing fails
         """
         try:
-            # Try to find JSON in response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
+            # Extract <think> content before stripping
+            think_match = re.search(r'<think>(.*?)</think>', response_text, flags=re.DOTALL)
+            thinking_content = think_match.group(1).strip() if think_match else None
+
+            # Strip <think>...</think> blocks before JSON extraction
+            clean_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+
+            # Try to find JSON in cleaned response
+            start_idx = clean_text.find('{')
+            end_idx = clean_text.rfind('}') + 1
+
             if start_idx >= 0 and end_idx > start_idx:
-                json_str = response_text[start_idx:end_idx]
+                json_str = clean_text[start_idx:end_idx]
                 parsed = json.loads(json_str)
-                
+
                 # Validate required fields
                 if 'action' in parsed:
                     return {
                         'action': parsed['action'],
                         'target': parsed.get('target'),
-                        'reasoning': parsed.get('reasoning', '')
+                        'reasoning': parsed.get('reasoning', ''),
+                        'thinking': thinking_content,
                     }
         except json.JSONDecodeError:
             pass
-        
+
         return None
     
     def _action_dict_to_action(self, action_dict: Dict) -> Optional[Action]:
@@ -113,7 +138,8 @@ class LLMAgent:
             'invest_other': ActionType.INVEST_OTHER,
             'arm_self': ActionType.ARM_SELF,
             'arm_other': ActionType.ARM_OTHER,
-            'attack': ActionType.ATTACK
+            'attack': ActionType.ATTACK,
+            'do_nothing': ActionType.DO_NOTHING
         }
         
         if action_str not in action_map:
@@ -125,7 +151,10 @@ class LLMAgent:
         if action_type in [ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK]:
             if not target or target == self.agent_id:
                 return None
-        
+            # Spatial validation: target must be a visible neighbor
+            if self._visible_agents is not None and target not in self._visible_agents:
+                return None
+
         return Action(
             agent_id=self.agent_id,
             action_type=action_type,
@@ -142,55 +171,164 @@ class LLMAgent:
         Returns:
             Selected action
         """
+        # Store visible agents for spatial target validation
+        self._visible_agents = observation.get('visible_agents', None)
+
         prompt = self._format_observation(observation)
-        
+
+        errors = []
+
         for attempt in range(self.retry_attempts):
             try:
-                response = self.client.chat.completions.create(
+                t0 = time.time()
+                # Build API call kwargs
+                api_kwargs = dict(
                     model=self.model,
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
-                    timeout=self.timeout
+                    timeout=self.timeout,
                 )
-                
-                response_text = response.choices[0].message.content
-                
-                # Log reasoning trace
-                self.reasoning_traces.append({
+                # Qwen3: enable thinking via chat template
+                if "qwen3" in self.model.lower():
+                    api_kwargs["extra_body"] = {
+                        "chat_template_kwargs": {"enable_thinking": True}
+                    }
+
+                response = self.client.chat.completions.create(**api_kwargs)
+                latency = time.time() - t0
+
+                msg = response.choices[0].message
+                response_text = msg.content or ""
+
+                # Extract thinking from reasoning_content (vLLM --reasoning-parser)
+                # or fall back to <think> tag extraction in _parse_response
+                thinking_content = getattr(msg, 'reasoning_content', None)
+
+                # Extract token usage from response
+                usage = {}
+                if response.usage:
+                    usage = {
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens,
+                    }
+
+                # Parse response (extracts thinking + action)
+                action_dict = self._parse_response(response_text)
+
+                # If content was empty but reasoning_content has JSON, try extracting from there
+                if not action_dict and thinking_content:
+                    action_dict = self._parse_response(thinking_content)
+
+                # Attach reasoning_content as thinking data
+                if thinking_content and action_dict:
+                    action_dict['thinking'] = thinking_content
+
+                # Log reasoning trace (includes thinking if present)
+                trace_entry = {
                     "round": observation['round'],
                     "agent_id": self.agent_id,
                     "prompt": prompt,
                     "response": response_text,
-                    "model": self.model
-                })
-                
-                # Parse response
-                action_dict = self._parse_response(response_text)
+                    "model": self.model,
+                    "latency_s": round(latency, 3),
+                    "usage": usage,
+                    "attempt": attempt + 1,
+                    "errors": errors.copy(),
+                }
+                final_thinking = thinking_content or (action_dict.get('thinking') if action_dict else None)
+                if final_thinking is not None:
+                    trace_entry["thinking"] = final_thinking
+                self.reasoning_traces.append(trace_entry)
+
                 if action_dict:
                     action = self._action_dict_to_action(action_dict)
                     if action:
                         return action
-                
-                # If parsing failed, try again
+
+                # JSON missing — send a follow-up requesting structured output
                 if attempt < self.retry_attempts - 1:
+                    try:
+                        t0 = time.time()
+                        retry_response = self.client.chat.completions.create(
+                            model=self.model,
+                            messages=[
+                                {"role": "user", "content": prompt},
+                                {"role": "assistant", "content": response_text},
+                                {"role": "user", "content": "Please respond with ONLY a JSON object in this exact format: {\"reasoning\": \"<think step by step>\", \"action\": \"<action_name>\", \"target\": \"<agent_id or null>\"}"}
+                            ],
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            timeout=self.timeout
+                        )
+                        retry_latency = time.time() - t0
+                        retry_text = retry_response.choices[0].message.content
+
+                        retry_usage = {}
+                        if retry_response.usage:
+                            retry_usage = {
+                                "prompt_tokens": retry_response.usage.prompt_tokens,
+                                "completion_tokens": retry_response.usage.completion_tokens,
+                                "total_tokens": retry_response.usage.total_tokens,
+                            }
+
+                        action_dict = self._parse_response(retry_text)
+                        if action_dict:
+                            action = self._action_dict_to_action(action_dict)
+                            if action:
+                                # Log the retry trace
+                                self.reasoning_traces.append({
+                                    "round": observation['round'],
+                                    "agent_id": self.agent_id,
+                                    "prompt": "(JSON retry)",
+                                    "response": retry_text,
+                                    "model": self.model,
+                                    "latency_s": round(retry_latency, 3),
+                                    "usage": retry_usage,
+                                    "attempt": attempt + 1,
+                                    "is_retry": True,
+                                })
+                                return action
+                    except Exception:
+                        pass
                     time.sleep(self.retry_delay)
                     continue
-                
+
             except Exception as e:
+                errors.append({"attempt": attempt + 1, "error": str(e)})
                 print(f"Error in LLM request (attempt {attempt + 1}/{self.retry_attempts}): {e}")
                 if attempt < self.retry_attempts - 1:
                     time.sleep(self.retry_delay)
-        
-        # Fallback: invest_self if all else fails
-        print(f"Warning: {self.agent_id} falling back to invest_self")
-        return Action(
-            agent_id=self.agent_id,
-            action_type=ActionType.INVEST_SELF,
-            target_id=None
-        )
+
+        # Log fallback with error context
+        self.reasoning_traces.append({
+            "round": observation['round'],
+            "agent_id": self.agent_id,
+            "prompt": prompt,
+            "response": None,
+            "model": self.model,
+            "fallback": True,
+            "errors": errors,
+        })
+
+        # Fallback: do_nothing if invest_self disabled, else invest_self
+        if self.game_params.get('allow_invest_self', True):
+            print(f"Warning: {self.agent_id} falling back to invest_self")
+            return Action(
+                agent_id=self.agent_id,
+                action_type=ActionType.INVEST_SELF,
+                target_id=None
+            )
+        else:
+            print(f"Warning: {self.agent_id} falling back to do_nothing")
+            return Action(
+                agent_id=self.agent_id,
+                action_type=ActionType.DO_NOTHING,
+                target_id=None
+            )
     
     def get_reasoning_traces(self) -> list:
         """Get all reasoning traces for analysis."""

@@ -4,58 +4,220 @@
 % =============================================================================
 % LITERATURE REVIEW (8-12 pages)
 % Rubric: Use of Literature (20% of Report)
-% "Was the quality and quantity of the literature sufficient? Was the literature
-%  cited adequately and correctly presented in a list of references?"
 % =============================================================================
 
 % -----------------------------------------------------------------------------
-% SECTION 1: Agent-Based Modeling & Emergence
+% SECTION 2.1: Emergent Social Structure in Agent Systems
 % -----------------------------------------------------------------------------
-\section{Agent-Based Modeling of Social Phenomena}
-% TODO: ABM tradition and methodology (Schelling 1971, Epstein & Axtell 1996)
-% TODO: What emergence means in ABM context - bottom-up, macro from micro
-% TODO: Coordination games in ABM (iterated PD, public goods, etc.)
+\section{Emergent Social Structure in Agent Systems}
+% TODO: The ABM tradition of bottom-up social emergence
+%   \cite{schelling1971} — segregation from mild preferences
+%   \cite{epstein1996} — Sugarscape: wealth inequality, trade, conflict from simple rules
+%   \cite{cederman1997} — emergent political structures
+%   \cite{bonabeau2002} — ABM methodology overview
+%
+% TODO: Cooperation as emergent phenomenon
+%   \cite{axelrod1981,axelrod1984} — evolution of cooperation, tit-for-tat
+%   \cite{axelrod1997} — norms emerging from decentralized interaction
+%   \cite{nowak2006,nowak2006five} — five mechanisms for cooperation
+%   \cite{ostrom1990} — self-organization without central authority
+%   \cite{fehr2002altruistic} — altruistic punishment and norm enforcement
+%
+% TODO: Framing effects on cooperation (classic result)
+%   \cite{liberman2004} — "The Name of the Game": calling PD "Wall Street Game" vs
+%     "Community Game" drastically changes cooperation rates. Foundational for our
+%     framing findings (η²=0.90 for framing→Gini).
+%
+% TODO: Key insight: classical ABMs use FIXED behavioral rules.
+%   What happens when agents can reason about the rules?
 
 % -----------------------------------------------------------------------------
-% SECTION 2: RL Agents and Emergent Cooperation
+% SECTION 2.2: Multi-Agent RL and Cooperation Dynamics
 % -----------------------------------------------------------------------------
-\section{Reinforcement Learning Agents}
-
-\subsection{Foundations of Multi-Agent RL}
-% TODO: Core RL concepts relevant to your work (policy, reward, LSTM for memory)
-% TODO: MARL frameworks (Lowe et al. 2017 - MADDPG, etc.)
-
-\subsection{Emergent Cooperation in RL Systems}
-% TODO: Key papers on emergent cooperation (Leibo et al. 2017, etc.)
-% TODO: What structures emerge? Coalitions, hierarchies, norms?
-% TODO: Limitations: slow learning, fragility (Langosco et al. 2022)
-
-% -----------------------------------------------------------------------------
-% SECTION 3: LLM-Based Agents
-% -----------------------------------------------------------------------------
-\section{Large Language Model Agents}
-
-\subsection{LLM Architecture and Capabilities}
-% TODO: Brief technical overview - transformer, pretraining, token prediction
-% TODO: What LLMs bring: linguistic/semantic capabilities from training data
-
-\subsection{Social Behavior in LLM Agents}
-% TODO: Park et al. 2023 (Generative Agents) - emergent social behaviors
-% TODO: Ashery et al. 2025 - norm formation
-% TODO: Lu et al. 2025 - cultural tendencies
-% TODO: Critical perspective: Larooij & Tornberg 2025 - validity concerns
+\section{Multi-Agent Reinforcement Learning}
+% TODO: MARL foundations
+%   \cite{sutton2018} — RL foundations
+%   \cite{hernandezleal2019} — comprehensive MARL survey
+%   \cite{huh2024} — comprehensive MARL survey (2024 update)
+%   \cite{lowe2017} — MADDPG, mixed cooperative-competitive
+%
+% TODO: Cooperation in MARL
+%   \cite{leibo2017} — ESSENTIAL: cooperation "changes dramatically as a function of
+%     environmental parameters." Identical manipulations have opposite effects.
+%   \cite{rachum2025} — emergent dominance hierarchies in RL agents.
+%     Relevant: hierarchies emerge from MARL without explicit design.
+%
+% TODO: The Hobbesian Trap — Kuusela & Roy (AAMAS 2024)
+%   - Level-0/1/2 reasoning in RL agents
+%   - Key finding: higher reasoning → MORE conflict, not less
+%   - "Hobbesian trap": rational agents arm because they model that others will arm
+%   - THIS IS THE METHODOLOGICAL TEMPLATE for the thesis
+%   - Our extension: prompt-based reasoning manipulation on LLMs
 
 % -----------------------------------------------------------------------------
-% SECTION 4: Comparing Architectures
+% SECTION 2.3: LLM Agents and Social Simulation
 % -----------------------------------------------------------------------------
-\section{Architectural Comparison: The Gap}
-% TODO: Synthesize: what do we know about each architecture's social emergence?
-% TODO: What's missing: controlled comparison in identical environments
-% TODO: Why this comparison matters for computational social science
+\section{LLM Agents in Social Simulation}
+% TODO: LLM agents as a new paradigm
+%   \cite{park2023generative} — Generative Agents: 25 agents, spontaneous social behavior
+%   \cite{park2024simulacra} — 1000 agents replicating real individuals (85% match)
+%   \cite{wang2024survey} — comprehensive LLM agents survey
+%   \cite{gao2024} — LLM-ABM integration survey
+%   \cite{taillandier2025} — integrating LLMs in ABM social simulation: position paper
+%     on hybrid approaches. Supports our validation discussion.
+%   \cite{riedl2025} — "Emergent Coordination in Multi-Agent Language Models":
+%     information-theoretic framework shows prompt design steers multi-agent LLMs
+%     from "mere aggregates to higher-order collectives." Mirrors our reasoning
+%     depth effect on emergent structure.
+%
+% TODO: LLMs in game-theoretic settings
+%   \cite{akata2023} — LLMs in repeated games, different patterns than humans
+%   \cite{akata2025} — cooperation biases exceeding human baselines (Nature Human Behav)
+%   \cite{pellert2025} — LLMs replicate AND predict human cooperation across game
+%     theory experiments. Complementary to Akata: LLMs can match human patterns.
+%   \cite{fontana2024} — LLMs more cooperative than humans in PD
+%   \cite{brookins2023} — LLM behavior in canonical games
+%   \cite{phelps2023} — experimental economics methods for LLM behavior
+%   \cite{lore2024} — Strategic behavior of LLMs: game structure vs contextual framing
+%     (Scientific Reports). Key finding: framing effects dominate game structure effects.
+%     DIRECTLY comparable to our η²=0.90 framing result on Gemma 2.
+%
+% TODO: LLM social behavior
+%   \cite{ashery2025} — emergent social conventions in LLM populations (Science Advances)
+%   \cite{yuan2024norms} — LLMs near human-level on social norms
+%   \cite{horiguchi2024} — norm AND metanorm emergence
+%   \cite{leng2023} — reciprocity, social welfare, group identity effects
+%   \cite{lu2025cultural} — cultural tendencies in generative AI
+%
+% TODO: Escalation and conflict
+%   \cite{hua2023waragent} — WarAgent: replicated alliance formations
+%   \cite{rivera2024} — all 5 LLMs showed escalation patterns
+%   \cite{mukobi2023} — Welfare Diplomacy benchmark
+%
+% TODO: Validation challenges
+%   \cite{larooij2025} — CRITICAL: generative ABMs productive when focusing on
+%     macro-level patterns, explanation, counterfactuals, and LLM limitations
+%   \cite{taillandier2025} — hybrid LLM+ABM approaches for transparency
+%   \cite{flache2017} — ABM validation challenges
+%   \cite{axtell2022} — authoritative ABM methodology review
+%   \cite{agarwal2025wolf} — WOLF: LLM framework for analyzing social science experiments
 
 % -----------------------------------------------------------------------------
-% SECTION 5: Theoretical Framing (if applicable)
+% SECTION 2.4: Reasoning Depth as Computation
 % -----------------------------------------------------------------------------
-% NOTE: Only include if you have theoretical commitments to declare
-% \section{Theoretical Framework}
-% TODO: Any theoretical lens you're using? (Not required for CLS thesis)
+\section{Reasoning Depth as Computation in Strategic Settings}
+
+% TODO: 2.4.1 — Chain-of-thought as computation, not just explanation
+\subsection{CoT as Computation}
+%   \cite{wei2022chain} — foundational CoT paper
+%   \cite{pfau2024dots} — "Let's Think Dot by Dot": even meaningless filler tokens
+%     improve performance because each token = additional forward pass.
+%     PROVES computational depth matters independently of semantic content.
+%   \cite{goyal2024think} — "Think Before You Speak": learnable pause tokens
+%     boost performance. Same conclusion: more compute → different behavior.
+%   - Synthesis (Preprints.org 2025 survey): semantic content of reasoning steps
+%     may be secondary to the computational time they provide.
+%
+%   IMPLICATION: L0→L3 prompts don't just change reasoning content — they change
+%   the AMOUNT OF COMPUTATION before choosing an action.
+
+% TODO: 2.4.2 — K-Level Reasoning in LLM games
+\subsection{K-Level Reasoning in LLM Games}
+%   \cite{zhang2024klevel} — K-Level Reasoning (NAACL 2025): recursive strategic
+%     depth in LLMs. Deeper reasoning improves performance but too much depth
+%     yields diminishing returns. DIRECTLY MAPS to our non-monotonic L0→L3.
+%   \cite{jia2025cot} — tested 22 LLMs: CoT not universally effective for strategic
+%     reasoning. Helps at certain levels, limited elsewhere. Supports finding that
+%     reasoning depth INTERACTS WITH game structure.
+%   \cite{duan2024gtbench} — GTBench (NeurIPS 2024): CoT and ToT don't always help
+%     in strategic games, sometimes hurt. Our non-monotonic finding is consistent.
+%   - TMGBench (2025, Neurocomputing): second-order ToM provides minimal gain over
+%     first-order. LLMs show "logical inconsistencies and superficial ToM."
+%     Relevant to our L2→L3 transition.
+
+% TODO: 2.4.3 — Faithfulness and causal analysis of reasoning traces
+\subsection{Faithfulness and Causal Analysis of Reasoning Traces}
+%   \cite{turpin2023} — CoT can be unfaithful to internal computation (NeurIPS 2023)
+%   \cite{lanham2023} — measuring faithfulness: early answering / truncation tests
+%   \cite{chen2025} — "Reasoning Models Don't Always Say What They Think": reasoning
+%     models construct fake rationales, <2% admit to using hints
+%   \cite{barez2025} — "Chain-of-Thought Is Not Explainability": CoT ≠ mechanistic
+%     explanation. Supports our "computation, not explanation" framing.
+%   \cite{paul2024} — measuring and improving CoT faithfulness
+%   \cite{bogdan2025anchors} — "Thought Anchors" (ICLR 2026 submission):
+%     counterfactual resampling at sentence level. Planning/uncertainty sentences
+%     are "thought anchors" that determine outcomes. APPLICABLE to identifying
+%     which reasoning types (opponent modeling, threat assessment) drive behavior.
+%   \cite{bogdan2025branches} — "Thought Branches" (ICLR 2026 submission):
+%     single CoT interpretation is inadequate; need distribution of trajectories.
+%     Off-policy interventions (hand-editing) yield small effects; on-policy
+%     resampling produces larger, more consistent effects.
+%
+%   IMPLICATION: Our truncation test (Lanham) is a weaker intervention than
+%   resampling. Consider Thought Anchors approach on a subset of runs.
+
+% TODO: 2.4.4 — Theory of Mind in LLMs
+\subsection{Theory of Mind in LLMs}
+%   \cite{kosinski2024} — GPT-4 solves 75% false-belief tasks; "may have
+%     spontaneously emerged as byproduct of language skills"
+%   \cite{strachan2024} — GPT-4 at/above human on indirect requests, false beliefs
+%     BUT also competence-performance gap
+%   \cite{zhao2024tom} — systematic failures in complex narratives requiring deep ToM
+%
+%   KEY DISTINCTION: We don't claim agents HAVE ToM. We claim prompting for
+%   opponent modeling changes computational depth, which changes behavior.
+
+% -----------------------------------------------------------------------------
+% SECTION 2.5: Phase Transitions in Social Systems
+% -----------------------------------------------------------------------------
+\section{Phase Transitions in Social Systems}
+% TODO: Phase transitions as a framework
+%   - Statistical mechanics analogy: order parameters, critical points
+%   - Spatial radius as control parameter (our strongest finding from Phase 1)
+%   - Cooperation-to-conflict transition at r=2→3
+%
+% TODO: Phase transitions in cooperation dynamics
+%   \cite{perc2017} — Physics Reports: comprehensive review of cooperation phase
+%     transitions in evolutionary game theory on networks. Spatial structure as
+%     control parameter. THE main reference for our phase transition analysis.
+%   \cite{wang2012perc} — sparse players + spatial structure → cooperation phase
+%     transitions in social dilemmas. Directly relevant to our radius sweep.
+%   \cite{scheffer2009} — Nature: early warning signals for critical transitions.
+%     Variance increase, autocorrelation, skewness before transitions.
+%     Methodological basis for our EWS analysis.
+%   \cite{hofer2018} — critical transitions and EWS in repeated cooperation games.
+%     Bridges EWS methodology to game-theoretic cooperation dynamics.
+%
+% TODO: Phase transitions in multi-agent systems
+%   \cite{evangelou2024} — ML for phase transition detection in ABMs (Physical Review E).
+%     Methodological reference for automated transition detection.
+%   \cite{gu2022} — change point detection in multi-agent systems using higher-order
+%     features (Chaos). Alternative detection methodology.
+%   \cite{liykziit2026} — phase transition for budgeted multi-agent synergy (2026).
+%     Recent theoretical work on transitions in multi-agent coordination.
+%
+% TODO: Connect to Debraj's work
+%   \cite{mengesha2025natcomms} — Mengesha & Roy (Nature Communications): carbon pricing
+%     drives critical transition. ABM phase transition methodology directly from
+%     supervisor's group.
+%   \cite{mengesha2025iccs} — Mengesha & Roy (ICCS): game selection leads to emergent
+%     inequality. Co-evolution of game structure and strategies.
+%
+% TODO: Connect to the thesis question
+%   - If reasoning depth shifts the critical point, that's a genuine interaction
+%     between cognition and structure
+%   - This is the "Origins" question: order emerges from the interaction of
+%     reasoning and environment, not from either alone
+
+% -----------------------------------------------------------------------------
+% SECTION 2.6: Research Gap
+% -----------------------------------------------------------------------------
+\section{Research Gap}
+% TODO: Synthesize the gap:
+%   1. K-Level Reasoning tested in 2-player settings, not N-agent coordination
+%   2. LLM game studies test behavior, not emergent STRUCTURE
+%   3. No one has tested reasoning depth × game structure as a factorial
+%   4. Phase transitions in LLM social systems not yet studied
+%   5. Kuusela & Roy used RL; prompt-based reasoning manipulation is untested
+%
+% TODO: Position thesis contribution relative to gap

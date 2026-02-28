@@ -1,6 +1,7 @@
-name: prompt_framing_factorial
-description: "Architectures Exp 2: Factorial model × framing — how do architecture and instructions interact?"
-reps: 20
+name: prompt_framing_factorial_snellius
+description: "Arch Exp 2 (Snellius): Factorial model × framing — how do architecture and instructions interact?"
+reps: 5
+api_config: vllm_config.yaml
 base_params:
   num_agents: 10
   initial_resources: 25.0
@@ -26,7 +27,11 @@ sweep:
   grid:
     - param: "model"
       target: "openrouter"
-      values: ["google/gemini-2.5-flash-lite", "amazon/nova-micro-v1", "deepseek/deepseek-v3.2"]
+      values:
+        - "Qwen/Qwen3-235B-A22B-Instruct-2507"
+        - "XiaomiMiMo/MiMo-V2-Flash"
+        - "Qwen/Qwen3-30B-A3B-Instruct-2507"
+        - "Qwen/QwQ-32B"
     - param: "framing"
       target: "prompt_config"
       values: ["neutral", "cooperative", "competitive", "strategic", "cautious"]

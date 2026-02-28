@@ -8,6 +8,9 @@ import sys
 import yaml
 import json
 import time
+import platform
+import random
+import numpy as np
 from typing import Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -19,7 +22,10 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent))
 
 from game.engine import GameEngine, GameState
+from game.spatial import SpatialField
 from agents.llm_agent import LLMAgent
+from analysis.metrics import compute_round_metrics
+from analysis.network import analyze_run_networks
 
 
 def load_config(config_path: str) -> dict:
@@ -28,13 +34,15 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def save_results(game_state: GameState, 
+def save_results(game_state: GameState,
                  reasoning_traces: list,
+                 round_metrics: list,
                  output_dir: Path,
-                 run_id: str):
+                 run_id: str,
+                 run_metadata: Optional[dict] = None):
     """Save simulation results to files."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Save game history
     history_file = output_dir / f"{run_id}_history.json"
     with open(history_file, 'w') as f:
@@ -44,15 +52,73 @@ def save_results(game_state: GameState,
             "total_rounds": game_state.round_number,
             "history": game_state.history
         }, f, indent=2)
-    
-    # Save reasoning traces
+
+    # Save reasoning traces (with token usage, latency, errors)
     traces_file = output_dir / f"{run_id}_traces.json"
     with open(traces_file, 'w') as f:
         json.dump(reasoning_traces, f, indent=2)
-    
+
+    # Save per-round metrics
+    metrics_file = output_dir / f"{run_id}_metrics.json"
+    with open(metrics_file, 'w') as f:
+        json.dump(round_metrics, f, indent=2)
+
+    # Run network analysis (Leiden communities, ingroup/outgroup, hierarchy)
+    if game_state.history:
+        try:
+            network_results = analyze_run_networks(
+                game_state.history, window_size=5, resolution=1.0
+            )
+            # Serialize: strip networkx objects, keep only JSON-safe data
+            network_output = {
+                'metrics_per_window': network_results['metrics_per_window'],
+                'communities_per_window': [
+                    {
+                        'window': cw['window'],
+                        'partition': [sorted(list(s)) for s in cw['partition']],
+                        'modularity': cw.get('modularity', 0.0),
+                        'n_communities': cw.get('n_communities', 0),
+                    }
+                    for cw in network_results['communities_per_window']
+                ],
+                'community_stability': network_results['community_stability'],
+                'hierarchy_metrics': {
+                    k: v for k, v in network_results['hierarchy_metrics'].items()
+                    if k != 'david_scores'  # david_scores saved separately (large)
+                },
+                'david_scores': network_results['hierarchy_metrics'].get('david_scores', {}),
+                'elo_ratings': {
+                    'final_ratings': network_results['elo_ratings'].get('final_ratings', {}),
+                    'steepness': network_results['elo_ratings'].get('steepness', 0.0),
+                    'landau_h': network_results['elo_ratings'].get('landau_h', 0.0),
+                },
+                'ingroup_outgroup_per_window': network_results['ingroup_outgroup_per_window'],
+                'ingroup_outgroup_overall': network_results['ingroup_outgroup_overall'],
+            }
+            # Strip non-serializable centrality dicts from metrics_per_window
+            for mw in network_output['metrics_per_window']:
+                mw.pop('betweenness_centrality', None)
+                mw.pop('eigenvector_centrality', None)
+
+            network_file = output_dir / f"{run_id}_network.json"
+            with open(network_file, 'w') as f:
+                json.dump(network_output, f, indent=2)
+            print(f"  - Network: {network_file.name}")
+        except Exception as e:
+            print(f"  - Network analysis failed: {e}")
+
+    # Save run metadata (seed, tokens, system info)
+    if run_metadata:
+        meta_file = output_dir / f"{run_id}_meta.json"
+        with open(meta_file, 'w') as f:
+            json.dump(run_metadata, f, indent=2)
+
     print(f"Results saved to {output_dir}")
     print(f"  - History: {history_file.name}")
     print(f"  - Traces: {traces_file.name}")
+    print(f"  - Metrics: {metrics_file.name}")
+    if run_metadata:
+        print(f"  - Metadata: {run_id}_meta.json")
 
 
 def run_simulation(game_params: dict, 
@@ -71,24 +137,56 @@ def run_simulation(game_params: dict,
     """
     if run_id is None:
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
+    # Set and log random seed for reproducibility
+    seed = game_params.get('random_seed', None)
+    if seed is None:
+        seed = int.from_bytes(os.urandom(4), 'big')
+    np.random.seed(seed)
+    random.seed(seed)
+
     print(f"\n{'='*60}")
     print(f"Starting simulation: {run_id}")
     print(f"{'='*60}\n")
+    print(f"Random seed: {seed}")
     
-    # Load API key
-    api_key_env = openrouter_config['api_key_env_var']
-    api_key = os.getenv(api_key_env)
-    if not api_key:
+    # Load API key (optional for local vLLM endpoints)
+    api_key_env = openrouter_config.get('api_key_env_var', '')
+    api_key = os.getenv(api_key_env) if api_key_env else None
+    base_url = openrouter_config.get('base_url', 'https://openrouter.ai/api/v1')
+
+    if not api_key and 'openrouter.ai' in base_url:
         raise ValueError(f"API key not found in environment variable: {api_key_env}")
+    if not api_key:
+        api_key = "none"  # vLLM doesn't require an API key
     
     # Create agent IDs
     agent_ids = [f"agent_{i+1}" for i in range(game_params['num_agents'])]
-    
+
+    # Build initial resource distribution
+    dist_type = game_params.get('initial_distribution', 'equal')
+    base_resources = game_params['initial_resources']
+    n = len(agent_ids)
+    total = base_resources * n
+
+    if dist_type == 'unequal':
+        # 1 rich agent, rest share remainder equally
+        rich_share = total * 0.4
+        poor_share = (total - rich_share) / (n - 1)
+        initial_resources = {agent_ids[0]: rich_share}
+        for aid in agent_ids[1:]:
+            initial_resources[aid] = poor_share
+    elif dist_type == 'random':
+        raw = np.random.uniform(5, 45, size=n)
+        scaled = raw / raw.sum() * total
+        initial_resources = {aid: float(s) for aid, s in zip(agent_ids, scaled)}
+    else:  # 'equal'
+        initial_resources = base_resources
+
     # Initialize game engine
     engine = GameEngine(
         agent_ids=agent_ids,
-        initial_resources=game_params['initial_resources'],
+        initial_resources=initial_resources,
         invest_self_cost=game_params['invest_self_cost'],
         invest_self_return=game_params['invest_self_return'],
         invest_other_cost=game_params['invest_other_cost'],
@@ -102,7 +200,16 @@ def run_simulation(game_params: dict,
         conflict_cost=game_params['conflict_cost'],
         max_rounds=game_params['max_rounds']
     )
-    
+
+    # Initialize spatial field if enabled
+    spatial_enabled = game_params.get('spatial_enabled', False)
+    spatial_field = None
+    if spatial_enabled:
+        grid_size = game_params.get('grid_size', int(np.ceil(np.sqrt(len(agent_ids) * 4))))
+        interaction_radius = game_params.get('interaction_radius', 2)
+        spatial_field = SpatialField(grid_size, agent_ids, interaction_radius)
+        print(f"Spatial field: {grid_size}x{grid_size} grid, interaction radius {interaction_radius}")
+
     # Initialize LLM agents
     agents = {}
     prompt_config = openrouter_config.get('prompt_config', {})
@@ -118,7 +225,8 @@ def run_simulation(game_params: dict,
             max_tokens=openrouter_config['max_tokens'],
             timeout=openrouter_config['timeout'],
             retry_attempts=openrouter_config['retry_attempts'],
-            retry_delay=openrouter_config['retry_delay']
+            retry_delay=openrouter_config['retry_delay'],
+            base_url=base_url
         )
     
     print(f"Initialized {len(agents)} LLM agents")
@@ -138,8 +246,11 @@ def run_simulation(game_params: dict,
     
     # Run simulation
     max_rounds = game_params['max_rounds']
+    action_order = game_params.get('action_order', 'simultaneous')
     start_time = time.time()
-    
+    all_round_metrics = []
+    previous_actions_map = None
+
     while not engine.is_game_over(max_rounds):
         state = engine.get_state()
         round_num = state.round_number
@@ -147,7 +258,11 @@ def run_simulation(game_params: dict,
         print(f"\n{'='*70}")
         print(f"ROUND {round_num}/{max_rounds}")
         print(f"{'='*70}")
-        
+
+        # Move agents on spatial field
+        if spatial_field:
+            spatial_field.move_agents()
+
         # Show current resources at start of round
         print("\n📊 Current Resources:")
         for agent_id in agent_ids:
@@ -165,121 +280,145 @@ def run_simulation(game_params: dict,
         print(f"\n🤔 Agent Decisions:")
         print("-" * 70)
         
-        # Get actions from all agents (in parallel for speed)
-        actions = []
-        action_details = []  # Store for better display
-        broke_agents = []  # Track agents who can't afford any action
-        
         # Get history length from config
         history_length = game_params.get('history_length', 10)
-        
-        # First pass: identify broke agents
-        active_agents = []
-        for agent_id in agent_ids:
-            agent_resources = state.resources[agent_id]
-            if not can_afford_any_action(agent_resources, game_params):
-                broke_agents.append(agent_id)
-                action_details.append({
-                    'agent': agent_id,
-                    'action': None,
-                    'reasoning': f"Cannot afford any action (has {agent_resources:.1f} resources, needs at least {min(game_params['invest_cost'], game_params['arm_cost'], game_params['conflict_cost']):.1f})"
-                })
-            else:
-                active_agents.append(agent_id)
-        
-        # Second pass: call LLMs in parallel for active agents
-        def get_agent_action(agent_id):
-            observation = state.get_observation(agent_id, history_length)
-            observation['broke_agents'] = broke_agents.copy()
+
+        def get_agent_action(agent_id, current_state):
+            observation = current_state.get_observation(agent_id, history_length)
+            observation['broke_agents'] = [
+                aid for aid in agent_ids
+                if not can_afford_any_action(current_state.resources[aid], game_params)
+            ]
+            # Add spatial info if enabled
+            if spatial_field:
+                neighbors = spatial_field.get_neighbors(agent_id)
+                observation['visible_agents'] = neighbors
+                observation['position'] = spatial_field.get_position(agent_id)
+                observation['all_positions'] = {
+                    aid: spatial_field.get_position(aid)
+                    for aid in [agent_id] + neighbors
+                }
+                observation['interaction_radius'] = spatial_field.interaction_radius
             action = agents[agent_id].select_action(observation)
-            
-            # Get reasoning from the last trace
+
             agent_traces = agents[agent_id].get_reasoning_traces()
             reasoning = ""
             if agent_traces:
                 last_trace = agent_traces[-1]
-                response_text = last_trace.get('response', '')
+                response_text = last_trace.get('response', '') or ''
                 try:
-                    start_idx = response_text.find('{')
-                    end_idx = response_text.rfind('}') + 1
+                    # Strip <think>...</think> blocks before JSON extraction
+                    import re
+                    clean_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+                    start_idx = clean_text.find('{')
+                    end_idx = clean_text.rfind('}') + 1
                     if start_idx >= 0 and end_idx > start_idx:
-                        parsed = json.loads(response_text[start_idx:end_idx])
+                        parsed = json.loads(clean_text[start_idx:end_idx])
                         reasoning = parsed.get('reasoning', 'No reasoning provided')
                 except:
                     reasoning = "Could not parse reasoning"
-            
+
             return agent_id, action, reasoning
-        
-        # Execute LLM calls in parallel
-        if active_agents:
-            with ThreadPoolExecutor(max_workers=len(active_agents)) as executor:
-                futures = {executor.submit(get_agent_action, agent_id): agent_id for agent_id in active_agents}
-                
-                for future in as_completed(futures):
-                    agent_id, action, reasoning = future.result()
-                    actions.append(action)
-                    action_details.append({
-                        'agent': agent_id,
-                        'action': action,
-                        'reasoning': reasoning
-                    })
-        
-        # Sort action_details to maintain consistent agent order in display
-        action_details.sort(key=lambda x: agent_ids.index(x['agent']))
-        
-        # Display all actions with reasoning
-        for detail in action_details:
-            agent_id = detail['agent']
-            action = detail['action']
-            reasoning = detail['reasoning']
-            
-            if action is None:
-                # Broke agent
-                print(f"\n{agent_id}:")
-                print(f"  Action: [BROKE - NO ACTION]")
-                print(f"  Status: {reasoning}")
-            else:
-                # Format action description
-                action_desc = action.action_type.value
-                if action.target_id:
-                    action_desc += f" → {action.target_id}"
-                
-                print(f"\n{agent_id}:")
-                print(f"  Action: {action_desc}")
+
+        if action_order == 'sequential':
+            # Sequential: random order, resolve each action immediately
+            order = list(agent_ids)
+            np.random.shuffle(order)
+            round_log = {"round": state.round_number, "actions": [], "resource_changes": {}, "combat_results": []}
+            all_actions_this_round = []
+
+            for agent_id in order:
+                current_state = engine.get_state()
+                if not can_afford_any_action(current_state.resources[agent_id], game_params):
+                    print(f"\n{agent_id}: [BROKE - NO ACTION]")
+                    round_log["actions"].append({"agent": agent_id, "action": "no_action", "reason": "insufficient_resources"})
+                    continue
+
+                agent_id, action, reasoning = get_agent_action(agent_id, current_state)
+                action_desc = action.action_type.value + (f" → {action.target_id}" if action.target_id else "")
+                print(f"\n{agent_id}: {action_desc}")
                 print(f"  Reasoning: {reasoning}")
-        
-        print(f"\n" + "-" * 70)
-        
-        # Resolve round
-        round_result = engine.resolve_round(actions)
-        
-        # Show round results
-        print(f"\n⚡ Round Results:")
-        
-        # Show rejected actions
-        rejected = [a for a in round_result['actions'] if a.get('action') == 'no_action']
-        if rejected:
-            print("  ❌ Rejected actions (insufficient resources):")
-            for action in rejected:
-                print(f"    {action['agent']}: cannot afford their chosen action")
-        
-        # Show resource changes
-        if round_result['resource_changes']:
-            print("  Resource changes:")
-            for agent_id, change in round_result['resource_changes'].items():
-                if abs(change) > 0.01:  # Only show if meaningful change
-                    sign = "+" if change > 0 else ""
-                    new_total = state.resources[agent_id]
-                    print(f"    {agent_id}: {sign}{change:.1f} (now: {new_total:.1f})")
-        
-        # Show combat results
-        if round_result.get('combat_results'):
-            print("\n  ⚔️  Combat outcomes:")
-            for combat in round_result['combat_results']:
-                winner_mark = "✓" if combat['winner'] == combat['attacker'] else "✗"
-                print(f"    {combat['attacker']} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
-                print(f"      (Win probability: {combat['attacker_win_prob']:.1%})")
-        
+
+                result = engine.resolve_single_action(action)
+                round_log["actions"].extend(result["actions"])
+                round_log["combat_results"].extend(result.get("combat_results", []))
+                all_actions_this_round.append(action)
+
+                # Show immediate result for attacks
+                for combat in result.get("combat_results", []):
+                    winner_mark = "✓" if combat['winner'] == combat['attacker'] else "✗"
+                    print(f"    ⚔️ vs {combat['defender']}: {combat['winner']} won {winner_mark} ({combat['attacker_win_prob']:.1%})")
+
+            # Tick arms and advance round
+            engine.tick_arms()
+            engine.advance_round(round_log)
+            round_result = round_log
+
+        else:
+            # Simultaneous: parallel decisions, batch resolution
+            actions = []
+            action_details = []
+            broke_agents = [
+                aid for aid in agent_ids
+                if not can_afford_any_action(state.resources[aid], game_params)
+            ]
+            active_agents = [aid for aid in agent_ids if aid not in broke_agents]
+
+            if active_agents:
+                with ThreadPoolExecutor(max_workers=len(active_agents)) as executor:
+                    futures = {executor.submit(get_agent_action, aid, state): aid for aid in active_agents}
+                    for future in as_completed(futures):
+                        agent_id, action, reasoning = future.result()
+                        actions.append(action)
+                        action_details.append({'agent': agent_id, 'action': action, 'reasoning': reasoning})
+
+            action_details.sort(key=lambda x: agent_ids.index(x['agent']))
+
+            for detail in action_details:
+                action_desc = detail['action'].action_type.value
+                if detail['action'].target_id:
+                    action_desc += f" → {detail['action'].target_id}"
+                print(f"\n{detail['agent']}:")
+                print(f"  Action: {action_desc}")
+                print(f"  Reasoning: {detail['reasoning']}")
+
+            for aid in broke_agents:
+                print(f"\n{aid}: [BROKE - NO ACTION]")
+
+            print(f"\n" + "-" * 70)
+
+            round_result = engine.resolve_round(actions)
+
+            # Show round results
+            print(f"\n⚡ Round Results:")
+            if round_result['resource_changes']:
+                print("  Resource changes:")
+                for agent_id, change in round_result['resource_changes'].items():
+                    if abs(change) > 0.01:
+                        sign = "+" if change > 0 else ""
+                        new_total = state.resources[agent_id]
+                        print(f"    {agent_id}: {sign}{change:.1f} (now: {new_total:.1f})")
+
+            if round_result.get('combat_results'):
+                print("\n  ⚔️  Combat outcomes:")
+                for combat in round_result['combat_results']:
+                    winner_mark = "✓" if combat['winner'] == combat['attacker'] else "✗"
+                    print(f"    {combat['attacker']} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
+                    print(f"      (Win probability: {combat['attacker_win_prob']:.1%})")
+
+        # Compute per-round metrics
+        updated_state = engine.get_state()
+        metrics, previous_actions_map = compute_round_metrics(
+            updated_state.resources,
+            round_result['actions'],
+            previous_actions_map
+        )
+        metrics['round'] = round_num
+        metrics['resources'] = dict(updated_state.resources)
+        all_round_metrics.append(metrics)
+
+        stability_str = f"{metrics['action_stability']:.0%}" if metrics['action_stability'] is not None else "n/a"
+        print(f"\n  Metrics: Gini={metrics['gini']:.3f}  Palma={metrics['palma']:.2f}  Stability={stability_str}")
         print()
     
     elapsed = time.time() - start_time
@@ -288,7 +427,11 @@ def run_simulation(game_params: dict,
     all_traces = []
     for agent in agents.values():
         all_traces.extend(agent.get_reasoning_traces())
-    
+
+    # Compute token totals from traces
+    total_prompt_tokens = sum(t.get('usage', {}).get('prompt_tokens', 0) for t in all_traces)
+    total_completion_tokens = sum(t.get('usage', {}).get('completion_tokens', 0) for t in all_traces)
+
     # Final summary
     state = engine.get_state()
     rounds_played = state.round_number - 1  # Round number is incremented after last round
@@ -321,9 +464,31 @@ def run_simulation(game_params: dict,
         pct = (count / sum(action_counts.values())) * 100
         print(f"  {action_type}: {count} ({pct:.1f}%)")
     
+    # Run metadata
+    run_metadata = {
+        "run_id": run_id,
+        "random_seed": seed,
+        "model": openrouter_config.get('model', 'unknown'),
+        "temperature": openrouter_config.get('temperature'),
+        "max_tokens": openrouter_config.get('max_tokens'),
+        "base_url": openrouter_config.get('base_url', ''),
+        "elapsed_seconds": round(elapsed, 1),
+        "total_prompt_tokens": total_prompt_tokens,
+        "total_completion_tokens": total_completion_tokens,
+        "total_tokens": total_prompt_tokens + total_completion_tokens,
+        "system": {
+            "platform": platform.platform(),
+            "python": platform.python_version(),
+            "node": platform.node(),
+            "slurm_job_id": os.getenv("SLURM_JOB_ID"),
+            "slurm_nodelist": os.getenv("SLURM_NODELIST"),
+            "cuda_visible": os.getenv("CUDA_VISIBLE_DEVICES"),
+        },
+    }
+
     print()
-    
-    return state, all_traces
+
+    return state, all_traces, all_round_metrics, run_metadata
 
 
 def main():
@@ -340,11 +505,11 @@ def main():
     
     # Run simulation
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    state, traces = run_simulation(game_params, openrouter_config, run_id)
-    
+    state, traces, round_metrics, run_metadata = run_simulation(game_params, openrouter_config, run_id)
+
     # Save results
     output_dir = project_root / "data" / "runs"
-    save_results(state, traces, output_dir, run_id)
+    save_results(state, traces, round_metrics, output_dir, run_id, run_metadata)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,32 @@
+name: prompt_framing_factorial
+description: "Architectures Exp 2: Factorial model × framing — how do architecture and instructions interact?"
+reps: 5  # reduced — first results before Origins
+base_params:
+  num_agents: 10
+  initial_resources: 25.0
+  invest_self_cost: 0
+  invest_self_return: 2
+  invest_other_cost: 0
+  invest_other_return: 5
+  arm_cost: 0.0
+  arm_multiplier: 2.0
+  arm_duration: 3
+  arm_other_contribution: 0.5
+  arm_other_duration: 3
+  attack_take_percent: 40.0
+  conflict_cost: 0.0
+  max_rounds: 50
+  history_length: 10
+  allow_invest_self: false
+  initial_distribution: "equal"
+  action_order: "simultaneous"
+  spatial_enabled: true
+  interaction_radius: 2
+sweep:
+  grid:
+    - param: "model"
+      target: "openrouter"
+      values: ["google/gemini-2.5-flash-lite", "deepseek/deepseek-v3.2", "meta-llama/llama-3.3-70b-instruct"]
+    - param: "framing"
+      target: "prompt_config"
+      values: ["neutral", "cooperative", "competitive", "strategic", "cautious"]

@@ -7,32 +7,87 @@
 % =============================================================================
 
 % -----------------------------------------------------------------------------
-% SECTION: Opening Hook & Motivation
+% SECTION 1.1: Opening Hook
 % -----------------------------------------------------------------------------
-% TODO: Open with the puzzle - both RL and LLM agents show emergent social
-%       structures, but via fundamentally different architectures
-% TODO: Why this matters: understanding how architecture shapes social emergence
-%       has implications for computational social science methodology
+\section{The Origins of Order}
+% TODO: Open with the puzzle of emergent social structure
+%   - When autonomous agents interact in shared environments, order emerges:
+%     hierarchies, coalitions, inequality, norms
+%   - Classical ABM tradition showed this with simple rules (Schelling 1971, Epstein & Axtell 1996)
+%   - But now agents can REASON about their situation via LLMs
+%   - Core tension: does the structure of the environment determine outcomes,
+%     or does HOW agents reason about it matter equally?
+%
+% Key references:
+%   \cite{schelling1971} — micro-rules → macro-patterns (foundational)
+%   \cite{epstein1996} — Sugarscape: growing artificial societies
+%   \cite{axelrod1984} — cooperation from self-interested agents via repeated interaction
+%   \cite{nowak2006five} — five mechanisms for cooperation evolution
 
-\section{Research Context}
-% TODO: Brief overview of agent-based modeling tradition (Schelling, Epstein & Axtell)
-% TODO: Position RL agents: reward-optimization, policy learning, emergent cooperation
-% TODO: Position LLM agents: token prediction, semantic priors from pretraining
-% TODO: The gap: no systematic comparison of emergent structures across architectures
+% -----------------------------------------------------------------------------
+% SECTION 1.2: Why Reasoning Depth Matters
+% -----------------------------------------------------------------------------
+\section{Reasoning Depth as a Variable}
+% TODO: Introduce the key insight that motivates the thesis
+%   - LLM agents don't just act — they reason before acting
+%   - This reasoning has COMPUTATIONAL depth: each token is an additional forward pass
+%     \cite{pfau2024dots} — even meaningless filler tokens improve multi-step computation
+%     \cite{goyal2024think} — learnable pause tokens boost performance
+%   - Deeper reasoning doesn't uniformly help in strategic settings:
+%     \cite{zhang2024klevel} — K-Level Reasoning: too much depth yields diminishing returns
+%     \cite{duan2024gtbench} — GTBench (NeurIPS): CoT doesn't always help, sometimes hurts
+%     \cite{jia2025cot} — CoT not universally effective; interacts with reasoning level
+%   - This connects to Kuusela & Roy (AAMAS 2024): more reasoning → more conflict
+%     in RL agents. Does the same hold for prompted reasoning in LLMs?
+%
+% TODO: Frame the gap:
+%   - K-Level Reasoning tested in 2-player competitive settings
+%   - No one has tested reasoning depth × game structure in multi-agent coordination
+%     with emergent social structure as the dependent variable
 
+% -----------------------------------------------------------------------------
+% SECTION 1.3: Research Question
+% -----------------------------------------------------------------------------
 \section{Research Question}
-% TODO: State main RQ clearly in one sentence
-%       "Does agent architecture (RL vs LLM) produce qualitatively different
-%        patterns of emergent social structure in identical coordination environments?"
-% TODO: Operationalize "emergent social structure" - what you will measure
+% TODO: State main RQ:
+%   "How does reasoning depth interact with game structure to shape
+%    emergent social order in multi-agent LLM systems?"
+%
+% TODO: Operationalize:
+%   - Reasoning depth: L0 (reactive) → L1 (strategic) → L2 (opponent modeling) → L3 (recursive)
+%   - Game structure: spatial constraints, costs/benefits, interaction radius
+%   - Emergent social order: inequality (Gini), cooperation rate, conflict onset,
+%     action distributions, phase transitions
+%
+% TODO: Sub-questions:
+%   SQ1: Does reasoning depth change emergent behavior? (pilot + production)
+%   SQ2: Does reasoning depth interact with game parameters? (cost sweeps)
+%   SQ3: Does reasoning depth shift phase transitions? (origins factorial)
 
+% -----------------------------------------------------------------------------
+% SECTION 1.4: Contributions
+% -----------------------------------------------------------------------------
 \section{Contributions}
-% TODO: What is YOUR specific contribution? Be explicit.
-%       - Controlled comparison framework
-%       - Minimal coordination game design
-%       - Empirical findings on architectural differences
-% NOTE: This section directly addresses rubric item "Has the contribution of
-%       the student been indicated explicitly?"
+% TODO: Explicit contributions:
+%   1. Reasoning depth operationalization via prompt manipulation on a single model,
+%      extending K-Level Reasoning (Zhang et al.) from 2-player to N-agent coordination
+%   2. Systematic characterization of reasoning depth × game structure interaction effects
+%   3. Evidence that phase transitions in emergent social structure shift with reasoning depth
+%   4. Methodological contribution: prompt-based reasoning manipulation as controlled
+%      experimental variable (vs. comparing different models, which is confounded)
+%
+% TODO: What this is NOT:
+%   - Not claiming LLMs have "real" theory of mind
+%   - Not claiming traces faithfully reflect internal computation
+%   - Reasoning depth as computational intervention, not psychological claim
 
+% -----------------------------------------------------------------------------
+% SECTION 1.5: Thesis Outline
+% -----------------------------------------------------------------------------
 \section{Thesis Outline}
-% TODO: Brief roadmap of remaining chapters
+% TODO: Brief roadmap
+%   Ch 2: Literature — cooperation dynamics, LLM agents, reasoning depth, phase transitions
+%   Ch 3: Methods — game design, reasoning levels, experimental design, metrics
+%   Ch 4: Results — system characterization, reasoning depth effects, origins factorial
+%   Ch 5: Discussion — interpretation, connection to Debraj/K-level, limitations
+%   Ch 6: Conclusion

@@ -4,112 +4,129 @@
 % =============================================================================
 % METHODS (10-15 pages)
 % Rubric: Methods (20% of Report)
-% "Were the methods described in such a way that the study could be repeated
-%  and that the results could be understood properly? Was a justification
-%  given for the choice of methods?"
 % =============================================================================
 
 % -----------------------------------------------------------------------------
-% SECTION 1: Experimental Design Overview
-% -----------------------------------------------------------------------------
-\section{Experimental Design}
-% TODO: High-level description of comparative methodology
-% TODO: Justify comparative approach - why compare RL vs LLM?
-% TODO: Describe the three conditions (from proposal Table 1):
-%       1. RL (LSTM) - baseline
-%       2. LLM-Comparison - same information as RL
-%       3. LLM-Control - prompt variation for robustness
-
-\subsection{Controlled Comparison Rationale}
-% TODO: What variables are held constant across conditions?
-%       - Environment (game rules)
-%       - Available information
-%       - Optimization objective (resource maximization)
-% TODO: What differs? Only the agent architecture
-% TODO: Acknowledge: cannot isolate ALL architectural differences
-
-% -----------------------------------------------------------------------------
-% SECTION 2: Game Design
+% SECTION 3.1: Game Design
 % -----------------------------------------------------------------------------
 \section{Coordination Game Design}
-% TODO: Justify game choice - why this minimal coordination game?
-% TODO: Game mechanics from proposal:
-%       - Agents pursue resource optimization
-%       - Simultaneous action selection each round
-
-\subsection{Action Space}
-% TODO: Define all actions (from proposal Table 2):
-%       - Invest (self/other): costs V, generates I
-%       - Arm (self/other): costs D, multiplies M
-%       - Attack (other): resource relocation
-% TODO: Why these specific actions? What social structures can they produce?
-
-\subsection{Conflict Resolution}
-% TODO: Probabilistic resolution based on combined resources
-% TODO: Winner takes percentage T of loser's resources
-% TODO: All combatants pay conflict costs C
-% TODO: Specify all parameter values (V, I, D, M, T, C, N)
-
-\subsection{Information Structure}
-% TODO: Complete information - all resources visible
-% TODO: History window for tracking previous interactions
-% TODO: N rounds (unknown to players) - why?
+% TODO: Describe the minimal game
+%   - 30 agents, 50 rounds, spatial grid
+%   - Action space: invest_other, arm_self, arm_other, attack, do_nothing
+%   - Each action's mechanics (costs, returns, combat resolution)
+%   - Why this specific design: minimal game enabling rich emergent structures
+%     (cooperation, conflict, coalitions, hierarchy)
+%   - Connect to Axelrod: agents optimize absolute resources (positive-sum possible)
+%
+% TODO: Game parameters table
+%   - Base params: invest_other_return=5, attack_take=40%, etc.
+%   - Spatial: grid layout, interaction_radius
+%   - Action order: simultaneous
+%
+% TODO: Justify design choices
+%   - Why not PD/Stag Hunt? Too constrained for emergent structure
+%   - Why spatial? Enables local interaction → phase transitions at radius boundaries
+%   - Why 30 agents? Large enough for structure, small enough for LLM inference
 
 % -----------------------------------------------------------------------------
-% SECTION 3: Agent Implementations
+% SECTION 3.2: Reasoning Depth Manipulation
 % -----------------------------------------------------------------------------
-\section{Agent Architectures}
-
-\subsection{RL Agent (LSTM)}
-% TODO: Policy network architecture
-% TODO: LSTM for temporal information (addressing Markovian limitation)
-% TODO: Training procedure - how many episodes, reward function
-% TODO: Hyperparameters
-
-\subsection{LLM Agent}
-% TODO: Which LLM (model, version, API)?
-% TODO: Prompt structure for comparison condition
-%       - What information is provided?
-%       - Goal statement (optimize resources)
-% TODO: Prompt variations for control condition
-%       - Tone, decoration, language, explicit instructions
-
-% -----------------------------------------------------------------------------
-% SECTION 4: Metrics
-% -----------------------------------------------------------------------------
-\section{Measurement of Emergent Social Structure}
-% TODO: Operationalize "emergent social structure"
-% TODO: Justify each metric choice
-
-\subsection{Coalition Structure}
-% TODO: Community detection algorithm (which one?)
-% TODO: Directed interaction networks from investment/arm actions
-% TODO: Metrics: number of communities, average size, temporal stability
-
-\subsection{Interaction Patterns}
-% TODO: Cooperation frequency (investment actions)
-% TODO: Aggression frequency (attack actions)
-% TODO: Retaliation probability - how computed?
-
-\subsection{Hierarchy}
-% TODO: Gini coefficient over resource distribution
-% TODO: Temporal dynamics of inequality
+\section{Reasoning Depth Manipulation}
+% TODO: The key experimental variable
+%   - L0: "State your choice briefly. Do not deliberate."
+%   - L1: "Calculate the expected value of each available action given the current state,
+%          then choose the best one."
+%   - L2: "First predict what each nearby agent is likely to do this round based on their
+%          recent behavior and resources. Then choose your action considering their
+%          probable responses."
+%   - L3: "Consider that nearby agents are also reasoning about your likely actions.
+%          Predict their strategies given that they anticipate your behavior, and choose
+%          your best response to their anticipated best responses."
+%
+% TODO: Connect to theoretical framework
+%   - Maps to K-Level Reasoning (Zhang et al., NAACL 2025)
+%   - Maps to Kuusela & Roy's level-0/1/2 framework
+%   - L0 = fixed heuristic, L1 = best response, L2 = opponent model, L3 = recursive
+%
+% TODO: Why prompt manipulation, not different models?
+%   - Single model (Gemma 2 27B) eliminates confounds
+%   - Prompt changes computational depth (Pfau et al., Goyal et al.)
+%   - Cleaner than comparing models that differ on 100 dimensions
+%
+% TODO: Validation of manipulation
+%   - Token counts: L0 ~6 tokens, L1 ~31, L2 ~40, L3 ~44
+%   - Qualitative trace inspection: L0 heuristic, L2 opponent modeling present
+%   - Backwards compatible: default behavior unchanged
 
 % -----------------------------------------------------------------------------
-% SECTION 5: Experimental Protocol
+% SECTION 3.3: Experimental Design
 % -----------------------------------------------------------------------------
-\section{Experimental Protocol}
-% TODO: How many simulation runs per condition?
-% TODO: Number of agents per simulation
-% TODO: Number of rounds per simulation
-% TODO: Statistical tests for comparing conditions
-% TODO: Sensitivity analysis plan
+\section{Experimental Design}
+% TODO: 3.3.1 — System characterization (Phase 1)
+%   - Parameter sweeps: spatial radius, arm_cost, conflict_cost, invest_return,
+%     invest_self on/off
+%   - Each sweep × 4 reasoning levels × 3 reps
+%   - Purpose: understand base system + identify reasoning depth interactions
+%
+% TODO: 3.3.2 — Reasoning depth production (Phase 2)
+%   - 4 reasoning levels × 20 reps at selected base params
+%   - Statistical power for ANOVA
+%
+% TODO: 3.3.3 — Origins factorial (Phase 3)
+%   - Reasoning depth × spatial radius: 4 levels × 6 radii × 20 reps
+%   - Tests whether phase transitions shift with reasoning depth
+%   - This is the core experiment
+%
+% TODO: 3.3.4 — Robustness check
+%   - Repeat key conditions on second model (Qwen3-32B)
 
 % -----------------------------------------------------------------------------
-% SECTION 6: Implementation Details
+% SECTION 3.4: Infrastructure
 % -----------------------------------------------------------------------------
-\section{Implementation}
-% TODO: Programming language, libraries, frameworks
-% TODO: Computational resources used
-% TODO: Code availability statement
-% NOTE: Rubric asks "Did the student demonstrate programming skills?"
+\section{Infrastructure}
+% TODO: Technical setup
+%   - Gemma 2 27B IT on Snellius HPC (NVIDIA H100)
+%   - vLLM serving, ~34 min per run
+%   - Custom game engine + sweep framework
+%   - Compute budget: ~1000+ SBU
+
+% -----------------------------------------------------------------------------
+% SECTION 3.5: Metrics
+% -----------------------------------------------------------------------------
+\section{Metrics}
+% TODO: Outcome metrics
+%   - Gini coefficient: wealth inequality (primary)
+%   - Palma ratio: top 10% / bottom 40%
+%   - Cooperation ratio: invest_other / all meaningful actions
+%   - First attack round: onset of conflict
+%   - Action distribution: behavioral fingerprint
+%
+% TODO: Process metrics
+%   - Cooperation rate timeseries (per-round)
+%   - Gini trajectory (temporal dynamics)
+%   - Reasoning token counts (manipulation check)
+%
+% TODO: Phase transition metrics
+%   - Gini vs radius curves per reasoning level
+%   - Binder cumulant for critical point detection
+%   - Variance peak for transition location
+%   - Rolling-window EWS: variance, lag-1 autocorrelation, skewness
+%     (\cite{scheffer2009}, \cite{hofer2018})
+%
+% TODO: Statistical tests
+%   - Mixed-effects models: Gini ~ reasoning_level * param + (1|RunID)
+%     with Satterthwaite approximation for df (lmerTest)
+%   - Partial eta-squared for omnibus effect sizes
+%   - Cohen's d for all pairwise comparisons
+%   - 95% confidence intervals for all key estimates
+%   - Bayes factors (JZS prior) for key comparisons (following \cite{akata2025})
+%   - Bonferroni correction for multiple comparisons
+%   - ICC for within-run vs between-run variance
+%
+% TODO: Prompt sensitivity
+%   - Report FormatSpread (\cite{sclar2024}) or PromptSensiScore (\cite{zhuo2024})
+%   - Quantify sensitivity to semantically equivalent reformulations
+%
+% TODO: Trace coding (if doing systematic trace analysis)
+%   - LACA framework (\cite{chew2023}): codebook → LLM coding → human verification
+%   - Inter-rater reliability with Gwet's AC1

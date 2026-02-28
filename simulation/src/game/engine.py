@@ -15,6 +15,7 @@ class ActionType(Enum):
     ARM_SELF = "arm_self"
     ARM_OTHER = "arm_other"
     ATTACK = "attack"
+    DO_NOTHING = "do_nothing"
 
 
 @dataclass
@@ -52,9 +53,9 @@ class GameState:
 class GameEngine:
     """Core game engine managing state transitions and action resolution."""
     
-    def __init__(self, 
+    def __init__(self,
                  agent_ids: List[str],
-                 initial_resources: float,
+                 initial_resources,  # float (equal) or Dict[str, float] (per-agent)
                  invest_self_cost: float,
                  invest_self_return: float,
                  invest_other_cost: float,
@@ -99,9 +100,14 @@ class GameEngine:
             "conflict_cost": conflict_cost
         }
         
+        if isinstance(initial_resources, dict):
+            resources = {aid: initial_resources[aid] for aid in agent_ids}
+        else:
+            resources = {aid: float(initial_resources) for aid in agent_ids}
+
         self.state = GameState(
             agents=agent_ids,
-            resources={agent_id: initial_resources for agent_id in agent_ids},
+            resources=resources,
             max_rounds=max_rounds
         )
     
@@ -117,7 +123,9 @@ class GameEngine:
             return resources >= self.params["arm_cost"]
         elif action_type == ActionType.ATTACK:
             return resources >= self.params["conflict_cost"]
-        
+        elif action_type == ActionType.DO_NOTHING:
+            return True
+
         return False
     
     def resolve_round(self, actions: List[Action]) -> Dict:
@@ -159,9 +167,11 @@ class GameEngine:
         for agent_id in self.state.agents:
             round_log["resource_changes"][agent_id] = 0.0
         
-        # Process non-attack actions first
+        # Process non-attack actions first (do_nothing is a valid no-op)
         for action in valid_actions:
-            if action.action_type == ActionType.INVEST_SELF:
+            if action.action_type == ActionType.DO_NOTHING:
+                pass  # Deliberate pass -- no cost, no effect
+            elif action.action_type == ActionType.INVEST_SELF:
                 self._resolve_invest_self(action, round_log)
             elif action.action_type == ActionType.INVEST_OTHER:
                 self._resolve_invest_other(action, round_log)
@@ -311,6 +321,74 @@ class GameEngine:
             "attacker_win_prob": attacker_win_prob
         })
     
+    def resolve_single_action(self, action: Action) -> Dict:
+        """Resolve a single action immediately (for sequential mode)."""
+        round_log = {
+            "actions": [],
+            "resource_changes": {},
+            "combat_results": []
+        }
+
+        for agent_id in self.state.agents:
+            round_log["resource_changes"][agent_id] = 0.0
+
+        if self.can_afford_action(action.agent_id, action.action_type):
+            round_log["actions"].append({
+                "agent": action.agent_id,
+                "action": action.action_type.value,
+                "target": action.target_id
+            })
+            if action.action_type == ActionType.DO_NOTHING:
+                pass
+            elif action.action_type == ActionType.INVEST_SELF:
+                self._resolve_invest_self(action, round_log)
+            elif action.action_type == ActionType.INVEST_OTHER:
+                self._resolve_invest_other(action, round_log)
+            elif action.action_type == ActionType.ARM_SELF:
+                self._resolve_arm_self(action, round_log)
+            elif action.action_type == ActionType.ARM_OTHER:
+                self._resolve_arm_other(action, round_log)
+            elif action.action_type == ActionType.ATTACK:
+                self._resolve_attack(action, round_log)
+        else:
+            round_log["actions"].append({
+                "agent": action.agent_id,
+                "action": "no_action",
+                "reason": "insufficient_resources"
+            })
+
+        # Apply resource changes immediately
+        for agent_id, change in round_log["resource_changes"].items():
+            self.state.resources[agent_id] = max(0, self.state.resources[agent_id] + change)
+
+        return round_log
+
+    def tick_arms(self):
+        """Decrement arm durations at end of round (call once per round in sequential mode)."""
+        expired_arms = []
+        for agent_id in list(self.state.active_arms.keys()):
+            self.state.active_arms[agent_id] -= 1
+            if self.state.active_arms[agent_id] <= 0:
+                expired_arms.append(agent_id)
+        for agent_id in expired_arms:
+            del self.state.active_arms[agent_id]
+
+        for target_id in list(self.state.arm_coalitions.keys()):
+            expired_supporters = []
+            for supporter_id in list(self.state.arm_coalitions[target_id].keys()):
+                self.state.arm_coalitions[target_id][supporter_id] -= 1
+                if self.state.arm_coalitions[target_id][supporter_id] <= 0:
+                    expired_supporters.append(supporter_id)
+            for supporter_id in expired_supporters:
+                del self.state.arm_coalitions[target_id][supporter_id]
+            if not self.state.arm_coalitions[target_id]:
+                del self.state.arm_coalitions[target_id]
+
+    def advance_round(self, round_log: Dict):
+        """Add round to history and increment round number."""
+        self.state.history.append(round_log)
+        self.state.round_number += 1
+
     def get_state(self) -> GameState:
         """Get current game state."""
         return self.state

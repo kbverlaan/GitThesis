@@ -118,16 +118,38 @@ I'm torn between two directions and want your honest take:
 ---
 
 ## After Meeting Notes
-<!-- Fill in during/after the meeting -->
 
 ### Key Takeaways
--
+- Debraj doesn't care about specific results yet -- first understand the SYSTEM
+- Without knowing how the system behaves, can't say anything meaningful about prompt variation later
+- Two clear phases now:
+  - **Phase 1**: Characterize the system. One metric, one prompt, vary cost/benefit (theta). Does it stabilize?
+  - **Phase 2**: Vary prompting and measure effects on the metrics from Phase 1
+- RL might not be needed. If used, keep it as a simple baseline. LLM prompt variations might be all we investigate.
+- Scale to 30 agents -- research suggests significant distribution changes at scale
 
 ### Action Items
--
+- Pick one metric: hierarchy (Gini, top 10% vs bottom 50%)
+- Pick one parameter set + one prompt as baseline
+- Measure agent action stability over time: do they converge on optimal actions?
+- Define theta = cost/benefit per action, systematically vary it
+- Test sensitivity of game stability to theta
+- If time: vary initial wealth distribution, simultaneous vs random action order
+- Check papers/tools:
+  - TextGrad (Zou group): https://github.com/zou-group/textgrad
+  - EGG (Facebook, emergence of language): https://github.com/facebookresearch/EGG
+  - Debraj's own paper (similar game, RL, published): https://dl.acm.org/doi/10.5555/3635637.3662962
 
 ### Decisions Made
--
+- Phase 1 before Phase 2: understand the system before varying prompts
+- RL is optional/lightweight, not the main contribution
+- Focus on LLM prompt variation as main investigation (confirms Option B/C direction)
+- Need to scale up to 30 agents
 
 ### Next Sprint Goals (Feb 13-20)
--
+- [ ] Read Debraj's paper (the similar game with RL)
+- [ ] Define theta = c/b for each action in current game
+- [ ] Set up baseline: one prompt, one model, 30 agents
+- [ ] Run baseline and measure: do agents stabilize? What does Gini look like over time?
+- [ ] Literature: catch up on reading list from Sprint 1
+- [ ] Check TextGrad and EGG repos

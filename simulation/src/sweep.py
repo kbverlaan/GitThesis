@@ -25,8 +25,9 @@ from main import run_simulation, save_results, load_config
 from analysis.metrics import (
     cooperation_ratio, first_attack_round, retaliation_probability,
     coalition_stability, theil_t_index, atkinson_index,
-    cooperation_rate_timeseries,
+    cooperation_rate_timeseries, compute_stabilisation_metrics,
 )
+from analysis.network import analyze_run_networks
 from run_logger import RunLogger
 
 
@@ -151,8 +152,9 @@ def run_sweep(spec_path: str):
     base_params = spec['base_params']
     description = spec.get('description', '')
 
-    # Load OpenRouter config
-    openrouter_config = load_config(project_root / "config" / "openrouter_config.yaml")
+    # Load LLM API config (default: openrouter, override via 'api_config' in spec)
+    api_config_file = spec.get('api_config', 'openrouter_config.yaml')
+    openrouter_config = load_config(project_root / "config" / api_config_file)
 
     # Apply base_openrouter overrides if present
     if 'base_openrouter' in spec:
@@ -228,14 +230,14 @@ def run_sweep(spec_path: str):
             print(f"\n--- {run_id} ---")
             run_start = time.time()
 
-            state, traces, round_metrics = run_simulation(
+            state, traces, round_metrics, run_metadata = run_simulation(
                 params, or_config, run_id
             )
 
             run_elapsed = time.time() - run_start
 
             # Save results into experiment subdirectory
-            save_results(state, traces, round_metrics, output_dir, run_id)
+            save_results(state, traces, round_metrics, output_dir, run_id, run_metadata)
 
             # Track in manifest
             final_gini = round_metrics[-1]['gini'] if round_metrics else None
@@ -263,6 +265,34 @@ def run_sweep(spec_path: str):
             # Per-round cooperation rate timeseries
             fc_timeseries = cooperation_rate_timeseries(history)
 
+            # Stabilisation metrics
+            stab_metrics = compute_stabilisation_metrics(round_metrics)
+
+            # Network / community metrics
+            try:
+                net_results = analyze_run_networks(history, window_size=5, resolution=1.0)
+                ig_og = net_results['ingroup_outgroup_overall']
+                comm_stab = net_results['community_stability']
+                hier = net_results['hierarchy_metrics']
+                # Summary: last window's community count
+                last_comm = net_results['communities_per_window'][-1] if net_results['communities_per_window'] else {}
+                network_summary = {
+                    'n_communities_final': last_comm.get('n_communities', 0),
+                    'modularity_final': last_comm.get('modularity', 0.0),
+                    'community_stability_nmi': comm_stab.get('mean_nmi', 0.0),
+                    'ei_index': ig_og.get('ei_index', 0.0),
+                    'ei_cooperation': ig_og.get('ei_cooperation', 0.0),
+                    'ei_conflict': ig_og.get('ei_conflict', 0.0),
+                    'ingroup_cooperation_rate': ig_og.get('ingroup_cooperation_rate', 0.0),
+                    'outgroup_attack_rate': ig_og.get('outgroup_attack_rate', 0.0),
+                    'hierarchy_steepness': hier.get('steepness', 0.0),
+                    'hierarchy_landau_h': hier.get('landau_h', 0.0),
+                    'hierarchy_transitivity': hier.get('triangle_transitivity', 0.0),
+                }
+            except Exception as e:
+                print(f"  Network analysis failed: {e}")
+                network_summary = {}
+
             # Condition value for manifest (backward compat for single-param)
             if len(condition) == 1:
                 cond_value = condition[0]['value']
@@ -284,6 +314,8 @@ def run_sweep(spec_path: str):
                 'retaliation_probability': retal_prob,
                 'coalition_stability': coal_stab,
                 'fc_timeseries': fc_timeseries,
+                'network': network_summary,
+                'stabilisation': stab_metrics,
                 'elapsed_seconds': round(run_elapsed, 1),
                 'timestamp': datetime.now().isoformat(),
             }
@@ -341,10 +373,106 @@ def run_sweep(spec_path: str):
     print(f"{'='*70}\n")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python src/sweep.py <experiment_spec.yaml>")
-        print("Example: python src/sweep.py experiments/baseline_replicability.yaml")
+def run_single(spec_path: str, run_index: int):
+    """Run a single (condition, rep) from an experiment spec.
+
+    run_index maps to flattened (condition_idx * reps + rep_idx), matching
+    SLURM_ARRAY_TASK_ID for array jobs.
+    """
+    load_dotenv()
+
+    project_root = Path(__file__).parent.parent
+    spec = load_experiment(spec_path)
+
+    name = spec['name']
+    reps = spec['reps']
+    base_params = spec['base_params']
+
+    api_config_file = spec.get('api_config', 'openrouter_config.yaml')
+    openrouter_config = load_config(project_root / "config" / api_config_file)
+
+    if 'base_openrouter' in spec:
+        for key, value in spec['base_openrouter'].items():
+            openrouter_config[key] = value
+
+    conditions = generate_conditions(spec['sweep'])
+    total_runs = len(conditions) * reps
+
+    if run_index < 0 or run_index >= total_runs:
+        print(f"ERROR: run_index {run_index} out of range [0, {total_runs})")
         sys.exit(1)
 
-    run_sweep(sys.argv[1])
+    cond_idx = run_index // reps
+    rep = (run_index % reps) + 1
+    condition = conditions[cond_idx]
+    label = condition_label(condition)
+    run_id = condition_run_id(condition, rep)
+
+    output_dir = project_root / "data" / "runs" / name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Skip if already completed
+    history_file = output_dir / f"{run_id}_history.json"
+    if history_file.exists():
+        print(f"SKIP: {run_id} already exists at {history_file}")
+        sys.exit(0)
+
+    print(f"\n{'='*70}")
+    print(f"SINGLE RUN: {name} [{run_index}/{total_runs}]")
+    print(f"Condition: {label}, Rep: {rep}")
+    print(f"Run ID: {run_id}")
+    print(f"{'='*70}\n")
+
+    params, or_config = apply_condition(condition, base_params, openrouter_config)
+
+    run_start = time.time()
+    state, traces, round_metrics, run_metadata = run_simulation(
+        params, or_config, run_id
+    )
+    run_elapsed = time.time() - run_start
+
+    save_results(state, traces, round_metrics, output_dir, run_id, run_metadata)
+
+    # Compute metrics
+    history = state.history
+    coop_ratio = cooperation_ratio(history)
+    final_gini = round_metrics[-1]['gini'] if round_metrics else None
+
+    print(f"\n--- Result: {run_id} ---")
+    print(f"  Gini: {final_gini:.3f}" if final_gini else "  Gini: N/A")
+    print(f"  Coop ratio: {coop_ratio:.3f}")
+    print(f"  Elapsed: {run_elapsed:.0f}s")
+
+
+def run_batch(spec_path: str, start_index: int, count: int):
+    """Run a batch of consecutive runs from an experiment spec.
+
+    Useful for large models where vLLM loading is expensive — amortize
+    loading cost across multiple runs in one SLURM job.
+    """
+    for i in range(count):
+        run_index = start_index + i
+        try:
+            run_single(spec_path, run_index)
+        except SystemExit:
+            # run_single exits on skip or out-of-range — continue to next
+            continue
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Run parameter sweep experiments")
+    parser.add_argument("experiment", help="Path to experiment YAML spec")
+    parser.add_argument("--run-index", type=int, default=None,
+                        help="Run single (condition, rep) by index (for SLURM array jobs)")
+    parser.add_argument("--batch-size", type=int, default=1,
+                        help="Number of consecutive runs per job (default: 1)")
+    args = parser.parse_args()
+
+    if args.run_index is not None:
+        if args.batch_size > 1:
+            run_batch(args.experiment, args.run_index, args.batch_size)
+        else:
+            run_single(args.experiment, args.run_index)
+    else:
+        run_sweep(args.experiment)

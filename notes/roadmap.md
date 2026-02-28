@@ -3,13 +3,14 @@
 **Timeline**: Feb 2026 - July 2026
 **Submission deadline**: July 15, 2026
 **Defence**: Late July 2026
-**Weekly meetings**: Fridays with Debraj
+**Biweekly meetings**: Fridays at 14:00 with Debraj (Feb 27, Mar 13, Mar 27, Apr 10, Apr 24, May 8, May 22, Jun 5, Jun 19, Jul 3)
+**Sprint cadence**: 2-week sprints, each ending at the Friday meeting
 
 ---
 
 ## How This Document Works
 
-Each **phase** covers ~4-6 weeks. Each week is a **sprint** ending at the Friday meeting.
+Each **phase** covers ~4-6 weeks. Each **sprint** is 2 weeks, ending at the biweekly Friday meeting.
 After each meeting, update the sprint with outcomes and set the next sprint goals.
 
 Rubric reminder (what matters):
@@ -19,15 +20,21 @@ Rubric reminder (what matters):
 
 ---
 
-## Phase 1: Foundation (Feb 1 - Feb 28)
-**Focus**: Literature, simulation polish, RL groundwork
+## Phase 1: System Characterization (Feb 1 - Feb 18) ✅ COMPLETE
+**Focus**: Understand the simulation as a system before varying prompts
+
+Per Debraj (Feb 13): "Without understanding the system, it's impossible to say anything about changing the prompting later."
 
 ### Goals for this phase
-- [ ] Read core literature across all areas (see reading list below)
-- [ ] LLM simulation stable and producing analyzable results
-- [ ] RL agent implementation started (architecture chosen, training loop)
-- [ ] Metrics pipeline: can compute Gini, network stats, action distributions from runs
-- [ ] Clear picture of experiment design for Phase 2
+- [x] Pick ONE metric: hierarchy (Gini coefficient, top 10% vs bottom 50%)
+- [x] Pick ONE baseline prompt + parameter set
+- [x] Measure agent action stability over time: do they converge on optimal actions?
+- [x] Define theta = cost/benefit for each action, systematically vary it → pivoted to parameter sensitivity analysis
+- [x] Determine how theta affects game stability (should be sensitive + indicative)
+- [x] Scale to 30 agents (research suggests significant distribution changes)
+- [x] If time: vary initial wealth distribution, vary simultaneous vs random action order
+- [ ] Read core literature across all areas (see reading list below) — ongoing
+- [x] Metrics pipeline: can compute Gini, action stability, distributions from runs
 
 ### Reading List (core papers -- TODO: prioritize and track)
 **RL + emergent social structures**:
@@ -49,7 +56,27 @@ Rubric reminder (what matters):
 
 **Validation / methodology**:
 - [ ] Larooij & Tornberg 2025 - LLM agent validation critique
-- [ ] Dubey et al. 2018 - Investigating Human Priors (semantic ablation inspiration)
+- [x] Dubey et al. 2018 - Investigating Human Priors (semantic ablation inspiration)
+
+**From Debraj (Feb 13)**:
+- [x] Debraj's paper with master student - RL in similar game (MUST READ): https://dl.acm.org/doi/10.5555/3635637.3662962
+- [x] TextGrad (Zou group) - prompt sensitivity tool: https://github.com/zou-group/textgrad
+- [ ] EGG (Facebook) - emergence of language framework: https://github.com/facebookresearch/EGG
+
+**Debraj's other papers (added Feb 17)**:
+- [ ] Mengesha & Roy 2025 - "Evolutionary Game Selection Leads to Emergent Inequality" (ICCS 2025). Game selection co-evolves with strategies → inequality. Connects to our finding that architectures "select" different equilibria. https://link.springer.com/chapter/10.1007/978-3-031-97557-8_21
+- [ ] Mengesha & Roy 2025 - "Carbon pricing drives critical transition to green growth" (Nature Communications). ABM with critical transitions — methodological reference for phase transition analysis.
+- [ ] Dupont & Roy 2025 - "Emergent poverty traps at multiple levels impede social mobility" (Humanities & Social Sciences Communications). Multi-level emergence and poverty traps — connects to our Matthew Effect finding.
+- [ ] Bazyleva, Garibay & Roy 2024 - "Trajectory-based global sensitivity analysis in multiscale models" (Scientific Reports). GSA methodology for ABMs — could inform parameter sensitivity analysis.
+
+**Reasoning depth & faithfulness** (added Feb 18):
+- [ ] Zhang et al. 2025 - "K-Level Reasoning: Establishing Higher Order Beliefs in LLMs for Strategic Reasoning" (NAACL 2025). K-Level framework for varying reasoning depth. https://arxiv.org/abs/2402.01521
+- [ ] Turpin et al. 2023 - "Language Models Don't Always Say What They Think: Unfaithful Explanations in CoT Prompting" (NeurIPS 2023). CoT can be systematically biased without model acknowledging it. https://arxiv.org/abs/2305.04388
+- [ ] Lanham et al. 2023 - "Measuring Faithfulness in Chain-of-Thought Reasoning" (Anthropic). Faithfulness varies by task; larger models = less faithful. https://arxiv.org/abs/2307.13702
+- [ ] Chen et al. 2025 - "Reasoning Models Don't Always Say What They Think" (Anthropic). Reasoning models construct fake rationales, <2% admit to using hints. https://arxiv.org/abs/2505.05410
+- [ ] arXiv:2502.20432 - "LLM Strategic Reasoning: Agentic Study through Behavioral Game Theory". CoT not universally effective — interacts with model capability.
+- [ ] arXiv:2601.15047 - "Game-Theoretic Lens on LLM-based Multi-Agent Systems". Formalizes reasoning equilibria — reasoning strategy changes the game's equilibrium.
+- [ ] Abdelnabi et al. 2024 - "Cooperation, Competition, and Maliciousness: LLM-Stakeholders Interactive Negotiation" (NeurIPS 2024). Structured CoT in multi-agent negotiation.
 
 **IR theory** (background, not central):
 - [ ] Waltz 1979 - Theory of International Politics
@@ -63,69 +90,249 @@ Rubric reminder (what matters):
 
 ---
 
-## Phase 2: Experimentation (Mar 1 - Apr 30)
-**Focus**: Run experiments across all conditions, iterate on design
+## Phase 2a: Architecture & Framing Experiments (Feb 17 - Feb 18) ✅ COMPLETE
+**Focus**: Do different LLM architectures produce distinct behavioral signatures? How does prompt framing interact?
 
-### Goals for this phase
-- [ ] RL agent (LSTM) trained and producing results
-- [ ] Systematic experiment runs across all 3 conditions
-- [ ] LLM prompt variation experiments (LLM-Control condition)
-- [ ] First round of metrics computed and compared across conditions
-- [ ] Experiment log documenting all runs, parameters, observations
-- [ ] TODO: which of Debraj's experiment ideas to include?
+### Key Results
+- **Gemma 2 27B**: 100 runs complete (5 framings × 20 reps). η²=0.901 — framing explains 90% of Gini variance
+- **Counterintuitive finding**: cautious framing (Gini 0.549) < cooperative (0.581)
+- **Trace analysis**: reasoning vocabulary predicts outcome within identical action distributions
+- Architecture comparison (cross-model) deprioritized: Qwen3-32B 8× slower, comparing models confounded
+- **Decision**: pivot to reasoning depth on single model (cleaner science, maps to Debraj's Level-0/1/2)
 
-### Key Questions to Resolve Before/During This Phase
-- How many runs per condition? (statistical power)
-- RL training: convergence criteria, hyperparameter sweep
-- Which prompt variations for LLM-Control?
-- Do we add semantic ablation experiments? (see semantic_ablation_idea.txt)
-- Spatial/partial info variant: core or stretch?
-
-### Stretch Goals (if time allows)
-- **Model scale comparison**: Run same conditions across models of increasing capability (e.g. small 8B -> mid-range -> frontier reasoning model). Early runs suggest enormous behavioral differences between Llama-8B and Gemini-3-Flash. Could reveal how model capability interacts with emergent structures. Risk: blows up experiment matrix, keep to 2-3 models max.
-- **Reasoning memory ablation**: Give agents persistent memory of their own reasoning across rounds (e.g. summary of previous strategy, stated intentions). Test whether this enables more complex behaviors like coalition formation (arm_other), which currently never occurs. Isolates whether the limitation is reasoning depth or memory/context.
-
-### Sprint Template (copy for each week)
-```
-### Sprint N: [dates]
-**Goal**: [one sentence]
-- [ ] task 1
-- [ ] task 2
-- [ ] task 3
-**Meeting notes**:
-**Next sprint direction**:
-```
+### Artifacts
+- Analysis: `arch_analysis.py`, `trace_analysis.py`, `notebooks/arch_exp_gemma2.ipynb`
+- 6 meeting plots: boxplot, trajectories, action dist, Cohen's d heatmap, keyword table, scatter
 
 ---
 
-## Phase 3: Analysis & Early Writing (May 1 - Jun 15)
-**Focus**: Analyze results, start writing thesis chapters
+## Phase 2b: Reasoning Depth Experiments (Feb 18 - ongoing) ✅ EXPLORATORY COMPLETE
+**Focus**: Isolate reasoning depth as the key variable. Vary reasoning instruction on ONE model (Gemma 2 27B) to test: does deeper reasoning change emergent social structure?
+**Status after Feb 27 meeting**: All exploratory work complete. Must rerun everything on Qwen 3.5-27B (dense) (Debraj: "one model, rerun everything"). Reasoning depth becomes one thesis chapter.
 
-### Goals for this phase
-- [ ] All experiments complete
-- [ ] Statistical analysis across conditions (ANOVA / effect sizes / Mann-Whitney)
-- [ ] Key figures and visualizations produced
-- [ ] Draft chapters: Methods (Ch 3), Results (Ch 4)
-- [ ] Literature Review chapter (Ch 2) drafted
-- [ ] Introduction framing refined based on actual results
+**Rationale for pivot** (decided Feb 18):
+- Comparing different models (Gemma vs Qwen) is confounded — they differ on 100 dimensions
+- Debraj's template: vary ONE parameter at a time on the same architecture
+- Cleaner science: isolate reasoning depth while holding model constant
 
-### Writing Plan (thesis chapters)
-| Chapter | Content | Depends On |
-|---------|---------|------------|
-| 1. Introduction | Motivation, RQ, thesis structure | Final results (to frame correctly) |
-| 2. Literature Review | Theory, related work | Phase 1 reading |
-| 3. Methods | Game design, agent architectures, experiment design | Phase 2 experiments |
-| 4. Results | Findings per condition, cross-condition comparison | Phase 2+3 analysis |
-| 5. Discussion | Interpretation, limitations, implications | Ch 4 results |
-| 6. Conclusion | Answer to RQ, future work | Ch 5 discussion |
+### Literature grounding
+- Kuusela & Roy (AAMAS 2024): Level-0 (heuristic) vs Level-2 (recursive) → more reasoning = more conflict
+- Zhang et al. (NAACL 2025): K-Level Reasoning framework for LLMs — recursive belief modeling
+- Pfau et al. (2024): "Let's Think Dot by Dot" — even filler tokens improve performance (computational depth matters independent of content)
+- Turpin et al. (NeurIPS 2023), Lanham et al. (2023): CoT not always faithful — frame as computational depth manipulation
+
+### Implementation
+- Reasoning levels implemented in `src/agents/prompts.py` via `REASONING_LEVELS` dict
+- JSON prompt template dynamically inserts reasoning instruction based on level
+- Backwards compatible: `reasoning_level='default'` preserves original behavior
+
+| Level | Label | Reasoning instruction | Observed tokens |
+|-------|-------|----------------------|-----------------|
+| 0 | Reactive | "State your choice briefly. Do not deliberate." | ~6 |
+| 1 | Strategic | "Calculate the expected value of each available action..." | ~31 |
+| 2 | Opponent modeling | "First predict what each nearby agent is likely to do..." | ~40 |
+| 3 | Recursive | "Consider that nearby agents are also reasoning about your likely actions..." | ~44 |
+
+### Experiment 3: Reasoning Depth Pilot ✅ COMPLETE
+**Design**: 4 reasoning levels × 3 reps = 12 runs, Gemma 2 27B, 30 agents, 50 rounds, spatial (r=2), zero costs
+**Config**: `experiments/reasoning_depth_pilot.yaml`
+
+**Results** (non-monotonic pattern — the key finding):
+
+| Level | Gini (mean±std) | Coop ratio | Top actions | Tokens |
+|-------|-----------------|------------|-------------|--------|
+| L0 | 0.566 ± 0.034 | 70% | invest_other 54%, do_nothing 25% | 6 |
+| L1 | 0.632 ± 0.064 | 63% | invest_other 47%, do_nothing 26% | 31 |
+| L2 | 0.624 ± 0.079 | 39% | arm_self 40%, invest_other 32% | 40 |
+| L3 | 0.712 ± 0.066 | 52% | invest_other 39%, attack 7% | 44 |
+
+- NOT "more reasoning = more cooperation" (naive expectation)
+- NOT "more reasoning = more conflict" (Kuusela & Roy's finding)
+- It's **non-monotonic and mechanism-dependent**: L0 cooperative, L1 strategic, L2 defensive/arming, L3 exploitative
+
+### Experiment 3b: Parameter Sweeps × Reasoning Depth
+**Question**: Does reasoning depth interact with game structure parameters?
+**Design**: 4 parameter sweeps × 4 reasoning levels × 3 reps each
+**Configs**: `experiments/sweep_{arm_cost,conflict_cost,invest_self,invest_return}_reasoning.yaml`
+
+| Sweep | Values | Status | Key finding |
+|-------|--------|--------|-------------|
+| arm_cost | 0, 2, 5 | ✅ 36/36 | **STRONG interaction**: L0 insensitive (Gini delta -0.045), L2 explodes (+0.226). L3 starts high, modest increase (+0.056) |
+| conflict_cost | 0, 3, 5 | ✅ 36/36 | Weak effect across all levels. L3 insensitive (delta -0.012) — attacks regardless of cost |
+| invest_self | true, false | ✅ 24/24 | **Strongest structural lever**: L0 collapses to 0.184 Gini with invest_self ON. L3 maintains 0.526 — highest even in safe regime |
+| invest_return | 2, 5, 20 | 0/36 (waiting for SLURM maintenance to end) | — |
+
+**Behavioral fingerprints confirmed across 96 runs (n=24 per level):**
+
+| Level | Gini | Coop% | Arm% | Atk% | Character |
+|-------|------|-------|------|------|-----------|
+| L0 | 0.535 | 65% | 0% | 3% | Naive cooperator |
+| L1 | 0.620 | 57% | 4% | 6% | Strategic calculator |
+| L2 | 0.608 | 34% | 37% | 2% | Defensive hoarder |
+| L3 | 0.693 | 47% | 16% | 8% | Selective predator |
+
+**Key insights from full sweep analysis:**
+- **arm_cost interaction** is the strongest: deeper reasoning AMPLIFIES structural incentives
+- **invest_self** is the strongest structural lever overall (delta up to 0.411)
+- **L3 is qualitatively different** from L2: cooperates more (47% vs 34%) but attacks 4× more (8% vs 2%). Cooperate-then-strike strategy.
+- **L0 is structurally blind**: Gini barely changes across any parameter manipulation
+- **L2 arms even when it's pointless** (31% arm_self with invest_self ON, where self-investment dominates)
+
+### Experiment 3c: Reasoning Depth Production (PLANNED)
+**Design**: 4 levels × 20 reps at optimized base params (selected from sweep results)
+**Config**: `experiments/reasoning_depth_production.yaml` (needs base param update after sweeps)
+**Purpose**: Statistical power for ANOVA, pairwise comparisons, Bayes factors
+
+### Next steps
+- [x] Complete parameter sweeps: arm_cost ✅, conflict_cost ✅, invest_self ✅
+- [ ] Complete invest_return sweep (SLURM maintenance, auto-submit will pick up)
+- [x] Analyze full sweep results (96/132 runs)
+- [ ] Select base parameters for production runs (genuine dilemmas)
+- [ ] Update production config with selected base params
+- [ ] Run production (80 runs) + power analysis from pilot ICC/effect sizes
+- [ ] Implement faithfulness validation (Lanham early-answering test on subset)
+
+---
+
+## Phase 2c: Origins — Phase Transitions × Reasoning Depth (~Mar 1 - Apr 15)
+**Focus**: The core thesis experiment. Does reasoning depth shift phase transitions in emergent social structure?
+
+This is the main contribution: emergent order arises from the *interaction* between reasoning depth and game structure, not from either alone.
+
+**Update after Feb 27 meeting**: All experiments must use Qwen 3.5-27B (dense, all 27B params active). Use the model's own reasoning traces (not instructed reasoning field). Debraj wants utility-based movement (Schelling-type) instead of random walk.
+
+### Design Principles
+- **Qwen 3.5-27B** (dense, replacing Gemma 2 27B — Debraj: one model only)
+- 20 reps per condition for statistical power
+- 50 rounds for trajectory analysis
+- 30 agents, spatial mode
+- Base parameters from Phase 2b sweep results (genuine dilemmas, not trivially dominant strategies)
+
+### Origins Factorial: Spatial Radius × Reasoning Depth
+**Config**: `experiments/origins_radius_reasoning.yaml`
+**Design**: 6 radii × 4 levels × 20 reps = 480 runs (~7-8 days on 4 GPUs)
+- Radii: 1, 2, 3, 4, 6, 10 (brackets the known transition at r=2→3, plus near-global)
+- Levels: L0, L1, L2, L3
+
+**Key questions**:
+- Does the cooperation→conflict phase transition shift with reasoning depth?
+- Do deeper-reasoning agents need stronger structural constraints to cooperate?
+- Is there a "cooperation frontier" in reasoning × structure space?
+
+### Analysis Plan
+- **Per reasoning level**: Gini vs radius curve (phase transition plot — the "hero figure")
+- **Two-way ANOVA**: reasoning_level × interaction_radius → Gini, cooperation_ratio
+- **Interaction effect**: partial η² for the reasoning × radius term
+- **Phase transition detection**: variance peak (susceptibility analogue), rolling-window EWS
+- **Mixed-effects**: `Gini ~ reasoning_level * radius + (1|RunID)` with Satterthwaite df
+- **Bayes factors** for key pairwise comparisons (following Akata et al., 2025)
+
+### Stretch experiments (if time/compute)
+- Information architecture × reasoning depth (resource visibility, history)
+- Scale effects (10, 20, 30 agents × reasoning level)
+
+### Deliverables
+- 4 phase transition curves (one per level) in single plot
+- Interaction effect sizes with CIs
+- Gini + cooperation trajectory plots per condition (mean + CI bands)
+- Mixed-effects model output table
+
+---
+
+## Phase 2d: Credible Commitment (~Apr 1 - Apr 30)
+**Focus**: Can enforceable contracts solve the Hobbesian trap that no reasoning level escapes?
+
+Approved by Debraj as **separate thesis chapter** alongside reasoning depth.
+
+### Design
+- Same game, same agents, add one mechanism: enforceable contracts with collateral
+- Agent proposes contract to neighbor ("we invest in each other this round")
+- Target accepts or refuses. If accepted: collateral locked. Deviation = lose collateral.
+- One contract per agent per round. Contract lasts one round.
+
+### Collateral Sweep
+| Condition | Description | Prediction |
+|-----------|-------------|------------|
+| No contract | Baseline anarchy | War equilibrium |
+| 0% collateral | Cheap talk (communication) | Minimal effect |
+| 10% collateral | Light commitment | Some cooperation |
+| 25% collateral | Moderate commitment | Transition zone? |
+| 50% collateral | Serious commitment | Stable cooperation? |
+| 100% collateral | Full commitment | Maximum cooperation |
+
+**Design**: 6 collateral levels × 20 reps = 120 runs
+
+### Extensions (if time permits)
+- Multi-party contracts (kartels, allianties, maffia)
+- Asymmetrische contracten (patronage, bescherming)
+- Contract duration (variabel, agent-chosen)
+- Delegation (mandaat aan een ander agent)
+- Agent-chosen collateral (agents kiezen zelf hoeveel ze inleggen)
+- Heterogeneous model mix (slim + dom, exploitatie-dynamiek)
+
+### Robustness & Validation
+
+### Prompt sensitivity
+- Report FormatSpread (Sclar et al., 2024) or PromptSensiScore (Zhuo et al., 2024)
+- Test semantically equivalent reformulations of L0-L3 prompts
+- **TextGrad Option B**: Run both original + TextGrad-optimized prompts as robustness check. If optimized prompts produce similar behavioral fingerprints → prompts are robust. If different → sensitivity finding.
+
+### Faithfulness validation
+- Implement Lanham et al.'s early-answering test on subset of runs
+- If compute allows: Thought Anchors resampling (Bogdan et al., 2025) on critical rounds
+- Report concordance: stated reasoning vs actual action choice
+
+### Trace coding
+- LACA framework (Chew et al., 2023): codebook → LLM coding → human verification
+- Inter-rater reliability with Gwet's AC1
+- Theory-of-mind depth coded per trace
+- Track prompted vs observed reasoning level divergence
+
+### Deliverables
+- Cross-model comparison (1-2 plots)
+- Prompt sensitivity analysis (incl. TextGrad Option B comparison)
+- Faithfulness validation results
+- Trace coding reliability report
+
+---
+
+---
+
+## Phase 3: Analysis & Writing (May 1 - Jun 15)
+**Focus**: Full statistical analysis to publishable standard, write thesis chapters
+
+### Analysis (publishable standard — see `notes/publishable_checklist.md`)
+- [ ] All experiments complete (Phase 2b production + 2c Origins factorial + 2d robustness)
+- [ ] Mixed-effects models with proper nesting: `Gini ~ reasoning_level * param + Round + (1|RunID)`
+- [ ] Effect sizes (Cohen's d, partial η²) + 95% CIs for everything
+- [ ] Bayes factors for key comparisons
+- [ ] Phase transition detection: EWS, variance peaks, critical point estimation
+- [ ] Trace coding with LACA framework, inter-rater reliability
+- [ ] All figures: colorblind-safe, vector format, error bars, individual trajectories visible
+
+### Writing Plan
+| Chapter | Content | Depends On | Outline status |
+|---------|---------|------------|----------------|
+| 1. Introduction | Hobbesian Trap framing → gap → contribution | Final results | TODO outline done |
+| 2. Literature Review | 6 sections: ABM, MARL, LLM agents, reasoning depth, phase transitions, gap | Reading | TODO outline done |
+| 3. Methods | Game design, reasoning levels, experimental design, metrics | Phase 2 experiments | TODO outline done |
+| 4. Results | System characterization, reasoning depth effects, origins factorial | Phase 2+3 analysis | Not started |
+| 5. Discussion | Interpretation, faithfulness, limitations, implications | Ch 4 results | TODO outline done |
+| 6. Conclusion | Answer to RQ, future work | Ch 5 | Not started |
 
 ### Suggested Writing Order
-1. Methods (you know this best already)
+1. Methods (know this best, write while running experiments)
 2. Results (write as you analyze)
-3. Literature Review (you've read the papers)
-4. Discussion (interpret your results)
-5. Introduction (frame based on what you found)
+3. Literature Review (papers read)
+4. Discussion (interpret results)
+5. Introduction (frame based on findings)
 6. Conclusion (last)
+
+### Claims calibration reminder
+- Strong evidence → "We find that..."
+- Moderate evidence → "Our results suggest..."
+- Weak/exploratory → "We observe preliminary evidence that..."
+- Frame reasoning depth as "computational depth manipulation", not cognitive claims
 
 ---
 
@@ -208,16 +415,104 @@ Key findings:
 - What parameter regime to standardize on
 - Is coalition formation (arm_other) worth pursuing through parameter tuning?
 
-**Next**:
+**Outcome**: Meeting shifted thesis direction. Phase 1 = understand the system first. Phase 2 = prompt variation. RL is optional/lightweight.
+**Next**: Sprint 2 -- system characterization begins
 
-<!--
-### Sprint 2: Feb 13 - Feb 20
-**Phase**: Foundation
-**Goal**: TODO (set after Sprint 1 meeting)
-- [ ]
-**Outcome**:
-**Next**:
--->
+### Sprint 2: Feb 13 - Feb 27
+**Phase**: System Characterization
+**Goal**: Get baseline running at scale, implement metrics, start theta analysis
+
+**Context from Debraj's paper (Kuusela & Roy, AAMAS 2024):**
+- Paper: 2 civilizations, Stag Hunt under uncertainty, I-POMDP with reasoning levels
+- Key finding: more reasoning → MORE conflict (counterintuitive). Fear spiral reinforces itself.
+- His method: systematically vary one parameter at a time, track action distributions + trajectories, connect to theory
+- His reasoning levels (0→1→2) map to our prompt variations (minimal → history → social CoT)
+- His "morality parameter" maps to our objective framing
+- He tracks action quality (WHY agents choose), not just WHAT they choose → use our reasoning traces as data
+- **This paper is our methodological template. Follow the same structure.**
+
+**TextGrad (Zou group, Nature 2025):**
+- Automatic prompt optimization via "textual backpropagation"
+- Verdict: cite it, don't integrate it. It reduces sensitivity; we want to measure and understand it.
+- Reference for literature review / future work section
+
+#### Week 1 (Feb 13-19): Setup & Metrics
+- [x] Read Debraj's paper
+- [x] Check TextGrad repo
+- [ ] Define theta = c/b for each action in current game design
+- [ ] Pick baseline: one objective (maximize_resources), minimal prompt, locked parameters
+- [ ] Implement Gini coefficient calculation over time (per round, not just final)
+- [ ] Implement action stability metric: what % of agents switch action between rounds?
+- [ ] Test scaling: run with 10, 15, 30 agents -- does it work? API costs? Runtime?
+
+#### Week 2 (Feb 20-26): Baseline Runs & Theta Sweep
+- [ ] Run baseline at 30 agents: multiple runs with same config, measure variance
+- [ ] Do agents stabilize? Plot action distribution per round over time
+- [ ] Plot Gini trajectory over time -- does hierarchy emerge or stay flat?
+- [ ] Start theta sweep: vary c/b ratio for one action at a time, measure effect on stability
+- [ ] Check EGG repo (Facebook, emergence of language)
+
+#### Literature (across both weeks)
+- [ ] Huh - Comprehensive Survey of RL
+- [ ] Riedl - Emergent Coordination
+- [ ] Ju et al. 2024 - Sense and Sensitivity
+- [ ] Park et al. 2023 - Generative Agents (re-read)
+- [ ] Leibo et al. 2017 - Multi-agent RL in Sequential Social Dilemmas
+
+#### Deliverables for Debraj (Feb 27)
+- Gini trajectory plot for baseline (30 agents, multiple runs)
+- Action stability plot (do agents converge?)
+- First theta sweep results: how does c/b ratio affect game dynamics?
+- Report on what you learned from the system characterization
+- Literature progress update
+
+**Outcome (updated Feb 18)**: Phase 1 complete (142 runs). Phase 2a complete (100 Gemma 2 runs, η²=0.901). Pivoted to reasoning depth on single model. Phase 2b pilot complete: non-monotonic pattern (L0 coop → L1 aggressive → L2 defensive → L3 exploitative). Parameter sweeps running. arm_cost × reasoning interaction effect is the strongest finding. Publishable thesis standard adopted.
+**Decisions**: Reasoning depth on single model (Gemma 2) over cross-model comparison. 4 reasoning levels (L0-L3). Parameter sweeps to find genuine dilemma parameters. Publishable quality standard.
+
+**Outcome (updated Feb 27)**: Presented all results to Debraj. He said "very publishable" — first time. Major decisions:
+- **Both directions approved**: reasoning depth (chapter) + credible commitment (chapter)
+- **One model strictly**: switch to Qwen 3.5-27B (dense), rerun ALL characterisation
+- **Reasoning model traces**: use model's own CoT, not instructed reasoning field
+- **Utility-based movement**: replace random walk with Schelling-type movement
+- **Stabilisation**: metrics must be shown as time plots or after stabilisation, not just end-values
+- **invest_self ON as baseline**: show stalemate as reference point
+- **TextGrad**: investigate for prompt engineering + uncertainty quantification
+- **K-instructed prompting is defensible** as method
+See `notes/meeting_prep_27_feb.md` for full meeting notes.
+Slides archived: `notes/archive/slides/meeting27slidedeck.key`
+
+### Sprint 3: Feb 27 - Mar 14
+**Phase**: Model transition + Qwen characterisation
+**Goal**: Deploy Qwen 3.5-27B, rerun baselines, implement stabilisation + network metrics
+**Sprint log**: `notes/sprint_3_feb27-mar14.md`
+
+#### Plan (3 phases within sprint)
+
+**Phase 1 — Baselines op Qwen (weekend + week 1)**
+- [ ] Deploy Qwen 3.5-27B (dense) on Snellius + validation test
+- [ ] Fingerprint: 20 neutral runs → baseline
+- [ ] K-level reasoning sweep: L0/L1/L2/L3 × 5 reps = 20 runs
+- [ ] Radius sweep: 4-6 radii × 3 reps × L0 = 12-18 runs
+- [ ] Invest_self ON vs OFF comparison (2×5 reps)
+
+**Phase 2 — Nieuwe mechaniek (week 2-3)**
+- [ ] Implement utility-based movement (Schelling-type)
+- [ ] K-level × radius factorial on best params from Phase 1
+
+**Phase 3 — Contracts (week 3+)**
+- [ ] Contract mechanism design + implementation
+- [ ] Separate chapter, builds on Phase 1-2 params
+
+#### Done
+- [x] Stabilisation metrics implemented (rolling std, Gini/coop/entropy convergence)
+- [x] Network analysis + Leiden + ingroup/outgroup integrated into pipeline
+- [x] production_design.md archived (superseded by Qwen switch)
+- [x] Test scripts for Qwen 3.5-27B created
+
+#### Still TODO
+- [ ] TextGrad investigation (Debraj suggestion)
+- [ ] Reasoning model traces: use Qwen's own CoT instead of instructed field
+- [ ] Literature: Turpin, Lanham, TextGrad paper, Zhang K-Level
 
 ---
 
@@ -233,17 +528,44 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Feb 4 | First simulation runs with varying configs | Testing prompt sensitivity, objective effects | - |
 | Feb 9 | Disable invest_self for main experiments | With invest_self on, most agents default to self-investment every round -- safe but boring. Turning it off forces social interaction, which is what the thesis investigates. | - |
 | Feb 9 | Be careful with "semantic priors" as explanation | Can observe THAT architectures differ, not claim WHY. Architecture + pretraining + inference all differ. Thesis is descriptive, not explanatory. Already in forbidden terms list. | - |
-| | | | |
+| Feb 13 | Phase 1 = characterize the system before varying prompts | Can't interpret prompt effects without understanding baseline system behavior | Debraj: "Without that, it's impossible to say anything about changing the prompting later" |
+| Feb 13 | RL is optional/lightweight, not core | LLM prompt variation is the main investigation. RL as simple baseline if used at all. | Debraj: "RL might not be needed, but we'll see. Keep it simple." |
+| Feb 13 | Scale to 30 agents | Research suggests significant distribution changes at scale | Debraj's recommendation |
+| Feb 13 | Vary theta (cost/benefit ratio) as the key parameter | Single systematic parameter to understand system sensitivity | Debraj: "This is the only parameter we vary at this point" |
+| Feb 13 | Drop theta framing, do parameter sensitivity analysis | Theta (c/b) only works for invest actions. Military actions have context-dependent expected values (depends on opponent, arms, coalitions). Vary individual params one at a time instead. Spirit of Debraj's instruction preserved. | - |
+| Feb 13 | Confirmed: invest_self off for baseline | 30-agent run with invest_self on = 100% stalemate (Gini=0.000). invest_self off = hegemon emergence (Gini=0.928). Need dynamics to characterize. | - |
+| Feb 16 | Launch Architecture Experiments as Phase 2a | Phase 1 showed architecture is dominant variable (Cohen's d > 3). Maps to Debraj's Level-0/Level-2 framework. Must characterize architectures before Origins experiments (need to know which models produce dynamics). | - |
+| Feb 16 | 50-round games for Arch experiments | 10 rounds too short for trajectory analysis — cooperation dynamics and hegemon formation need 30+ rounds to stabilize. 50 rounds captures full trajectory. | - |
+| Feb 16 | Llama 3.3 70B unsuitable for Origins | 100% do_nothing across all 20 runs, zero variance. Cannot produce the dynamics needed for Origins experiments. Need alternative open-weight model from Snellius tests. | - |
+| Feb 17 | Combined Exp 1+2 on Snellius per model | Running fingerprint (neutral × 20 reps) + framing factorial (5 framings × 20 reps) in single job per model. Efficient use of Snellius GPU time. | - |
+| Feb 18 | Pivot from cross-model comparison to reasoning depth on single model (Gemma 2 27B) | Cleaner science: isolates ONE variable (reasoning depth). Cross-model comparison confounded by 100+ differences. Maps to Debraj's Level-0/1/2 framework. Computationally feasible. | Anticipated approval — will present Feb 27 |
+| Feb 18 | 4 reasoning levels (L0-L3), not 3 | L3 (recursive) added after pilot showed non-monotonic L0→L2 pattern. L3 tests whether recursive reasoning cooperates again or escalates further. Answer: L3 is most exploitative (Gini 0.712, 7% attack). | - |
+| Feb 18 | Parameter sweeps before production runs | Zero-cost regime makes arm_self trivially dominant. Must find base params that create genuine strategic dilemmas. 4 sweeps launched: arm_cost, conflict_cost, invest_self, invest_return. | - |
+| Feb 18 | Adopt publishable thesis standard | Created `notes/publishable_checklist.md` with comprehensive quality requirements. Updated CLAUDE.md to enforce standards. Key: mixed-effects models, effect sizes + CIs + Bayes factors, faithfulness validation, LACA trace coding. | - |
+| Feb 18 | Frame reasoning depth as computational depth manipulation | Not claiming agents "reason" or have ToM. Prompts change computational depth (supported by Pfau et al., 2024). Traces are behavioral data, not mechanistic explanations. | - |
+| Feb 27 | Both directions: reasoning depth + credible commitment | Debraj approved both as separate thesis chapters. Reasoning depth is the "agent" chapter, credible commitment is the "environment" chapter. | "Do both! Nobody has done this before." |
+| Feb 27 | Switch to Qwen 3.5-27B (dense) as sole model | All prior work was exploratory on multiple models. Production must use one model only. Qwen 3.5-27B chosen: dense (all 27B params active), reasoning model, strong performance (SWE-bench 72.4, IFEval 95.0). MoE variant (35B-A3B) had vLLM compat issues. | "One model! Rerun everything!" |
+| Feb 27 | Use model's own reasoning traces, not instructed reasoning | Qwen 3.5 is a reasoning model — its own CoT is the data. The instructed "reasoning" JSON field is not the same as the model's actual reasoning process. | "Use THEIR reasoning traces as object of observation" |
+| Feb 27 | Replace random walk with utility-based movement | Random walk prevents relationship formation (agents see new neighbors every round). Schelling-type movement enables ingroup/outgroup dynamics. | "In real life, movement is utility-based, never random" |
+| Feb 27 | K-instructed prompting is defensible | Even though we now use a reasoning model, instructed K-level prompting remains a valid methodology for varying reasoning depth. | Explicit approval |
+| Feb 27 | Invest_self ON as baseline, not excluded condition | Stalemate (Gini 0.000) is itself an interesting result and provides context for all other conditions. | "Show it as a baseline" |
 
 ---
 
 ## Risk Register
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| RL agent doesn't converge / learn meaningful policy | High | Start early, try multiple architectures, consult Debraj |
-| Prompt sensitivity makes LLM results unreliable | Medium | LLM-Control condition explicitly tests this |
-| Not enough time for all experiments | Medium | Prioritize core comparison (RL vs LLM-Comp), cut stretch goals |
-| Results show no difference between conditions | Low (still publishable) | "Null result" is a valid finding -- material incentives dominate |
-| Scope creep (spatial, language variation, ablation...) | Medium | Core experiments first, extras only if time allows |
-| Writing takes longer than expected | High | Start Methods chapter early (Phase 2), don't save all writing for Phase 4 |
+| Risk | Impact | Mitigation | Status |
+|------|--------|------------|--------|
+| System doesn't stabilize / no clear baseline behavior | High | Vary theta systematically, try different parameter regimes | ✅ Resolved — system well-characterized |
+| Scaling to 30 agents: API costs, runtime, context window limits | Medium | Test incrementally (6 -> 15 -> 30), monitor costs | ✅ Resolved — 30 agents works fine |
+| Prompt sensitivity makes LLM results unreliable | Medium | FormatSpread analysis, semantically equivalent reformulations | Active — Phase 2d |
+| Compute budget exceeded before Origins factorial | Low | 75K extra SBU goedgekeurd (totaal ~77.4K). Ruim voldoende. | ✅ Resolved |
+| Results show no difference across reasoning levels | Low (moot) | "Null result" = publishable. But pilot shows strong effects. | ✅ Moot — strong effects found |
+| Faithfulness objection undermines trace analysis | High | Frame as computational depth, not cognitive claims. Implement Lanham/Thought Anchors validation. | Phase 2d |
+| Single-model limitation weakens generalizability claim | Medium | Using Qwen 3.5 only. Acknowledge in limitations. Credible commitment chapter generalizes across models by design. | Accepted |
+| Non-monotonic pattern not robust to base parameter change | Medium | Parameter sweeps running now to check. arm_cost interaction effect survives across values. | Must revalidate on Qwen 3.5 |
+| Writing takes longer than expected | High | Chapter outlines already created. Start Methods early. | Outlines done |
+| Scope creep (two chapters + extensions) | **High** | Debraj approved both directions but risk of spreading too thin. Prioritize: (1) Qwen deploy, (2) characterisation rerun, (3) reasoning depth, (4) credible commitment. Extensions are stretch goals. | **Active — monitor closely** |
+| Model transition delays | Medium | All prior results are exploratory. Qwen 3.5 may behave differently. Budget time for re-characterisation. | New |
+| Qwen 3.5-27B reasoning depth effects differ from Gemma 2 | Medium | 27B dense (all params active). Pilot first, compare behavioral fingerprints with Gemma 2 results. | New |
+| SBU budget for double experiments | Low | 75K extra SBU goedgekeurd. Ruim budget voor beide chapters + extensies. | ✅ Resolved |

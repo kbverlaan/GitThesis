@@ -405,6 +405,136 @@ def cooperation_rate_timeseries(history: List[Dict]) -> List[float]:
     return timeseries
 
 
+def stabilisation_round(timeseries: List[float],
+                        window: int = 10,
+                        threshold: float = 0.02) -> Optional[int]:
+    """
+    Detect the round at which a timeseries stabilises.
+
+    Uses a rolling window: the system is "stabilised" when the standard
+    deviation of the metric within the window drops below threshold AND
+    stays below for all subsequent windows.
+
+    Args:
+        timeseries: List of metric values, one per round (e.g. Gini per round).
+        window: Rolling window size (default 10 rounds).
+        threshold: Max std within window to count as stable (default 0.02).
+
+    Returns:
+        Round index (0-indexed) at which stabilisation begins, or None if
+        the system never stabilises.
+    """
+    if len(timeseries) < window:
+        return None
+
+    # Compute rolling std
+    for start in range(len(timeseries) - window + 1):
+        segment = timeseries[start:start + window]
+        if np.std(segment) > threshold:
+            continue
+        # Check all subsequent windows also stable
+        all_stable = True
+        for check_start in range(start, len(timeseries) - window + 1):
+            if np.std(timeseries[check_start:check_start + window]) > threshold:
+                all_stable = False
+                break
+        if all_stable:
+            return start
+
+    return None
+
+
+def compute_stabilisation_metrics(round_metrics: List[Dict],
+                                  window: int = 10,
+                                  threshold: float = 0.02) -> Dict:
+    """
+    Compute stabilisation metrics for a completed run.
+
+    Checks whether key metrics (Gini, cooperation rate, action distribution)
+    converge by the end of the simulation.
+
+    Args:
+        round_metrics: List of per-round metric dicts (from compute_round_metrics).
+                       Each must have 'gini', 'action_distribution', and optionally
+                       'resources' keys.
+        window: Rolling window for stabilisation detection.
+        threshold: Std threshold for stabilisation.
+
+    Returns:
+        Dict containing:
+            - 'gini_stabilisation_round': round where Gini stabilised (or None)
+            - 'gini_stabilised': bool
+            - 'gini_final_std': std of Gini over last `window` rounds
+            - 'coop_rate_stabilisation_round': round where coop rate stabilised
+            - 'coop_rate_stabilised': bool
+            - 'coop_rate_final_std': std over last window
+            - 'action_entropy_stabilisation_round': round where action entropy stabilised
+            - 'action_entropy_stabilised': bool
+            - 'action_entropy_final_std': std over last window
+            - 'overall_stabilised': True if ALL key metrics stabilised
+            - 'latest_stabilisation_round': max of all stabilisation rounds (or None)
+    """
+    if not round_metrics:
+        return {
+            'gini_stabilisation_round': None, 'gini_stabilised': False,
+            'gini_final_std': 0.0,
+            'coop_rate_stabilisation_round': None, 'coop_rate_stabilised': False,
+            'coop_rate_final_std': 0.0,
+            'action_entropy_stabilisation_round': None, 'action_entropy_stabilised': False,
+            'action_entropy_final_std': 0.0,
+            'overall_stabilised': False, 'latest_stabilisation_round': None,
+        }
+
+    # Extract timeseries
+    gini_ts = [m['gini'] for m in round_metrics]
+
+    # Cooperation rate per round
+    coop_ts = []
+    for m in round_metrics:
+        dist = m.get('action_distribution', {})
+        invest = dist.get('invest_other', 0)
+        meaningful = sum(v for k, v in dist.items() if k not in ('no_action', 'do_nothing'))
+        coop_ts.append(invest / meaningful if meaningful > 0 else 0.0)
+
+    # Action distribution entropy per round (Shannon)
+    entropy_ts = []
+    for m in round_metrics:
+        dist = m.get('action_distribution', {})
+        total = sum(dist.values())
+        if total == 0:
+            entropy_ts.append(0.0)
+            continue
+        probs = np.array([v / total for v in dist.values() if v > 0])
+        entropy_ts.append(float(-np.sum(probs * np.log2(probs))))
+
+    # Detect stabilisation
+    gini_stab = stabilisation_round(gini_ts, window, threshold)
+    coop_stab = stabilisation_round(coop_ts, window, threshold * 2)  # coop rate more volatile
+    entropy_stab = stabilisation_round(entropy_ts, window, threshold * 5)  # entropy wider range
+
+    # Final window stats
+    def final_std(ts):
+        if len(ts) >= window:
+            return float(np.std(ts[-window:]))
+        return float(np.std(ts)) if ts else 0.0
+
+    stab_rounds = [r for r in [gini_stab, coop_stab, entropy_stab] if r is not None]
+
+    return {
+        'gini_stabilisation_round': gini_stab,
+        'gini_stabilised': gini_stab is not None,
+        'gini_final_std': final_std(gini_ts),
+        'coop_rate_stabilisation_round': coop_stab,
+        'coop_rate_stabilised': coop_stab is not None,
+        'coop_rate_final_std': final_std(coop_ts),
+        'action_entropy_stabilisation_round': entropy_stab,
+        'action_entropy_stabilised': entropy_stab is not None,
+        'action_entropy_final_std': final_std(entropy_ts),
+        'overall_stabilised': all(r is not None for r in [gini_stab, coop_stab, entropy_stab]),
+        'latest_stabilisation_round': max(stab_rounds) if stab_rounds else None,
+    }
+
+
 def fc_variance_across_runs(run_histories: List[List[Dict]]) -> Dict:
     """
     Compute variance of cooperation rate across runs at each round.

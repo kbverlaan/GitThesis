@@ -16,26 +16,63 @@ At the end of this journey, Koen must be able to confidently say: "I wrote this 
 
 ## Project Context
 
-**RQ**: Do different agent architectures (RL vs LLM) produce different patterns of emergent social structures in the same coordination environment?
+**RQ**: How does reasoning depth interact with game structure to shape emergent social order in multi-agent LLM systems?
 
-**Design**: Three conditions -- RL (LSTM), LLM-Comparison (minimal prompt), LLM-Control (prompt variations). Same game, same goal (maximize absolute resources), different reasoning architectures.
+**Design** (updated Feb 18): Reasoning depth (L0-L3) is manipulated via prompt instruction on a single model (Gemma 2 27B), crossed with game structure parameters (spatial radius, costs/benefits). Phase 1 characterizes the system. Phase 2 is the reasoning depth × structure factorial. The thesis aims for publishable quality.
 
 **Timeline**: Feb 2026 - Jul 15 2026 (submission), defence late July.
+**Meetings**: Biweekly Fridays 14:00 with Debraj (next: Feb 27).
+**Ambition**: Publishable thesis — see `notes/publishable_checklist.md` for full quality checklist.
 
-**Current phase**: Foundation (Feb) -- literature review, simulation polish, RL groundwork.
+**Current phase**: Phase 1 → Phase 2 transition. System characterization (parameter sweeps) running. Reasoning depth pilot complete with strong results. Next: full factorial (reasoning depth × spatial radius).
+
+### Debraj's Methodological Template
+
+Debraj's paper "Higher Order Reasoning under Intent Uncertainty Reinforces the Hobbesian Trap" (AAMAS 2024, with master student Otto Kuusela) is the methodological template for this thesis. It reveals what Debraj values and expects:
+
+1. **Systematically vary ONE parameter at a time.** He varied reasoning level, morality, observation noise -- each independently. For Koen: vary theta (cost/benefit), then prompt dimensions, one at a time.
+2. **Seek counterintuitive findings.** His best result: more reasoning → more conflict (not less). For Koen: look for "more X surprisingly leads to less Y" type results.
+3. **Theoretically grounded.** Always connect to existing framework (Stag Hunt, Hobbes). Not "look what happens" but "theory X predicts Y, does it hold?"
+4. **Emergence from simple rules.** Simple agents, complex outcomes. Keep the game minimal, let structure emerge.
+5. **Clean metrics over time.** Track action distributions, probabilities, streaks -- not just final outcomes but trajectories.
+6. **Track WHY agents choose actions.** He collected action quality data (Q-values). For Koen: use reasoning traces as data, not just decoration.
+
+His reasoning levels (level-0 → level-1 → level-2) map to Koen's prompt variations:
+- Level-0 (fixed policy) → "State your choice briefly. Do not deliberate."
+- Level-1 (best response) → "Calculate the expected value of each available action..."
+- Level-2 (opponent modeling) → "First predict what each nearby agent is likely to do..."
+- Level-3 (recursive) → "Consider that nearby agents are also reasoning about your likely actions..."
+
+When Koen feels lost about what to do next or how to structure experiments, refer back to this template. Ask: "What would Debraj's paper do here?"
 
 ### Key Documents
 
 | Document | Location | Purpose |
 |----------|----------|---------|
-| Roadmap | `notes/roadmap.md` | Monthly phases, weekly sprint log, decision log, risk register |
+| Roadmap | `notes/roadmap.md` | Phases, sprint log, decision log, risk register |
+| Current sprint | `notes/sprint_2_feb13-27.md` | Active sprint tasks, daily log, deliverables |
+| Experiment log | `notes/experiment_log.md` | All 142 runs documented with observations |
 | Meeting prep | `notes/meeting_prep_[date].md` | Agenda and notes per supervisor meeting |
 | Proposal (submitted) | `text/proposal/` | LaTeX proposal, submitted Jan 30 |
-| Thought log | `text/proposal/thought_log.md` | Research question evolution, conceptual review |
 | Research question | `text/proposal/research_question.txt` | Current RQ framing and experimental design |
+| Thought log | `text/proposal/thought_log.md` | Research question evolution, conceptual review |
 | Simulation | `simulation/src/` | Game engine, LLM agent, prompts, analysis |
 | Ideas | `notes/ideas.txt` | Parking lot for future directions |
-| Simulation observations | `notes/simulation_observations.txt` | First results from LLM runs |
+| Quality checklist | `notes/publishable_checklist.md` | Full publishable standard checklist |
+
+### Publishable Thesis Standard
+
+This thesis aims for publication quality. Claude must actively enforce these standards:
+
+**Experimental rigor**: Every run must be fully reproducible (seed, config, model version, hardware logged). Minimum 20 runs per condition. Base parameters must create genuine dilemmas (no trivially dominant strategies). Power analysis before production runs.
+
+**Statistical discipline**: Report effect sizes (Cohen's d, partial η²) and 95% CIs for everything — never p-values alone. Use Bayes factors for key comparisons (following Akata et al., 2025). Mixed-effects models with RunID as random effect. Correct for multiple comparisons. Distinguish confirmatory from exploratory.
+
+**Reasoning trace integrity**: Always frame traces as behavioral data, not mechanistic explanations. Cite faithfulness literature (Turpin, Lanham, Chen). Implement at least one faithfulness validation (early-answering or Thought Anchors resampling). Frame prompts as manipulating computational depth, not semantic content.
+
+**Claims calibration**: Match claim strength to evidence. Strong evidence → "We find", moderate → "suggests", weak → "preliminary evidence". Never claim causality without faithfulness caveat. The novel claims are: (1) reasoning depth produces qualitatively different emergent structures, (2) the effect is non-monotonic and conditional on game structure, (3) extension of Hobbesian Trap from 2-agent RL to 30-agent LLM.
+
+**When Claude reviews experimental design or analysis code**: actively check against `notes/publishable_checklist.md` and flag gaps. Do not let methodological shortcuts slide because "it's just a master thesis."
 
 ### Working Process: Weekly Sprints
 
@@ -456,8 +493,8 @@ This document should evolve as Koen learns what works. Updates should reflect:
 - New boundaries discovered through practice
 - Refinements to maintain authentic authorship
 
-**Last modified**: 2026-02-09
-**Next review**: Start of Phase 2 (Experimentation, ~Mar 1)
+**Last modified**: 2026-02-18
+**Next review**: After Feb 27 meeting with Debraj
 
 ---
 
