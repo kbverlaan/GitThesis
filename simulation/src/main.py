@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from game.engine import GameEngine, GameState
 from game.spatial import SpatialField
 from agents.llm_agent import LLMAgent
-from analysis.metrics import compute_round_metrics
+from analysis.metrics import compute_round_metrics, check_early_stopping
 from analysis.network import analyze_run_networks
 
 
@@ -241,6 +241,22 @@ def run_simulation(game_params: dict,
     # Run simulation
     max_rounds = game_params['max_rounds']
     action_order = game_params.get('action_order', 'simultaneous')
+
+    # Early stopping config (Two-Phase Adaptive; Lee et al. 2015, JASSS 18(4))
+    early_stop_cfg = game_params.get('early_stopping', {})
+    early_stop_enabled = early_stop_cfg.get('enabled', False)
+    early_stopped = False
+    early_stop_reason = None
+    if early_stop_enabled:
+        max_rounds = early_stop_cfg.get('max_rounds', max_rounds)
+        es_min_rounds = early_stop_cfg.get('min_rounds', 15)
+        es_patience = early_stop_cfg.get('patience', 5)
+        es_gini_threshold = early_stop_cfg.get('gini_threshold', 0.01)
+        es_entropy_threshold = early_stop_cfg.get('entropy_threshold', 0.05)
+        print(f"Early stopping: enabled (min={es_min_rounds}, max={max_rounds}, "
+              f"patience={es_patience}, gini_thr={es_gini_threshold}, "
+              f"entropy_thr={es_entropy_threshold})")
+
     start_time = time.time()
     all_round_metrics = []
     previous_actions_map = None
@@ -296,18 +312,25 @@ def run_simulation(game_params: dict,
             reasoning = ""
             if agent_traces:
                 last_trace = agent_traces[-1]
-                response_text = last_trace.get('response', '') or ''
-                try:
-                    # Strip <think>...</think> blocks before JSON extraction
-                    import re
-                    clean_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-                    start_idx = clean_text.find('{')
-                    end_idx = clean_text.rfind('}') + 1
-                    if start_idx >= 0 and end_idx > start_idx:
-                        parsed = json.loads(clean_text[start_idx:end_idx])
-                        reasoning = parsed.get('reasoning', 'No reasoning provided')
-                except:
-                    reasoning = "Could not parse reasoning"
+                # Prefer the 'thinking' field (populated by vLLM reasoning parser
+                # for models like Qwen3.5 that use <think> tokens)
+                thinking = last_trace.get('thinking', '') or ''
+                if thinking:
+                    # Truncate for log display (full trace saved in traces JSON)
+                    reasoning = thinking[:300] + ('...' if len(thinking) > 300 else '')
+                else:
+                    # Fallback: try to extract reasoning from JSON response body
+                    response_text = last_trace.get('response', '') or ''
+                    try:
+                        import re
+                        clean_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+                        start_idx = clean_text.find('{')
+                        end_idx = clean_text.rfind('}') + 1
+                        if start_idx >= 0 and end_idx > start_idx:
+                            parsed = json.loads(clean_text[start_idx:end_idx])
+                            reasoning = parsed.get('reasoning', 'No reasoning provided')
+                    except:
+                        reasoning = "Could not parse reasoning"
 
             return agent_id, action, reasoning
 
@@ -411,6 +434,23 @@ def run_simulation(game_params: dict,
         stability_str = f"{metrics['action_stability']:.0%}" if metrics['action_stability'] is not None else "n/a"
         print(f"\n  Metrics: Gini={metrics['gini']:.3f}  Palma={metrics['palma']:.2f}  Stability={stability_str}")
 
+        # Early stopping check (Phase 2: after min_rounds, check convergence)
+        if early_stop_enabled:
+            should_stop, stop_reason = check_early_stopping(
+                all_round_metrics,
+                min_rounds=es_min_rounds,
+                patience=es_patience,
+                gini_threshold=es_gini_threshold,
+                entropy_threshold=es_entropy_threshold,
+            )
+            if should_stop:
+                print(f"\n{'='*70}")
+                print(f"EARLY STOPPING at round {round_num}: {stop_reason}")
+                print(f"{'='*70}")
+                early_stopped = True
+                early_stop_reason = stop_reason
+                break
+
         # Update agent memories
         if memory_config.get('enabled', False):
             post_resources = dict(updated_state.resources)
@@ -510,6 +550,9 @@ def run_simulation(game_params: dict,
         "total_prompt_tokens": total_prompt_tokens,
         "total_completion_tokens": total_completion_tokens,
         "total_tokens": total_prompt_tokens + total_completion_tokens,
+        "early_stopped": early_stopped,
+        "early_stop_reason": early_stop_reason,
+        "early_stop_round": len(all_round_metrics) if early_stopped else None,
         "system": {
             "platform": platform.platform(),
             "python": platform.python_version(),

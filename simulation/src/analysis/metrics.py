@@ -1,6 +1,21 @@
 """
 Metrics for system characterization.
 Computes inequality and stability measures per round.
+
+Design references:
+- Gini coefficient: standard inequality measure (Atkinson, 1970).
+- Palma ratio: ratio of top 10% to bottom 40% income share
+  (Palma, 2011; Cobham & Sumner, 2013). More sensitive to tail inequality
+  than Gini, relevant for wealth concentration in agent systems.
+- Theil T index: information-theoretic inequality measure (Theil, 1967).
+  Decomposable into between-group and within-group components.
+- Atkinson index: welfare-based inequality with aversion parameter epsilon
+  (Atkinson, 1970). epsilon controls sensitivity to bottom of distribution.
+- Cooperation ratio: fraction of meaningful actions that are invest_other.
+  Operationalizes cooperation as revealed preference (behavioral, not stated).
+- Retaliation probability: measures tit-for-tat dynamics (Axelrod, 1984).
+- Stabilisation detection: rolling window std threshold, inspired by
+  early warning signals methodology (Scheffer et al., 2009).
 """
 
 from typing import Dict, List, Optional
@@ -533,6 +548,79 @@ def compute_stabilisation_metrics(round_metrics: List[Dict],
         'overall_stabilised': all(r is not None for r in [gini_stab, coop_stab, entropy_stab]),
         'latest_stabilisation_round': max(stab_rounds) if stab_rounds else None,
     }
+
+
+def check_early_stopping(round_metrics: List[Dict],
+                         min_rounds: int = 15,
+                         patience: int = 5,
+                         gini_threshold: float = 0.01,
+                         entropy_threshold: float = 0.05) -> tuple:
+    """
+    Online early stopping check — call after each round.
+
+    Two-phase adaptive stopping inspired by Lee et al. (2015, JASSS 18(4))
+    rolling-window variance for ABM convergence detection. No published
+    LLM multi-agent paper uses online convergence detection — Akata et al.
+    (2025), Park et al. (2023), Kuusela & Roy (AAMAS 2024) all use fixed
+    horizons. This is a methodological contribution.
+
+    Phase 1: Always run at least min_rounds (exploration).
+    Phase 2: Stop if Gini AND action entropy are stable for `patience`
+             consecutive rounds (relative change criterion).
+
+    Stability is defined as: range(metric) over last `patience` rounds
+    is below the threshold (absolute, scale-invariant for 0-1 metrics).
+
+    Args:
+        round_metrics: list of per-round metric dicts (must have 'gini'
+                       and 'action_distribution' keys)
+        min_rounds: minimum rounds before early stopping can trigger
+        patience: number of consecutive stable rounds required
+        gini_threshold: max allowed range of Gini over patience window
+        entropy_threshold: max allowed range of action entropy over patience window
+
+    Returns:
+        (should_stop: bool, reason: str or None)
+    """
+    n = len(round_metrics)
+
+    # Phase 1: never stop before min_rounds
+    if n < min_rounds:
+        return (False, None)
+
+    # Need at least `patience` rounds of data
+    if n < patience:
+        return (False, None)
+
+    window = round_metrics[-patience:]
+
+    # Check Gini stability
+    ginis = [m['gini'] for m in window]
+    gini_range = max(ginis) - min(ginis)
+    gini_stable = gini_range < gini_threshold
+
+    # Check action entropy stability (Shannon entropy of action distribution)
+    entropies = []
+    for m in window:
+        dist = m.get('action_distribution', {})
+        total = sum(dist.values())
+        if total == 0:
+            entropies.append(0.0)
+            continue
+        probs = np.array(list(dist.values()), dtype=float) / total
+        probs = probs[probs > 0]
+        entropies.append(float(-np.sum(probs * np.log2(probs))))
+
+    entropy_range = max(entropies) - min(entropies)
+    entropy_stable = entropy_range < entropy_threshold
+
+    if gini_stable and entropy_stable:
+        reason = (f"converged over {patience} rounds: "
+                  f"gini_range={gini_range:.4f}<{gini_threshold}, "
+                  f"entropy_range={entropy_range:.4f}<{entropy_threshold}")
+        return (True, reason)
+
+    return (False, None)
 
 
 def fc_variance_across_runs(run_histories: List[List[Dict]]) -> Dict:

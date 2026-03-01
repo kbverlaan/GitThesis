@@ -316,6 +316,9 @@ def run_sweep(spec_path: str):
                 'fc_timeseries': fc_timeseries,
                 'network': network_summary,
                 'stabilisation': stab_metrics,
+                'early_stopped': run_metadata.get('early_stopped', False),
+                'early_stop_round': run_metadata.get('early_stop_round'),
+                'early_stop_reason': run_metadata.get('early_stop_reason'),
                 'elapsed_seconds': round(run_elapsed, 1),
                 'timestamp': datetime.now().isoformat(),
             }

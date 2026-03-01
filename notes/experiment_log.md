@@ -776,3 +776,61 @@ Discuss with Debraj on Feb 27. Key question: is comparing Gemma vs Qwen (100 con
 - `data/runs/RUNID_metrics.json`
 
 -->
+
+---
+
+## Run: invest_return sweep — L1 (job 20201444)
+- **Date**: 2026-03-01
+- **Phase**: Phase 2c (Parameter Characterisation)
+- **Purpose**: Test effect of invest_other_return_pct=25 on L1 vs L3 behaviour
+
+### Config
+| Parameter | Value |
+|-----------|-------|
+| num_agents | 10 |
+| initial_resources | 25.0 |
+| max_rounds | 10 |
+| model | Qwen 3.5-27B (dense) |
+| reasoning_level | L1 (2 reps) |
+| invest_other_return_pct | 25 |
+| invest_self | OFF |
+| memory | ON |
+| spatial | ON (radius=2) |
+
+### Results (L1, both reps)
+| Metric | Rep 1 | Rep 2 |
+|--------|-------|-------|
+| Final Gini | 0.000 | 0.000 |
+| Cooperation ratio | 0% | 0% |
+| Top action | do_nothing (100%) | do_nothing (100%) |
+| Stabilisation | Round 1 | Round 1 |
+
+### Observations
+- do_nothing is strictly dominant for L1 without invest_self: all other actions have negative EV for the actor
+- invest_other costs 10%, returns 25% to target — positive for target, negative for investor
+- Agents correctly calculate EV in thinking traces and choose rationally
+- Raising invest_other_return_pct to 25 does not break do_nothing equilibrium at L1
+
+### Files
+- `data/runs/qwen_sweep_invest_return/` (L1 results only)
+
+---
+
+## Run: invest_return sweep — L3 (job 20201444, CRASHED)
+- **Date**: 2026-03-01
+- **Phase**: Phase 2c
+- **Purpose**: L3 reasoning depth with invest_other_return_pct=25
+- **Status**: CANCELLED DUE TO TIME LIMIT at round 7/10. Traces NOT saved.
+
+### Partial Results (from SLURM stdout, rounds 1-7)
+- Round 1: 3 attacks, 7 do_nothing. Gini=0.034
+- Round 3: 2 attacks, 8 do_nothing. Gini rising
+- Round 4: 1 arm_self, 1 invest_other, 1 attack. First cooperative action!
+- Round 7: Gini=0.108, mix of arm/attack/do_nothing
+
+### Key Finding: Hobbesian Trap
+L3 agents calculate the same negative EV as L1 but some break equilibrium by reasoning about others' potential future aggression — preemptive attack logic. Agents reason: "if I don't attack now, they might attack me later." This is the Hobbesian Trap pattern (Kuusela & Roy, AAMAS 2024).
+
+### Rerun
+- Job 20203534: 20 rounds, 5h time limit, logging fix applied
+- Config: `experiments/qwen_l3_rerun_invest_return.yaml`
