@@ -27,6 +27,48 @@ SURPASS SCENARIO:
   Start 1 agent with 2x resources, measure when others attack. Does reasoning
   depth lower the threshold for preventive conflict?
 
+NETWORK REWIRING INSTEAD OF GRID MOVEMENT (Mar 2):
+  Replace fixed spatial grid with dynamic social network. Instead of agents
+  moving on a grid, agents periodically rewire connections: drop low-utility
+  neighbours, add new ones (random or preferential attachment).
+  - Solves Debraj's "random movement isn't representable" feedback (Jan 30)
+  - Movement becomes part of base game, not an IV — keeps IVs independent
+  - Rewiring rules (e.g., drop worst neighbour every N rounds) are engine-level,
+    no LLM decision needed
+  - Enables richer network metrics (clustering evolution, community detection,
+    degree distribution) — already have code for this in metrics.py
+  - Architecturally: replaces grid + interaction_radius with adjacency graph.
+    Significant refactor of engine.py, main.py, prompts.
+  - Literature: Santos et al. (2006) "Cooperation prevails when individuals
+    adjust their social ties", Perc et al. (2017). Also Epstein & Axtell (1996)
+    for spatial ABM comparison.
+  - Options for rewire rule: utility-based (drop lowest-return neighbour),
+    threat-based (drop most-armed neighbour), random with bias, or Schelling-
+    style threshold (flee if >k% hostile neighbours).
+  - DECISION: Discuss with Debraj on Mar 14 before implementing. Risk: big
+    refactor with 1723 SBU remaining.
+
+---
+
+## Possible PhD Directions
+
+ENDOGENOUS MECHANISM DESIGN — AGENTS CREATE THE RULES (Mar 2):
+  Instead of fixed game rules, let agents propose/modify rules themselves.
+  Options:
+  - Agents vote on rule changes each N rounds (constitutional AI)
+  - Concordia-style Game Master (GM) that adjudicates emergent rules
+  - Agents propose institutions (enforcement, taxation, trade agreements)
+    and a GM LLM evaluates feasibility/consistency
+  Current thesis: fixed rules, manipulate cognition/info/enforcement as IVs.
+  This direction: rules themselves are endogenous → everything is emergent.
+  Fundamentally different research question: not "how does X shape order"
+  but "what institutions do agents create, and do they converge on efficient
+  mechanisms?" — endogenous mechanism design.
+  Literature: Concordia (DeepMind, 2023), constitutional AI (Anthropic),
+  Ostrom (1990) on self-governance, Maskin (1999) implementation theory.
+  Too big for thesis — kills causal inference (no controlled IVs).
+  Strong PhD venue: "Emergent Institutions in LLM Societies."
+
 ---
 
 ## Possible Paper Directions
@@ -47,11 +89,11 @@ SEMANTIC ABLATION (Dubey et al. 2018):
 
 ## Parking Lot
 
-- Spatial/partial information variant (agents walk around, local info only) [Debraj, Jan 30]
+- Spatial/partial information variant [Debraj, Jan 30] → see NETWORK REWIRING above
 - Language variation experiments [Debraj interest area]
 - RL with semantic vectors (same context as LLM agents) — level the playing field
 - Moltbook video — add to lit review on emergent social structures
 
 ---
 
-*Last updated: 2026-02-28*
+*Last updated: 2026-03-02*

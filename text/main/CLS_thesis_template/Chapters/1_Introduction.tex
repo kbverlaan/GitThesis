@@ -16,65 +16,81 @@
 %   - Classical ABM tradition showed this with simple rules (Schelling 1971, Epstein & Axtell 1996)
 %   - But now agents can REASON about their situation via LLMs
 %   - Core tension: does the structure of the environment determine outcomes,
-%     or does HOW agents reason about it matter equally?
+%     or does HOW agents reason, WHAT they know, and WHETHER they can commit
+%     matter equally?
 %
 % Key references:
 %   \cite{schelling1971} — micro-rules → macro-patterns (foundational)
 %   \cite{epstein1996} — Sugarscape: growing artificial societies
-%   \cite{axelrod1984} — cooperation from self-interested agents via repeated interaction
+%   \cite{axelrod1984} — cooperation from self-interested agents
 %   \cite{nowak2006five} — five mechanisms for cooperation evolution
 
 % -----------------------------------------------------------------------------
-% SECTION 1.2: Why Reasoning Depth Matters
+% SECTION 1.2: The Mechanism Design Framework
 % -----------------------------------------------------------------------------
-\section{Reasoning Depth as a Variable}
-% TODO: Introduce the key insight that motivates the thesis
-%   - LLM agents don't just act — they reason before acting
-%   - This reasoning has COMPUTATIONAL depth: each token is an additional forward pass
-%     \cite{pfau2024dots} — even meaningless filler tokens improve multi-step computation
-%     \cite{goyal2024think} — learnable pause tokens boost performance
-%   - Deeper reasoning doesn't uniformly help in strategic settings:
-%     \cite{zhang2024klevel} — K-Level Reasoning: too much depth yields diminishing returns
-%     \cite{duan2024gtbench} — GTBench (NeurIPS): CoT doesn't always help, sometimes hurts
-%     \cite{jia2025cot} — CoT not universally effective; interacts with reasoning level
-%   - This connects to Kuusela & Roy (AAMAS 2024): more reasoning → more conflict
-%     in RL agents. Does the same hold for prompted reasoning in LLMs?
+\section{Three Inputs to Social Order}
+% TODO: Introduce the theoretical framing that structures the thesis
+%   - Hurwicz (1960) mechanism design: three inputs determine outcomes in any
+%     social interaction:
+%     (1) How agents reason/optimize (solution concept)
+%     (2) What agents know about each other (type/information space)
+%     (3) How agents can communicate and commit (message space)
+%   - Hobbes (1651) identified the same three factors as causes of conflict
+%     in the state of nature: competition, diffidence, lack of common power
+%   - This thesis manipulates all three as independent variables:
+%     IV1: Reasoning depth (L0-L3 prompted reasoning)
+%     IV2: Information structure (visibility, memory)
+%     IV3: Communication & enforcement (no-comm → cheap talk → contracts)
 %
-% TODO: Frame the gap:
-%   - K-Level Reasoning tested in 2-player competitive settings
-%   - No one has tested reasoning depth × game structure in multi-agent coordination
-%     with emergent social structure as the dependent variable
+% TODO: Brief preview of why each matters
+%   - IV1: Kuusela & Roy (AAMAS 2024) showed higher reasoning → more conflict in RL.
+%     Does this hold for LLMs? Is it non-monotonic?
+%   - IV2: Most LLM game studies give agents full information. Real social
+%     systems have local observation + memory. What changes?
+%   - IV3: Hobbes's solution (Leviathan) is enforcement. Does adding credible
+%     commitment shift LLM agents from conflict to cooperation?
 
 % -----------------------------------------------------------------------------
 % SECTION 1.3: Research Question
 % -----------------------------------------------------------------------------
 \section{Research Question}
 % TODO: State main RQ:
-%   "How does reasoning depth interact with game structure to shape
-%    emergent social order in multi-agent LLM systems?"
+%   "How do strategic reasoning, information structure, and enforcement mechanisms
+%    each shape the emergence of social order in multi-agent LLM systems?"
 %
 % TODO: Operationalize:
 %   - Reasoning depth: L0 (reactive) → L1 (strategic) → L2 (opponent modeling) → L3 (recursive)
-%   - Game structure: spatial constraints, costs/benefits, interaction radius
+%   - Information: visibility radius + persistent per-agent memory vs full info
+%   - Communication: no-comm → cheap talk → binding contracts
 %   - Emergent social order: inequality (Gini), cooperation rate, conflict onset,
-%     action distributions, phase transitions
+%     community structure, phase transitions
 %
-% TODO: Sub-questions:
-%   SQ1: Does reasoning depth change emergent behavior? (pilot + production)
-%   SQ2: Does reasoning depth interact with game parameters? (cost sweeps)
-%   SQ3: Does reasoning depth shift phase transitions? (origins factorial)
+% TODO: Sub-questions (mapped to IVs):
+%   SQ1: How does reasoning depth interact with game structure to shape emergent order?
+%        (extends Kuusela & Roy from RL to LLM)
+%   SQ2: How does information structure (visibility, memory) modulate these effects?
+%        (Harsanyi's incomplete information in an LLM setting)
+%   SQ3: Does adding communication and enforcement shift the system from Hobbesian
+%        conflict toward cooperative order?
+%        (the "Leviathan hypothesis")
 
 % -----------------------------------------------------------------------------
 % SECTION 1.4: Contributions
 % -----------------------------------------------------------------------------
 \section{Contributions}
 % TODO: Explicit contributions:
-%   1. Reasoning depth operationalization via prompt manipulation on a single model,
-%      extending K-Level Reasoning (Zhang et al.) from 2-player to N-agent coordination
-%   2. Systematic characterization of reasoning depth × game structure interaction effects
-%   3. Evidence that phase transitions in emergent social structure shift with reasoning depth
-%   4. Methodological contribution: prompt-based reasoning manipulation as controlled
-%      experimental variable (vs. comparing different models, which is confounded)
+%   1. Extending the Hobbesian Trap (Kuusela & Roy) from 2-agent RL to 30-agent LLM,
+%      with prompt-based reasoning manipulation on a single model (Qwen 3.5-27B)
+%   2. First systematic manipulation of all three mechanism design inputs
+%      (reasoning, information, communication) in LLM multi-agent systems
+%   3. Persistent per-agent memory architecture as experimental variable
+%      (local observation + sliding window, not god-view profiles)
+%   4. Evidence for phase transitions in emergent social structure that shift
+%      with reasoning depth and information structure
+%   5. Reasoning traces as behavioral data (not explanation) with faithfulness
+%      validation via truncation tests and Thought Anchors
+%   6. Methodological: prompt-based reasoning manipulation as controlled IV
+%      (vs. comparing different models, which is confounded)
 %
 % TODO: What this is NOT:
 %   - Not claiming LLMs have "real" theory of mind
@@ -85,9 +101,16 @@
 % SECTION 1.5: Thesis Outline
 % -----------------------------------------------------------------------------
 \section{Thesis Outline}
-% TODO: Brief roadmap
-%   Ch 2: Literature — cooperation dynamics, LLM agents, reasoning depth, phase transitions
-%   Ch 3: Methods — game design, reasoning levels, experimental design, metrics
-%   Ch 4: Results — system characterization, reasoning depth effects, origins factorial
-%   Ch 5: Discussion — interpretation, connection to Debraj/K-level, limitations
-%   Ch 6: Conclusion
+% TODO: Brief roadmap (updated chapter structure — Ch4 merged into Ch3)
+%   Ch 2: Literature Review — ABMs to LLMs, mechanism design × Hobbes,
+%          three IVs (reasoning, information, communication), faithfulness,
+%          phase transitions
+%   Ch 3: Methods — game design, agent architecture + model selection,
+%          independent variables, experimental design, metrics,
+%          computational infrastructure (Snellius, vLLM, reproducibility)
+%   Ch 4: Results — OAT parameter characterization, reasoning depth effects,
+%          information/memory effects, communication effects, phase transitions
+%   Ch 5: Validation — CoT faithfulness tests, K-level reasoning verification,
+%          trace analysis methodology
+%   Ch 6: Discussion — interpretation, Hobbesian Trap extension, limitations
+%   Ch 7: Conclusion — answers to RQs, contributions, future work

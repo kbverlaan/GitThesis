@@ -1,0 +1,126 @@
+\chapter{Validation} % Chapter 5 (renumbered)
+\label{Validation}
+
+% =============================================================================
+% VALIDATION (5-8 pages)
+% Validates reasoning trace integrity, K-level reasoning manipulation,
+% and addresses faithfulness concerns. This chapter ensures the thesis
+% can defend its use of reasoning traces as behavioral data.
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% SECTION 6.1: Reasoning Trace Analysis
+% -----------------------------------------------------------------------------
+\section{Reasoning Trace Analysis}
+
+% TODO: 6.1.1 — Trace content overview
+\subsection{Trace Content by Reasoning Level}
+%   - Token count distributions: L0 vs L1 vs L2 vs L3
+%   - Qualitative examples of trace content per level
+%   - Does L2 actually mention opponent modeling? Does L3 show recursion?
+%   - Manipulation check: do higher levels produce qualitatively different traces?
+
+% TODO: 6.1.2 — Trace coding methodology
+\subsection{Systematic Trace Coding}
+%   - LACA framework (Chew et al., 2023): codebook → LLM coding → human verification
+%   - Codebook categories: payoff calculation, opponent prediction, recursive reasoning,
+%     threat assessment, cooperation signaling, resource tracking
+%   - Inter-rater reliability with Gwet's AC1
+%   - Frequency of each category per reasoning level
+%   - Key question: does L2 contain MORE opponent modeling than L1?
+%     Does L3 contain MORE recursive reasoning than L2?
+
+% -----------------------------------------------------------------------------
+% SECTION 6.2: Faithfulness Validation
+% -----------------------------------------------------------------------------
+\section{Faithfulness of Reasoning Traces}
+
+% TODO: 6.2.1 — The faithfulness problem
+\subsection{The Faithfulness Problem}
+%   - CoT traces may not reflect internal computation (Turpin et al., 2023)
+%   - Reasoning models construct post-hoc rationales (Chen et al., 2025)
+%   - CoT ≠ mechanistic explanation (Barez et al., 2025)
+%   - OUR FRAMING: traces are behavioral data, not explanations
+%     We measure what agents DO when given different computational depth,
+%     not what they "really think"
+
+% TODO: 6.2.2 — Truncation test (Lanham et al., 2023)
+\subsection{Truncation Test}
+%   - Method: for a subset of runs, truncate the thinking trace at various points
+%     and check if the final action changes
+%   - If truncating the opponent-modeling section of an L2 trace changes the action,
+%     that section has causal influence on the output
+%   - Expected: L0 traces trivially faithful (short, heuristic)
+%     L2/L3 traces: some sections causally relevant, others rationalizing
+%   - Report: fraction of traces where truncation changes action, per level
+
+% TODO: 6.2.3 — Thought Anchors (Bogdan et al., 2025)
+\subsection{Thought Anchors Analysis}
+%   - Method: counterfactual resampling at sentence level
+%   - Identify "thought anchors": sentences that, when resampled, change the outcome
+%   - Apply to subset of critical rounds (e.g., first attack, cooperation breakdown)
+%   - Expected: planning/uncertainty sentences are anchors, not filler
+%   - This is a stronger test than truncation (Bogdan et al., 2025)
+
+% TODO: 6.2.4 — TextGrad-inspired analysis
+\subsection{Gradient-Based Prompt Sensitivity}
+%   - Method: find minimal prompt perturbations that flip the action
+%   - If small changes to the reasoning instruction change behavior,
+%     the instruction has genuine causal influence
+%   - Report: sensitivity per reasoning level
+%   - Limitation: computational cost, may only be feasible on subset
+
+% -----------------------------------------------------------------------------
+% SECTION 6.3: K-Level Reasoning Verification
+% -----------------------------------------------------------------------------
+\section{K-Level Reasoning Verification}
+
+% TODO: 6.3.1 — Does the manipulation work?
+\subsection{Manipulation Check}
+%   - L0 should NOT predict opponents (instruction says "do not deliberate")
+%   - L1 should compute payoffs but NOT model opponents
+%   - L2 should predict opponent actions
+%   - L3 should reason about what opponents think about YOU
+%   - Check via trace coding: are these instructions followed?
+%   - Report: compliance rate per level
+
+% TODO: 6.3.2 — K-Level depth measurement
+\subsection{Depth Measurement}
+%   - Following Zhang et al. (NAACL 2025):
+%     Count levels of recursive reasoning in each trace
+%   - L0 should show depth 0, L2 should show depth 1, L3 should show depth 2
+%   - Do agents actually recurse to the instructed depth?
+%   - Or do they default to a lower level despite the instruction?
+
+% TODO: 6.3.3 — Compliance vs behavior
+\subsection{Compliance vs Behavioral Outcomes}
+%   - Even if L3 agents don't fully follow recursive instructions,
+%     they still BEHAVE differently from L0/L1
+%   - The behavioral effect is what matters for the thesis
+%   - The trace compliance is a secondary validation
+%   - Frame: "the prompt manipulation produces reliably different behavior
+%     and reasoning patterns, even if full recursive compliance is partial"
+
+% -----------------------------------------------------------------------------
+% SECTION 6.4: Robustness and Sensitivity
+% -----------------------------------------------------------------------------
+\section{Robustness Checks}
+
+% TODO: 6.4.1 — Prompt sensitivity
+\subsection{Prompt Sensitivity}
+%   - Test semantically equivalent reformulations of L0-L3 instructions
+%   - Report FormatSpread or PromptSensiScore
+%   - Key question: are results robust to wording, or fragile?
+
+% TODO: 6.4.2 — Seed stability
+\subsection{Seed Stability}
+%   - Across-run variance at same condition: ICC analysis
+%   - How many runs needed for stable effect estimates?
+%   - Report: variance decomposition (within-run vs between-run)
+
+% TODO: 6.4.3 — Generative ABM validation
+\subsection{Generative ABM Validity}
+%   - Following Larooij et al. (2025): focus on macro-level patterns
+%   - Do aggregate metrics (Gini, cooperation rate) show consistent trends
+%     across runs, even if individual agent behavior varies?
+%   - Are phase transitions reproducible across seeds?

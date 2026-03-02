@@ -1,0 +1,136 @@
+\chapter{Discussion} % Chapter 6 (renumbered)
+\label{Discussion}
+
+% =============================================================================
+% DISCUSSION (5-8 pages)
+% Rubric: Clarity of Conclusions (10% of Report)
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% SECTION 7.1: Interpretation of Results
+% -----------------------------------------------------------------------------
+\section{Interpretation of Results}
+
+% TODO: 7.1.1 — Reasoning depth effects (IV1)
+\subsection{Reasoning Depth and the Hobbesian Trap}
+%   - Non-monotonic pattern: L0→L1→L2→L3 (if confirmed by Qwen results)
+%   - Compare to Kuusela & Roy (AAMAS 2024):
+%     Their finding: higher reasoning → more conflict (L0→L1→L2)
+%     Our finding: [to be filled based on results]
+%   - Key comparison: same fear spiral, different behavioral expression?
+%     Kuusela & Roy: fear → pre-emptive attacks (only option in 2-action game)
+%     Our game: fear → defensive hoarding (arm_self) or attacks, depending on params
+%   - The fear spiral from deeper reasoning may be CONSERVED across game designs,
+%     but behavioral expression depends on available actions and game structure
+
+% TODO: 7.1.2 — Information structure effects (IV2)
+\subsection{Information and Memory Effects}
+%   - Does persistent memory change emergent structure?
+%   - Hobbes's "diffidence": does local (incomplete) information increase arming?
+%   - Do agents with memory develop more stable cooperative relationships?
+%   - Connection to Harsanyi: incomplete information games in LLM agents
+
+% TODO: 7.1.3 — Communication & enforcement effects (IV3)
+\subsection{Communication and Enforcement}
+%   - Does cheap talk actually change behavior? (Crawford & Sobel prediction)
+%   - Does enforcement reduce conflict? (Hobbes's Leviathan hypothesis)
+%   - Is enforcement MORE effective at higher reasoning depth?
+%     (sophisticated agents may better exploit commitment mechanisms)
+
+% TODO: 7.1.4 — Interaction effects
+\subsection{Interaction Effects Across IVs}
+%   - Does reasoning depth × information interact?
+%     (does information matter MORE at higher reasoning depth?)
+%   - Does reasoning depth × enforcement interact?
+%     (does enforcement help MORE for deeper reasoners?)
+%   - These interaction effects are the novel contribution
+
+% -----------------------------------------------------------------------------
+% SECTION 7.2: The Origins of Order
+% -----------------------------------------------------------------------------
+\section{The Origins of Order}
+% TODO: Answer the title question
+%   - Order emerges from the INTERACTION of reasoning, information, and enforcement
+%   - Neither alone determines outcomes:
+%     * Same structure, different reasoning → different outcomes
+%     * Same reasoning, different information → different outcomes
+%     * Same everything, with/without enforcement → different outcomes
+%   - The thesis demonstrates that ALL THREE mechanism design inputs matter
+%
+% TODO: Phase transition interpretation
+%   - If confirmed: critical point shifts with reasoning depth / information
+%   - This is a genuine interaction between cognition/knowledge and structure
+%   - Strongest theoretical contribution: parametric map of conditions under
+%     which social order emerges vs collapses
+
+% TODO: Connect to computational depth
+%   \cite{pfau2024dots}: the manipulation works because it changes computation,
+%     not just content. Even if traces are unfaithful, the prompt changes what
+%     the model computes before acting.
+
+% -----------------------------------------------------------------------------
+% SECTION 7.3: On Reasoning Traces
+% -----------------------------------------------------------------------------
+\section{On Reasoning Traces}
+% TODO: What can we claim?
+%   - Traces correlate with behavior (L2 mentions opponent modeling, L0 doesn't)
+%   - But correlation ≠ causation in trace content
+%   - The PROMPT manipulation is causal (it's the experimental variable)
+%   - The trace CONTENT may or may not reflect the actual computation
+%   - Validation chapter results: what did truncation/anchors show?
+%
+% TODO: The "computation, not content" framing
+%   - Our L0→L3 prompts change computational depth
+%   - This is a real intervention even if traces are unfaithful
+%   - Frame: "reasoning depth changes behavior" not "reasoning content explains behavior"
+%
+% TODO: Design choice — instruction, not computation budget
+%   - We manipulate instructed reasoning depth, NOT computational budget
+%   - Token counts are OBSERVED, not controlled
+%   - If L2 and L3 produce similar token counts but different behavior,
+%     the instruction matters beyond token count
+
+% -----------------------------------------------------------------------------
+% SECTION 7.4: Limitations
+% -----------------------------------------------------------------------------
+\section{Limitations}
+% TODO: Model specificity
+%   - Results on Qwen 3.5-27B — may not generalize to other architectures
+%   - Gemma 2 results provide some cross-model evidence for reasoning depth effects
+%
+% TODO: Game specificity
+%   - One coordination game design (invest/arm/attack)
+%   - Game parameters systematically varied, but topology is fixed
+%
+% TODO: Prompt sensitivity
+%   - Exact wording matters — report sensitivity analysis from Validation chapter
+%   - \cite{lore2024}: framing effects dominate in LLM games
+%   - We must distinguish reasoning depth effects from mere framing effects
+%
+% TODO: Scale
+%   - 10-30 agents — large enough for structure, not "society-scale"
+%   - Compute constraints limit scale
+%
+% TODO: Communication conditions
+%   - If Phase 2d not completed: acknowledge this as future work
+%   - IV3 may be partially tested
+
+% -----------------------------------------------------------------------------
+% SECTION 7.5: Implications
+% -----------------------------------------------------------------------------
+\section{Implications}
+% TODO: For computational social science
+%   - LLM agents are NOT neutral simulation tools — their reasoning shapes outcomes
+%   - Researchers using LLM-ABMs must control for reasoning depth AND information
+%   - Memory architecture choice is not "implementation detail" — it changes results
+%
+% TODO: For AI safety/alignment
+%   - Deeper reasoning doesn't mean "better" social outcomes
+%   - Non-monotonic effects: more capable AI may produce MORE inequality
+%   - Enforcement mechanisms matter: design for commitment, not just capability
+%   - \cite{dafoe2020}: our results directly address their open problems
+%
+% TODO: For mechanism design theory
+%   - Empirical evidence that all three Hurwicz inputs matter in LLM systems
+%   - Phase transitions may mark qualitative regime changes
+%   - Implications for designing multi-agent AI systems

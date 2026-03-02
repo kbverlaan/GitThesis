@@ -4,129 +4,392 @@
 % =============================================================================
 % METHODS (10-15 pages)
 % Rubric: Methods (20% of Report)
+%   "Were methods described such that study could be repeated?
+%    Was justification given for method choice?"
+% Rubric structure suggestion: Model Overview, Agent Architecture,
+%   Environment Design, Experimental Design, Analysis Methods
+%
+% Dual theoretical framing:
+%   - Mechanism Design (Hurwicz, 1960) = formal backbone. Three IVs map exactly
+%     to MD's three inputs: solution concept, type space, message space.
+%   - Hobbes (Leviathan, 1651) = narrative frame. Three causes of conflict:
+%     competition, diffidence, lack of common power.
+%   - Caveat: info→diffidence mapping is a causal chain (less info → more
+%     uncertainty → more defensive), not a direct equivalence. Diffidence also
+%     includes distrust WITH full info (which is really an enforcement problem).
+%   - Use MD in methods, Hobbes in intro/discussion.
 % =============================================================================
 
 % -----------------------------------------------------------------------------
 % SECTION 3.1: Game Design
 % -----------------------------------------------------------------------------
 \section{Coordination Game Design}
-% TODO: Describe the minimal game
-%   - 30 agents, 50 rounds, spatial grid
-%   - Action space: invest_other, arm_self, arm_other, attack, do_nothing
-%   - Each action's mechanics (costs, returns, combat resolution)
-%   - Why this specific design: minimal game enabling rich emergent structures
-%     (cooperation, conflict, coalitions, hierarchy)
-%   - Connect to Axelrod: agents optimize absolute resources (positive-sum possible)
+% TODO: Formal game specification (AAMAS expects this)
+%   - State space S: agent resources R_i ∈ R+, positions on grid, arm_bonus
+%   - Action space A: {do_nothing, invest_other(target), arm_self, attack(target)}
+%     NOTE: invest_self is OFF by default (trivially dominant, kills dilemma)
+%   - Observation function O: depends on interaction_radius (local visibility)
+%   - Transition function T: simultaneous resolution, %-based economy
+%   - Reward: R_i(t+1) — pure resource maximization, no utility function
+%
+% TODO: %-based economy (unified engine+prompt params, decision Mar 1)
+%   - All costs and returns are % of actor's resources (not absolute values)
+%   - invest_other: costs invest_other_cost_pct% of your resources,
+%     target receives invest_other_return_pct% of your resources
+%   - arm_self: costs arm_cost_pct% → becomes additive combat bonus,
+%     bonus decays by arm_decay (×0.5) each round
+%   - attack(target): winner takes attack_take_pct% of loser's resources,
+%     both pay conflict_cost_pct%. Combat: probabilistic, strength = resources + arm_bonus
+%   - do_nothing: free, no effect
 %
 % TODO: Game parameters table
-%   - Base params: invest_other_return=5, attack_take=40%, etc.
-%   - Spatial: grid layout, interaction_radius
-%   - Action order: simultaneous
+%   Base params: invest_other_cost=10%, invest_other_return=25%,
+%     attack_take=40%, conflict_cost=5%, arm_cost=10%, arm_decay=0.5
+%   Spatial: toroidal grid, interaction_radius=2 (default)
+%   Agents: 10 (default), simultaneous action resolution
+%   Rounds: max_rounds=50 with early stopping (see 3.3)
 %
 % TODO: Justify design choices
-%   - Why not PD/Stag Hunt? Too constrained for emergent structure
-%   - Why spatial? Enables local interaction → phase transitions at radius boundaries
-%   - Why 30 agents? Large enough for structure, small enough for LLM inference
+%   - Why not PD/Stag Hunt? Too constrained for emergent structure — only 2
+%     actions, no spatial dynamics, no resource accumulation, no coalitions.
+%     Our game has 4 action types × N targets = rich action space.
+%   - Why spatial? Enables local interaction, coalition formation along
+%     geographic lines, phase transitions at radius boundaries
+%     (Perc & Szolnoki, 2010; Wang et al., 2012)
+%   - Why 10 agents? Large enough for network structure (communities, hierarchy),
+%     small enough for LLM inference (10 concurrent API calls per round)
+%   - Why simultaneous? Removes first-mover advantage, closer to Nash setup
+%   - Why %-based? Scale-invariant — poor and rich agents face same dilemma
+%     structure. Prevents dominant strategies at extreme resource levels.
+%   - Connect to Axelrod (1984): positive-sum cooperation possible
+%   - Connect to Epstein & Axtell (1996): Sugarscape-inspired resource dynamics
+%
+% TODO: Spatial structure — OPEN DESIGN DECISION
+%   Current: fixed toroidal grid with interaction_radius
+%   Under consideration: network rewiring (dynamic social network instead of grid)
+%   - Agents periodically drop low-utility neighbours, add new ones
+%   - Solves "random movement not representable" (Debraj feedback, Jan 30)
+%   - See ideas.txt, discuss with Debraj Mar 14
+%   - If rewiring: cite Santos et al. (2006), Perc et al. (2017)
+%   - If grid: cite Schelling (1971), Epstein & Axtell (1996)
 
 % -----------------------------------------------------------------------------
-% SECTION 3.2: Reasoning Depth Manipulation
+% SECTION 3.2: Agent Architecture and Model Selection
+% (Rubric explicitly requires: "Agent Architecture — LLM setup, prompts, memory")
+% Model selection rationale merged from former Chapter 4.
 % -----------------------------------------------------------------------------
-\section{Reasoning Depth Manipulation}
-% TODO: The key experimental variable
+\section{Agent Architecture and Model Selection}
+
+% TODO: 3.2.1 — Model Selection (merged from former Ch 4.1)
+\subsection{Model Selection}
+%   Requirements for the thesis:
+%   1. Structured JSON output (action selection)
+%   2. Reasoning traces (<think> tokens) as behavioral data
+%   3. Open-weight (reproducibility, no API cost variance)
+%   4. Fits on 1× H100 80GB
+%   5. Single model — eliminates architecture confounds across all conditions
+%
+%   Candidates evaluated:
+%   - Phase 1: Gemma 2 27B IT (initial characterization, Dec 2025 - Feb 2026)
+%     Strong cooperation bias (70% invest_other at L0), framing effects (η²=0.90)
+%     Limitation: no native reasoning/thinking support
+%   - Qwen3-30B-A3B (MoE, 3B active): fast but shallow reasoning
+%   - QwQ-32B (dense reasoning): strong but no MTP, slower inference
+%   - Qwen3-235B-A22B (MoE, 22B active): needs 2-4 GPUs
+%   - Qwen3.5-27B (dense, Gated DeltaNet hybrid): selected
+%
+%   Why Qwen 3.5-27B:
+%   - Dense 27B — all params active every token (no MoE routing variance)
+%   - Native <think>...</think> reasoning tokens → traces as primary data
+%   - MTP speculative decoding: ~1.9× throughput (~490 tok/s)
+%   - Single H100 with 95% memory utilization
+%   - Apache 2.0 license (fully reproducible)
+%   - bf16 precision (FP8 tested Mar 2: 26% slower due to DeepGEMM overhead)
+%   - Temperature: 0.7 (fixed across all conditions)
+%   - vLLM reasoning parser separates thinking from output
+%
+% TODO: 3.2.2 — Prompt structure
+\subsection{Prompt Structure}
+%   Each round, each agent receives a prompt containing:
+%   1. System instructions (game rules, action descriptions, objective)
+%   2. Reasoning level instruction (L0-L3, see §3.3.1)
+%   3. Current state (own resources, visible neighbours and their resources)
+%   4. Memory (if enabled): accumulated local observations from past rounds
+%   5. Response format: JSON with action choice + reasoning field
+%
+%   Prompt is deterministic given state — same state = same prompt.
+%   Full prompt text in Appendix.
+%
+% TODO: 3.2.3 — Memory architecture
+\subsection{Agent Memory}
+%   Local observation memory (decision Mar 1):
+%   - Agents accumulate observations from their own perspective only
+%   - No god-view: agents don't know what happened outside their radius
+%   - Memory window: sliding window of last 10 rounds (configurable)
+%   - Per-neighbour: tracks last observed action, resources, round
+%   - Stale entries: neighbours that moved out of range show "last seen round X"
+%   - Memory OFF = no history, only current state (no reciprocity possible)
+%   - Memory ON = default. Without memory, do_nothing is Nash equilibrium
+%     (invest_other costs you 10%, returns go to target, not you)
+%
+%   Connect to theory:
+%   - Park et al. (2023): Generative Agents memory stream (ours is simplified)
+%   - No game-theory LLM paper has systematic memory architecture manipulation
+%     → potential methodological contribution
+%
+%   Key difference from standard ABM: memory is IN THE PROMPT, not in hidden
+%   state. What the agent "knows" is exactly what's in its context window.
+%   This is both a feature (transparent) and a limitation (context length bound).
+
+% -----------------------------------------------------------------------------
+% SECTION 3.3: Independent Variables
+% Framed as mechanism design's three formal inputs (Hurwicz, 1960)
+% -----------------------------------------------------------------------------
+\section{Independent Variables}
+
+% TODO: Brief framing paragraph
+%   Three IVs correspond to the three inputs of mechanism design (Hurwicz, 1960):
+%   1. Solution concept → reasoning depth (how agents compute strategies)
+%   2. Type space → information structure (what agents know)
+%   3. Message space → communication & enforcement (how agents coordinate)
+%   Each is manipulated independently while holding the other two constant.
+
+% TODO: 3.3.1 — IV1: Reasoning Depth (L0-L3)
+\subsection{Reasoning Depth}
+%   Operationalized as prompt-level manipulation of deliberation depth:
 %   - L0: "State your choice briefly. Do not deliberate."
-%   - L1: "Calculate the expected value of each available action given the current state,
-%          then choose the best one."
-%   - L2: "First predict what each nearby agent is likely to do this round based on their
-%          recent behavior and resources. Then choose your action considering their
-%          probable responses."
-%   - L3: "Consider that nearby agents are also reasoning about your likely actions.
-%          Predict their strategies given that they anticipate your behavior, and choose
-%          your best response to their anticipated best responses."
+%     → Heuristic/reactive, minimal computation (K-level 0)
+%   - L1: "Compute the expected resource change for each action, then choose
+%          the highest payoff. Do not predict what neighbors will do."
+%     → Best-response, no opponent modeling (K-level 1)
+%   - L2: "Predict each neighbor's most likely action based on their recent
+%          behavior, then choose your best response."
+%     → Opponent modeling, one level of recursion (K-level 2)
+%   - L3: "Your neighbors observe your recent actions and predict what you will
+%          do next. Predict their response to that prediction, then choose your
+%          best action."
+%     → Recursive reasoning, two levels of recursion (K-level 3)
 %
-% TODO: Connect to theoretical framework
-%   - Maps to K-Level Reasoning (Zhang et al., NAACL 2025)
-%   - Maps to Kuusela & Roy's level-0/1/2 framework
-%   - L0 = fixed heuristic, L1 = best response, L2 = opponent model, L3 = recursive
+%   Theoretical grounding:
+%   - Cognitive hierarchy theory: Camerer, Ho & Chong (2004, QJE)
+%   - K-Level Reasoning in LLMs: Zhang et al. (2024, NAACL)
+%   - Kuusela & Roy (2024, AAMAS): level-0/1/2 in 2-agent RL → Hobbesian Trap
+%   - Prompt as computational depth manipulation: Pfau et al. (2024)
 %
-% TODO: Why prompt manipulation, not different models?
-%   - Single model (Gemma 2 27B) eliminates confounds
-%   - Prompt changes computational depth (Pfau et al., Goyal et al.)
-%   - Cleaner than comparing models that differ on 100 dimensions
+%   Why prompt manipulation, not different models?
+%   - Single model eliminates architecture confounds
+%   - Same weights, same training data — only instruction changes
+%   - Cleaner causal inference than comparing models differing on 100 dims
 %
-% TODO: Validation of manipulation
-%   - Token counts: L0 ~6 tokens, L1 ~31, L2 ~40, L3 ~44
-%   - Qualitative trace inspection: L0 heuristic, L2 opponent modeling present
-%   - Backwards compatible: default behavior unchanged
+%   Faithfulness caveat (MUST include):
+%   - Reasoning traces are behavioral data, not mechanistic explanations
+%   - Cite: Turpin (2023), Lanham (2023), Chen (2025)
+%   - We manipulate prompt-elicited deliberation, not "true" reasoning depth
+%   - Thinking token distributions: L1 mean ~4800, L3 mean ~5600 (only 17% diff)
+%     → model thinks deeply regardless of prompt level
+
+% TODO: 3.3.2 — IV2: Information Structure
+\subsection{Information Structure}
+%   Two sub-manipulations (MD type space):
+%   (a) Visibility: interaction_radius controls observation range
+%       Radius 1 (local, ~4 neighbours) → radius 2 (~12) → global (all visible)
+%   (b) Memory: persistent local observations vs stateless
+%       See §3.2.3 for memory architecture details
+%
+%   Theoretical grounding:
+%   - Harsanyi (1967-68): incomplete information games, type uncertainty
+%   - Hobbes's "diffidence" (narrative frame, with caveat — see chapter header)
+%   - Information asymmetry creates strategic uncertainty → defensive behaviour
+%
+%   NOTE: hide_resources (agents see only own resources) was considered but
+%   not implemented. Focus is on spatial visibility + temporal memory.
+
+% TODO: 3.3.3 — IV3: Communication and Enforcement
+\subsection{Communication and Enforcement}
+%   Three conditions (MD message space):
+%   (1) No communication (baseline — Hobbesian state of nature)
+%       Agents choose actions based only on observation, no messaging
+%   (2) Cheap talk: pre-round messaging, not binding
+%       Agents can send messages to neighbors before choosing actions
+%       Messages have no enforcement — cheap talk (Crawford & Sobel, 1982)
+%   (3) Contracts with enforcement: binding agreements + punishment for defection
+%       Agents can propose/accept agreements; violation = automatic penalty
+%       Implements Hobbes's Leviathan: external enforcement enables cooperation
+%
+%   Theoretical grounding:
+%   - Crawford & Sobel (1982): strategic information transmission
+%   - Hurwicz (1960): message space as mechanism design input
+%   - Baliga & Sjöström (2004): arms races with/without communication
+%   - Schelling (1960): commitment as strategic tool
+%   - Dafoe et al. (2020): commitment as key to cooperative AI
+%
+%   STATUS: Not yet implemented (Phase 2d). Design finalized, implementation
+%   depends on Phase 2c results and compute budget.
 
 % -----------------------------------------------------------------------------
-% SECTION 3.3: Experimental Design
+% SECTION 3.4: Experimental Design
 % -----------------------------------------------------------------------------
 \section{Experimental Design}
-% TODO: 3.3.1 — System characterization (Phase 1)
-%   - Parameter sweeps: spatial radius, arm_cost, conflict_cost, invest_return,
-%     invest_self on/off
-%   - Each sweep × 4 reasoning levels × 3 reps
-%   - Purpose: understand base system + identify reasoning depth interactions
-%
-% TODO: 3.3.2 — Reasoning depth production (Phase 2)
-%   - 4 reasoning levels × 20 reps at selected base params
-%   - Statistical power for ANOVA
-%
-% TODO: 3.3.3 — Origins factorial (Phase 3)
-%   - Reasoning depth × spatial radius: 4 levels × 6 radii × 20 reps
-%   - Tests whether phase transitions shift with reasoning depth
-%   - This is the core experiment
-%
-% TODO: 3.3.4 — Robustness check
-%   - Repeat key conditions on second model (Qwen3-32B)
 
-% -----------------------------------------------------------------------------
-% SECTION 3.4: Infrastructure
-% -----------------------------------------------------------------------------
-\section{Infrastructure}
-% TODO: Technical setup
-%   - Gemma 2 27B IT on Snellius HPC (NVIDIA H100)
-%   - vLLM serving, ~34 min per run
-%   - Custom game engine + sweep framework
-%   - Compute budget: ~1000+ SBU
+% TODO: 3.4.1 — Two-phase adaptive stopping
+\subsection{Convergence Detection}
+%   Fixed max_rounds wastes compute on equilibrium runs and may cut short
+%   dynamic ones. Two-phase adaptive stopping (implemented Mar 1):
+%
+%   Phase 1 (exploration): run at least min_rounds=15. No early stopping.
+%   Phase 2 (convergence): after min_rounds, check after each round.
+%     Stop if BOTH metrics stable for patience=5 consecutive rounds:
+%     - Gini range over window < 0.01
+%     - Action entropy range over window < 0.05
+%     Hard cap at max_rounds=50.
+%
+%   Inspired by Lee et al. (2015, JASSS 18(4)) rolling-window ABM convergence.
+%   No published LLM multi-agent paper uses online convergence detection —
+%   Akata (2025), Park (2023), Kuusela & Roy (2024) all use fixed horizons.
+%   → Methodological contribution.
+%
+%   Logged: early_stopped flag, stop_reason, stop_round in metadata.
+
+% TODO: 3.4.2 — OAT Parameter Characterization
+\subsection{Parameter Characterization (OAT Screening)}
+%   One-at-a-time sweeps of game parameters on Qwen 3.5-27B:
+%   9 parameters × L1+L3 × 2 reps = ~116 runs
+%   Parameters: conflict_cost_pct, attack_take_pct, arm_cost_pct,
+%     invest_other_return_pct, invest_other_cost_pct, interaction_radius,
+%     invest_self toggle, memory toggle
+%   Purpose: identify sensitive parameters and reasoning depth × param interactions
+%   Follows Debraj's template: systematically vary ONE parameter at a time.
+%
+%   NOTE: invest_self is OFF by default in all sweeps. Even +2% net gain
+%   causes 100% invest_self in L1 runs (trivially dominant). Tested separately.
+
+% TODO: 3.4.3 — Reasoning Depth Production
+\subsection{Reasoning Depth Experiments}
+%   Based on OAT screening results:
+%   - L0/L1/L2/L3 × sensitive parameter values × 20 reps per condition
+%   - Purpose: main effect of reasoning depth + interaction with game structure
+%   - Statistical power: minimum 20 runs per condition for mixed-effects models
+%   - Key question: does Kuusela's Hobbesian Trap (2-agent RL) replicate
+%     in N-agent LLM systems?
+
+% TODO: 3.4.4 — Information Experiments
+\subsection{Information Structure Experiments}
+%   Radius × memory manipulation at fixed reasoning level:
+%   - interaction_radius: [1, 2, 3, global] × memory [on, off] × reps
+%   - Purpose: test whether more information reduces or increases conflict
+%   - Key question: does Harsanyi's insight hold — does type uncertainty
+%     drive defensive behaviour?
+
+% TODO: 3.4.5 — Communication Experiments (Phase 2d)
+\subsection{Communication and Enforcement Experiments}
+%   Three communication conditions × reasoning levels × key params × reps
+%   Purpose: test whether enforcement shifts system from Hobbesian conflict
+%   to cooperative order (the "Leviathan hypothesis")
+%   STATUS: design only, depends on Phase 2c results and compute budget
+
+% TODO: 3.4.6 — Robustness
+\subsection{Robustness Checks}
+%   - All runs: unique seed, full config, model version, hardware, vLLM
+%     version logged. Exact prompt text versioned in git.
+%   - Prompt sensitivity: test semantically equivalent prompt reformulations
+%     Report FormatSpread (Sclar et al., 2024) or equivalent
+%   - Temperature sensitivity: spot-check at T=0.3 and T=1.0
+%   - R-hat convergence diagnostic (Gelman & Rubin, 1992) across reps
+%   - Faithfulness validation: at least one test (early-answering or
+%     concordance rate between stated reasoning and action choice)
 
 % -----------------------------------------------------------------------------
 % SECTION 3.5: Metrics
+% Checklist says "pick 3, not 15" — focus on primary metrics,
+% defer secondary to appendix
 % -----------------------------------------------------------------------------
 \section{Metrics}
-% TODO: Outcome metrics
-%   - Gini coefficient: wealth inequality (primary)
-%   - Palma ratio: top 10% / bottom 40%
-%   - Cooperation ratio: invest_other / all meaningful actions
+
+% TODO: 3.5.1 — Primary outcome metrics (the 3 focus metrics)
+\subsection{Primary Metrics}
+%   Three focus metrics (all reported as time series, not just end-values):
+%
+%   1. Cooperation ratio f_C(t): invest_other / (invest_other + attack + arm_self)
+%      Maps to Kuusela & Roy's attack frequency. Primary behavioral outcome.
+%
+%   2. Gini coefficient G(t): inequality in resource distribution
+%      Standard measure (Atkinson, 1970). Range [0,1], 0 = equal, 1 = one agent
+%      has everything. Tracks hierarchy emergence.
+%
+%   3. E-I index: (external - internal) / (external + internal) interactions
+%      (Krackhardt & Stern, 1988). Measures coalition formation.
+%      Range [-1, +1], -1 = pure ingroup, +1 = pure outgroup interaction.
+%
+%   Why these three:
+%   - Cover behaviour (cooperation), outcome (inequality), structure (coalitions)
+%   - All computable per round → time series analysis
+%   - All have clear theoretical grounding
+
+% TODO: 3.5.2 — Secondary metrics (reported but not primary focus)
+\subsection{Secondary Metrics}
+%   Reported in appendix / supplementary:
+%   - Action distribution per round (behavioral fingerprint)
+%   - Action stability: fraction of agents repeating previous action
 %   - First attack round: onset of conflict
-%   - Action distribution: behavioral fingerprint
-%
-% TODO: Process metrics
-%   - Cooperation rate timeseries (per-round)
-%   - Gini trajectory (temporal dynamics)
-%   - Reasoning token counts (manipulation check)
-%
-% TODO: Phase transition metrics
-%   - Gini vs radius curves per reasoning level
-%   - Binder cumulant for critical point detection
-%   - Variance peak for transition location
-%   - Rolling-window EWS: variance, lag-1 autocorrelation, skewness
-%     (\cite{scheffer2009}, \cite{hofer2018})
-%
-% TODO: Statistical tests
-%   - Mixed-effects models: Gini ~ reasoning_level * param + (1|RunID)
+%   - Palma ratio: top 10% / bottom 40% (tail sensitivity)
+%   - Network metrics: community detection (Leiden), Elo ratings, hierarchy
+%     steepness — only if rewiring is implemented and network is dynamic
+%   - Phase transition indicators: variance peak, rolling-window EWS
+%     (Scheffer et al., 2009)
+%   - Stabilisation round: post-hoc convergence detection for validation
+
+% TODO: 3.5.3 — Statistical analysis
+\subsection{Statistical Analysis}
+%   - Mixed-effects models: Outcome ~ ReasoningLevel * GameParam + Round + (1|RunID)
 %     with Satterthwaite approximation for df (lmerTest)
-%   - Partial eta-squared for omnibus effect sizes
-%   - Cohen's d for all pairwise comparisons
+%   - Effect sizes: partial eta-squared (omnibus) + Cohen's d (pairwise)
 %   - 95% confidence intervals for all key estimates
-%   - Bayes factors (JZS prior) for key comparisons (following \cite{akata2025})
-%   - Bonferroni correction for multiple comparisons
+%   - Bayes factors (JZS prior) for key comparisons (following Akata et al., 2025)
+%   - FDR correction for multiple comparisons (not Bonferroni — too conservative)
 %   - ICC for within-run vs between-run variance
+%   - Early stopping analysis: compare metrics at fixed checkpoints (round 10, 20, 30)
+%     regardless of total run length, to handle variable-length runs
+
+% -----------------------------------------------------------------------------
+% SECTION 3.6: Computational Infrastructure
+% (Rubric: reproducibility requires documenting infrastructure)
+% -----------------------------------------------------------------------------
+\section{Computational Infrastructure}
+% TODO: Merged from former Chapter 4 (Model Selection & Infrastructure)
+%   All infrastructure detail is now here. Former Ch 4 deleted.
 %
-% TODO: Prompt sensitivity
-%   - Report FormatSpread (\cite{sclar2024}) or PromptSensiScore (\cite{zhuo2024})
-%   - Quantify sensitivity to semantically equivalent reformulations
+% TODO: 3.6.1 — Snellius HPC
+%   - SURF national supercomputer (Netherlands)
+%   - GPU partition: NVIDIA H100 80GB SXM5, shared nodes (up to 4 jobs/node)
+%   - Apptainer (Singularity) containers for reproducibility (pinned vLLM version)
+%   - Compute budget: initially 125K SBU, extended to 225K SBU
+%     (192 SBU per GPU-hour on H100)
 %
-% TODO: Trace coding (if doing systematic trace analysis)
-%   - LACA framework (\cite{chew2023}): codebook → LLM coding → human verification
-%   - Inter-rater reliability with Gwet's AC1
+% TODO: 3.6.2 — vLLM serving configuration
+%   - vLLM 0.16.1rc1 (nightly for Qwen3.5 support)
+%   - Key flags:
+%     --reasoning-parser qwen3 (separates thinking from content)
+%     --language-model-only (skips vision encoder)
+%     --speculative-config {"method":"mtp","num_speculative_tokens":1}
+%     --no-async-scheduling (prefix caching for DeltaNet hybrid)
+%     --enable-prefix-caching (shared game rules prefix, ~300 tokens)
+%     --max-model-len 16384 (reasoning headroom)
+%     --max-num-seqs 32 (all agents concurrent)
+%     --gpu-memory-utilization 0.95
+%   - MTP acceptance rate: 85-88%, ~1.85-1.88 mean acceptance length
+%   - Prefix caching: saves ~300 × N_agents redundant prefill tokens per round
+%     Challenge: DeltaNet hybrid has 0% hit with async scheduling → --no-async fix
+%   - Client timeout: 900s (thinking models need ~200s at load)
+%
+% TODO: 3.6.3 — Experiment runner
+%   - sweep.py: generates parameter grid, supports SLURM array jobs
+%   - Batch mode: multiple runs per SLURM task (amortize vLLM startup)
+%   - ThreadPoolExecutor: N_agents concurrent requests per round
+%   - All configs, traces, and results saved as JSON
+%   - Infra metadata logged: SLURM job ID, node, GPU info, timestamps
+%
+% TODO: 3.6.4 — Quantization decision
+%   - FP8 quantization benchmarked (Mar 2): 238s/round vs 188s/round bf16
+%   - 26% SLOWER due to DeepGEMM overhead at 27B scale on H100
+%   - Decision: bf16 for all production runs
+%   - Detailed vLLM flags → Appendix for full reproducibility

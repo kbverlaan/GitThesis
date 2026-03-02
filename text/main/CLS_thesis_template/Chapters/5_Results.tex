@@ -1,0 +1,128 @@
+\chapter{Results} % Chapter 4 (renumbered: former Ch 4 merged into Ch 3)
+\label{Results}
+
+% =============================================================================
+% RESULTS (10-15 pages)
+% Rubric: Results and Analysis (20% of Report)
+% CRITICAL: Reports WHAT happened. Discussion chapter interprets WHY.
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+% SECTION 5.1: Experimental Setup Summary
+% -----------------------------------------------------------------------------
+\section{Experimental Overview}
+% TODO: Brief recap of conditions actually run
+%   - Total runs completed per phase
+%   - Any deviations from planned design (budget constraints, model changes)
+%   - Reference Methods chapter for full design details
+
+% -----------------------------------------------------------------------------
+% SECTION 5.2: OAT Parameter Characterization
+% -----------------------------------------------------------------------------
+\section{Parameter Characterization (OAT Sweeps)}
+
+% TODO: 5.2.1 — Conflict parameters
+\subsection{Conflict Parameters}
+%   - conflict_cost_pct [2, 5, 10, 20]: effect on attack rate, Gini
+%   - attack_take_pct [20, 40, 60, 80]: effect on attack rate, inequality
+%   - Key finding: which parameters most strongly influence behavior?
+%   - L1 vs L3 comparison: does reasoning depth modulate parameter sensitivity?
+
+% TODO: 5.2.2 — Arming parameters
+\subsection{Arming Parameters}
+%   - arm_cost_pct [5, 10, 20]: effect on arm rate, defensive behavior
+%   - arm_other_cost_pct [5, 10, 20]: effect on coalition formation
+%   - Key finding: threshold effects? Phase transitions in arming behavior?
+
+% TODO: 5.2.3 — Cooperation parameters
+\subsection{Cooperation Parameters}
+%   - invest_other_return_pct [10, 15, 25]: effect on cooperation rate
+%     This is the most theoretically interesting: does increasing returns to
+%     cooperation shift the system from conflict to cooperation?
+%     Does reasoning depth modulate this shift?
+%   - invest_other_cost_pct [5, 10, 20]: effect on cooperation cost sensitivity
+
+% TODO: 5.2.4 — Spatial parameter
+\subsection{Spatial Structure}
+%   - interaction_radius [1, 2, 3]: effect on cooperation/conflict
+%   - Expected: phase transition in cooperation at some radius threshold
+%     (consistent with Perc, 2017; our Gemma 2 results)
+
+% TODO: 5.2.5 — Toggle effects
+\subsection{Toggle Effects}
+%   - invest_self on/off: does removing self-investment force cooperation?
+%   - memory on/off: does persistent memory change behavior vs stateless?
+%     This is the first test of IV2 (information structure)
+
+% TODO: 5.2.6 — OAT summary
+\subsection{Summary: Sensitive Parameters}
+%   - Table: parameter × effect size × reasoning depth interaction
+%   - Identify top 2-3 parameters for factorial design
+%   - Report partial η² for each parameter and reasoning level interaction
+
+% -----------------------------------------------------------------------------
+% SECTION 5.3: Reasoning Depth Effects (IV1)
+% -----------------------------------------------------------------------------
+\section{Reasoning Depth Effects}
+% TODO: If separate reasoning depth sweep is run (all 4 levels × N reps)
+%   - Action distributions per level (L0 vs L1 vs L2 vs L3)
+%   - Gini trajectory per level
+%   - Cooperation rate evolution per level
+%   - Non-monotonic pattern: does L0→L1→L2→L3 show non-linear effects?
+%   - Compare to Kuusela & Roy: do we see the Hobbesian Trap (more reasoning → more conflict)?
+%   - Or is it more nuanced (L2 defensive, L3 exploitative)?
+%
+%   Statistical tests:
+%   - One-way ANOVA: Gini ~ reasoning_level
+%   - Pairwise comparisons with Bonferroni correction
+%   - Effect sizes (Cohen's d) for each pair
+%   - Bayes factors for key comparisons
+
+% -----------------------------------------------------------------------------
+% SECTION 5.4: Information Structure Effects (IV2)
+% -----------------------------------------------------------------------------
+\section{Information and Memory Effects}
+% TODO: If memory sweep is run
+%   - Memory ON vs OFF: behavioral differences
+%   - Do agents with memory develop more stable relationships?
+%   - Do agents with memory show more retaliation (they remember attacks)?
+%   - Does memory reduce or increase inequality?
+%
+% TODO: Visibility effects
+%   - Interaction of radius × memory: does memory matter more at small radius?
+%   - hide_resources effect: does removing information about others change behavior?
+
+% -----------------------------------------------------------------------------
+% SECTION 5.5: Communication & Enforcement Effects (IV3)
+% -----------------------------------------------------------------------------
+\section{Communication and Enforcement Effects}
+% TODO: If Phase 2d is completed
+%   - No-comm vs cheap talk vs enforcement conditions
+%   - Does cheap talk change behavior? (Crawford & Sobel: only if interests align)
+%   - Does enforcement reduce conflict? (Hobbes's Leviathan hypothesis)
+%   - Interaction with reasoning depth: does enforcement matter more at higher L?
+
+% -----------------------------------------------------------------------------
+% SECTION 5.6: Phase Transitions
+% -----------------------------------------------------------------------------
+\section{Phase Transitions}
+% TODO: Phase transition analysis across IVs
+%   - Gini vs control parameter (e.g., radius) per reasoning level
+%   - Does the critical point shift with reasoning depth?
+%   - EWS analysis: variance peak, autocorrelation increase before transition
+%   - Network structure transitions: community count/stability vs parameter
+%
+% This is potentially the strongest result: if reasoning depth shifts the
+% phase transition point, that demonstrates a genuine interaction between
+% cognition and environmental structure.
+
+% -----------------------------------------------------------------------------
+% SECTION 5.7: Summary
+% -----------------------------------------------------------------------------
+\section{Summary of Results}
+% TODO: Concise summary table mapping results to research questions
+%   SQ1 (reasoning depth): [finding]
+%   SQ2 (information): [finding]
+%   SQ3 (communication): [finding]
+%
+% NOTE: Do NOT interpret findings here - that belongs in Discussion chapter.

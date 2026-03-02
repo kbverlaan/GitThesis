@@ -4,6 +4,16 @@ Single minimal prompt -- no narrative framing, no social CoT, no toggles.
 Used for Phase 1 system characterization.
 
 Old prompt variations archived in git history (pre-Feb 2026).
+
+Design references:
+- Reasoning levels L0-L3: operationalize K-Level Reasoning (Zhang et al., NAACL 2025)
+  and extend Kuusela & Roy (AAMAS 2024) from RL to prompted LLM reasoning.
+- L0/L1/L2/L3 map to level-0 (fixed), level-1 (best response), level-2 (opponent
+  modeling), level-3 (recursive) in the cognitive hierarchy literature (Camerer, 2003).
+- CoT-as-computation framing: each reasoning level adds computational depth
+  (Pfau et al., 2024 "Let's Think Dot by Dot"; Goyal et al., 2024 "Think Before You Speak").
+- Framing effects: FRAMINGS dict implements the "Name of the Game" manipulation
+  (Liberman et al., 2004; Loré & Brockman, 2024).
 """
 
 from typing import Dict, Optional
@@ -99,6 +109,14 @@ class BaselinePrompt:
         obj_text = self.OBJECTIVES.get(self.objective_style, self.OBJECTIVES['maximize_resources'])
         parts.append(f"OBJECTIVE: {obj_text}")
 
+        # Temporal reasoning (constant across all K-levels)
+        parts.append(
+            "This is a repeated game with multiple rounds. "
+            "Your actions affect how others treat you in future rounds. "
+            "Investments can build reciprocity over time; attacks invite retaliation. "
+            "Consider the long-term consequences of your choices."
+        )
+
         # Framing instruction
         framing_text = FRAMINGS.get(self.framing, '')
         if framing_text:
@@ -107,16 +125,14 @@ class BaselinePrompt:
         # State
         parts.append(self._format_state(observation, agent_id))
 
-        # Memory-based sections vs legacy neighbor profiles
+        # Memory-based history sections (only when memory is enabled)
         memory = observation.get('agent_memory')
         if memory is not None:
             memory_section = self._format_memory_section(memory, observation)
             if memory_section:
                 parts.append(memory_section)
-        else:
-            profiles = self._format_neighbor_profiles(observation, agent_id)
-            if profiles:
-                parts.append(profiles)
+        # No memory = no history. Agent sees only current state.
+        # (Legacy god-view neighbor profiles removed — they leak omniscient info)
 
         # Actions + reasoning block
         parts.append(self._format_actions())

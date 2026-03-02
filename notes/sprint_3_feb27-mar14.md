@@ -123,6 +123,8 @@
 | Mar 1 | L3 rerun with 20 rounds | 10 rounds te kort voor L3 dynamica. 20 rondes met 5h wall time. Early stopping nog niet actief (eerst valideren). |
 | Mar 1 | RQ updated: three Hobbesian conditions | Three IVs = mechanism design's three formal inputs (exact). Hobbes's three causes of conflict as narrative frame (with caveats on info→diffidence). See roadmap. |
 | Mar 1 | Publishable checklist rewritten for AAMAS | OCAR story structure, Kuusela's patterns, 8-page budget, declarative section titles, 3 focus metrics, dual theoretical framework (MD + Hobbes). |
+| Mar 2 | Stay with bf16, not FP8 | FP8 benchmark (job 20205606): 238s/round vs 188s/round bf16 — 26% slower. DeepGEMM overhead not worth it at 27B scale on single H100. FP8 saves VRAM (28 vs 52 GiB) but VRAM is not the bottleneck. |
+| Mar 2 | Temporal reasoning in base prompt (all levels) | Added "This is a repeated game..." block to base prompt. All K-levels get identical temporal instruction. Ensures K-level manipulation is purely about social modeling depth, not whether agents think long-term. Insight from reading Camerer (2004): CH is about static strategic depth, our game requires temporal reasoning — must separate these two dimensions. |
 
 ---
 

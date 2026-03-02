@@ -1,0 +1,29 @@
+name: fp8_benchmark
+description: "FP8 vs bf16 throughput comparison — 3 rounds, L3, 10 agents"
+reps: 1
+api_config: vllm_fp8_config.yaml
+base_params:
+  num_agents: 10
+  initial_resources: 25.0
+  invest_self_cost_pct: 10
+  invest_self_return_pct: 12
+  invest_other_cost_pct: 10
+  invest_other_return_pct: 25
+  arm_cost_pct: 10
+  arm_decay: 0.5
+  attack_take_pct: 40
+  conflict_cost_pct: 5
+  max_rounds: 3
+  history_length: 10
+  allow_invest_self: false
+  initial_distribution: "equal"
+  action_order: "simultaneous"
+  spatial_enabled: true
+  interaction_radius: 2
+sweep:
+  grid:
+    - param: "reasoning_level"
+      target: "prompt_config"
+      values: ["level3"]
+# 1 condition x 1 rep = 1 run
+# Quick benchmark to compare FP8 model throughput with bf16 baseline
