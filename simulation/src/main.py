@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent))
 
 from game.engine import GameEngine, GameState
-from game.spatial import SpatialField
+from game.spatial import NetworkTopology
 from agents.llm_agent import LLMAgent
 from analysis.metrics import compute_round_metrics, check_early_stopping
 from analysis.network import analyze_run_networks
@@ -199,14 +199,18 @@ def run_simulation(game_params: dict,
         max_rounds=game_params['max_rounds'],
     )
 
-    # Initialize spatial field if enabled
-    spatial_enabled = game_params.get('spatial_enabled', False)
-    spatial_field = None
-    if spatial_enabled:
-        grid_size = game_params.get('grid_size', int(np.ceil(np.sqrt(len(agent_ids) * 4))))
-        interaction_radius = game_params.get('interaction_radius', 2)
-        spatial_field = SpatialField(grid_size, agent_ids, interaction_radius)
-        print(f"Spatial field: {grid_size}x{grid_size} grid, interaction radius {interaction_radius}")
+    # Initialize network topology if enabled
+    network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))
+    network = None
+    if network_enabled:
+        mean_degree = game_params.get('mean_degree', 5.0)
+        rewiring_prob = game_params.get('rewiring_prob', 0.0)
+        payoff_window = game_params.get('payoff_window', 5)
+        network = NetworkTopology(agent_ids, mean_degree, rewiring_prob, payoff_window)
+        degree_stats = network.get_degree_stats()
+        print(f"Network topology: ER graph, ⟨k⟩={degree_stats['mean']:.1f} "
+              f"(target {mean_degree}), w={rewiring_prob}, "
+              f"degree range [{degree_stats['min']}, {degree_stats['max']}]")
 
     # Initialize LLM agents
     agents = {}
@@ -260,6 +264,7 @@ def run_simulation(game_params: dict,
     start_time = time.time()
     all_round_metrics = []
     previous_actions_map = None
+    resource_changes_history = []  # For network rewiring payoff window
 
     while not engine.is_game_over(max_rounds):
         state = engine.get_state()
@@ -269,9 +274,8 @@ def run_simulation(game_params: dict,
         print(f"ROUND {round_num}/{max_rounds}")
         print(f"{'='*70}")
 
-        # Move agents on spatial field
-        if spatial_field:
-            spatial_field.move_agents()
+        # Network rewiring happens at END of round (after resource updates)
+        # No movement step needed — network is static within a round
 
         # Show current resources at start of round
         print("\n📊 Current Resources:")
@@ -292,16 +296,10 @@ def run_simulation(game_params: dict,
                 aid for aid in agent_ids
                 if not can_afford_any_action(current_state.resources[aid], game_params)
             ]
-            # Add spatial info if enabled
-            if spatial_field:
-                neighbors = spatial_field.get_neighbors(agent_id)
+            # Add network topology info if enabled
+            if network:
+                neighbors = network.get_neighbors(agent_id)
                 observation['visible_agents'] = neighbors
-                observation['position'] = spatial_field.get_position(agent_id)
-                observation['all_positions'] = {
-                    aid: spatial_field.get_position(aid)
-                    for aid in [agent_id] + neighbors
-                }
-                observation['interaction_radius'] = spatial_field.interaction_radius
             # Inject memory into observation for prompt formatting
             if agents[agent_id].memory is not None:
                 observation['agent_memory'] = agents[agent_id].memory
@@ -483,7 +481,7 @@ def run_simulation(game_params: dict,
 
             for aid in agent_ids:
                 action_str, target = agent_action_map.get(aid, ('no_action', None))
-                visible = spatial_field.get_neighbors(aid) if spatial_field else None
+                visible = network.get_neighbors(aid) if network else None
                 agents[aid].update_memory(
                     round_num=round_num,
                     action_str=action_str,
@@ -495,6 +493,15 @@ def run_simulation(game_params: dict,
                     combat_results=combat_results,
                     all_resources=post_resources
                 )
+
+        # Network rewiring (end of round, after resource updates)
+        if network:
+            rc = round_result.get('resource_changes', {})
+            resource_changes_history.append(rc)
+            rewire_stats = network.rewire(resource_changes_history)
+            if rewire_stats['agents_rewired'] > 0:
+                print(f"  🔗 Network rewired: {rewire_stats['agents_rewired']} agents, "
+                      f"{rewire_stats['edges_dropped']} edges swapped")
 
         print()
 

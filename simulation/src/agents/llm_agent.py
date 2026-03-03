@@ -1,6 +1,15 @@
 """
 LLM agent using OpenRouter API for decision making.
 Uses configurable prompt styles for different experimental conditions.
+
+Design references:
+- Reasoning traces as data: thinking tokens (<think>...</think>) are extracted
+  and stored as behavioral data, not as mechanistic explanations. Faithfulness
+  caveats per Turpin et al. (2023), Lanham et al. (2023), Chen et al. (2025).
+- Thinking model support: Qwen3/3.5 reasoning via enable_thinking chat template.
+  vLLM reasoning parser separates thinking from content tokens.
+- Retry with structured output: JSON follow-up prompt on parse failure,
+  preserving the original reasoning trace for analysis.
 """
 
 import os
@@ -64,9 +73,11 @@ class LLMAgent:
         else:
             self.max_tokens = max_tokens
         # Thinking models need longer timeout (long reasoning chains)
-        # 4096 tokens at ~30 tok/s worst case = ~136s; 240s gives safe margin
-        if self.is_thinking_model and timeout < 240:
-            self.timeout = 240
+        # With 8+ concurrent requests, per-request throughput drops to ~30 tok/s.
+        # 6K thinking tokens / 30 tok/s = 200s decode + prefill + scheduling.
+        # Qwen3.5 vLLM recipe uses 3600s. 900s is a safe practical minimum.
+        if self.is_thinking_model and timeout < 900:
+            self.timeout = 900
         else:
             self.timeout = timeout
         self.retry_attempts = retry_attempts
@@ -78,7 +89,7 @@ class LLMAgent:
 
         # Initialize memory
         mem_cfg = memory_config or {}
-        self.memory_enabled = mem_cfg.get('enabled', False)
+        self.memory_enabled = mem_cfg.get('enabled', True)
         if self.memory_enabled:
             window_size = mem_cfg.get('window_size', 10)
             self.memory = AgentMemory(agent_id, window_size=window_size)
@@ -163,7 +174,7 @@ class LLMAgent:
         if action_type in [ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK]:
             if not target or target == self.agent_id:
                 return None
-            # Spatial validation: target must be a visible neighbor
+            # Network validation: target must be a connected neighbor
             if self._visible_agents is not None and target not in self._visible_agents:
                 return None
 
@@ -183,7 +194,7 @@ class LLMAgent:
         Returns:
             Selected action
         """
-        # Store visible agents for spatial target validation
+        # Store visible agents for network target validation
         self._visible_agents = observation.get('visible_agents', None)
 
         prompt = self._format_observation(observation)
@@ -215,9 +226,9 @@ class LLMAgent:
                 msg = response.choices[0].message
                 response_text = msg.content or ""
 
-                # Extract thinking from reasoning_content (vLLM --reasoning-parser)
-                # or fall back to <think> tag extraction in _parse_response
-                thinking_content = getattr(msg, 'reasoning_content', None)
+                # Extract thinking from vLLM --reasoning-parser output
+                # vLLM uses 'reasoning' attr (not 'reasoning_content')
+                thinking_content = getattr(msg, 'reasoning_content', None) or getattr(msg, 'reasoning', None)
 
                 # Extract token usage from response
                 usage = {}

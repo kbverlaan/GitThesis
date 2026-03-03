@@ -6,13 +6,13 @@ num_agents: 30
 initial_resources: 25.0
 
 # Investment Parameters (% of actor's resources)
-invest_self_cost_pct: 10      # You pay 10% of your resources
-invest_self_return_pct: 20    # You gain 20% (net +10%)
+invest_self_pct: 2            # Flat gain: +2% of your resources (no cost)
 invest_other_cost_pct: 10     # You pay 10% of your resources
-invest_other_return_pct: 15    # Target gains 15% of your resources
+invest_other_return_pct: 15   # Target gains 15% of your resources
 
 # Military Parameters (% of actor's resources)
-arm_cost_pct: 10              # Spent amount becomes combat bonus (additive)
+arm_cost_pct: 10              # You pay 10% of your resources
+arm_multiplier: 2.0           # Combat bonus = cost × multiplier (pay 10%, get +20% bonus)
 arm_decay: 0.5                # Bonus halves each round (×0.5)
 
 # Combat Parameters
@@ -32,10 +32,11 @@ initial_distribution: "equal"
 # Action Order
 action_order: "simultaneous"
 
-# Spatial Field
-spatial_enabled: true
-# grid_size: auto  # defaults to ceil(sqrt(num_agents * 4))
-interaction_radius: 2
+# Network Topology (replaces spatial field)
+network_enabled: true
+mean_degree: 5.0              # Expected degree ⟨k⟩ for initial ER graph
+rewiring_prob: 0.0            # w: 0=static, 0.05=viscous, 0.3=fluid, 1.0=fully dynamic
+payoff_window: 5              # Rounds of resource changes used for rewiring decisions
 
 # Agent Memory
 memory:

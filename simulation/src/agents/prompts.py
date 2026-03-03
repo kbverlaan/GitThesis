@@ -146,11 +146,11 @@ class BaselinePrompt:
 
         lines = [f"CURRENT STATE ({round_info}):"]
 
-        # Spatial mode: simple neighbor list, no coordinates
+        # Network mode: show connected agents
         visible = observation.get('visible_agents', None)
         if visible is not None:
-            lines.append(f"\nYou can only interact with nearby agents this round.")
-            lines.append(f"Nearby agents: {', '.join(visible) if visible else 'none'}")
+            lines.append(f"\nYou can only interact with agents you are connected to.")
+            lines.append(f"Connected agents: {', '.join(visible) if visible else 'none'}")
 
         # Resources -- only show visible agents in spatial mode
         if self.hide_resources:
