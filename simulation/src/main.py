@@ -265,6 +265,8 @@ def run_simulation(game_params: dict,
     all_round_metrics = []
     previous_actions_map = None
     resource_changes_history = []  # For network rewiring payoff window
+    comm_scope = game_params.get('comm_scope', 'none')
+    pending_messages = {aid: [] for aid in agent_ids}  # Messages to deliver next round
 
     while not engine.is_game_over(max_rounds):
         state = engine.get_state()
@@ -300,6 +302,9 @@ def run_simulation(game_params: dict,
             if network:
                 neighbors = network.get_neighbors(agent_id)
                 observation['visible_agents'] = neighbors
+            # Inject received messages from previous round
+            if pending_messages.get(agent_id):
+                observation['received_messages'] = pending_messages[agent_id]
             # Inject memory into observation for prompt formatting
             if agents[agent_id].memory is not None:
                 observation['agent_memory'] = agents[agent_id].memory
@@ -420,6 +425,44 @@ def run_simulation(game_params: dict,
                     print(f"    {attackers_str} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
                     print(f"      (Win probability: {combat['attacker_win_prob']:.1%})")
 
+        # Collect and route messages for next round
+        if comm_scope != 'none':
+            next_messages = {aid: [] for aid in agent_ids}
+            msg_count = 0
+            for aid in agent_ids:
+                msg = agents[aid].get_last_message()
+                if msg and msg.get('message'):
+                    msg_to = msg.get('message_to')
+                    neighbors = network.get_neighbors(aid) if network else agent_ids
+                    if msg_to == 'all' or comm_scope == 'broadcast':
+                        # Broadcast to all connected agents
+                        for nbr in neighbors:
+                            next_messages[nbr].append({
+                                'from': aid,
+                                'message': msg['message'],
+                                'channel': 'broadcast',
+                            })
+                        msg_count += 1
+                    elif msg_to and msg_to in (neighbors if network else agent_ids):
+                        # DM to specific agent
+                        next_messages[msg_to].append({
+                            'from': aid,
+                            'message': msg['message'],
+                            'channel': 'dm',
+                        })
+                        msg_count += 1
+            pending_messages = next_messages
+            # Log messages in round result for post-hoc analysis
+            round_messages = []
+            for aid in agent_ids:
+                msg = agents[aid].get_last_message()
+                if msg and msg.get('message'):
+                    round_messages.append(msg)
+            if round_messages:
+                round_result['messages'] = round_messages
+            if msg_count > 0:
+                print(f"  💬 Messages: {msg_count} sent this round")
+
         # Compute per-round metrics
         updated_state = engine.get_state()
         metrics, previous_actions_map = compute_round_metrics(
@@ -491,7 +534,8 @@ def run_simulation(game_params: dict,
                     round_actions=round_actions,
                     resource_changes=resource_changes,
                     combat_results=combat_results,
-                    all_resources=post_resources
+                    all_resources=post_resources,
+                    received_messages=pending_messages.get(aid, []),
                 )
 
         # Network rewiring (end of round, after resource updates)

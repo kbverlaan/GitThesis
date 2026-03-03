@@ -85,13 +85,14 @@ class BaselinePrompt:
 
     def __init__(self, game_params: Optional[Dict] = None, objective_style: str = 'maximize_resources',
                  hide_resources: bool = False, show_reputation: bool = False, framing: str = 'neutral',
-                 reasoning_level: str = 'default'):
+                 reasoning_level: str = 'default', comm_scope: str = 'none'):
         self.game_params = game_params or {}
         self.objective_style = objective_style
         self.hide_resources = hide_resources
         self.show_reputation = show_reputation
         self.framing = framing
         self.reasoning_level = reasoning_level
+        self.comm_scope = comm_scope
 
     def format_observation(self, observation: Dict, agent_id: str) -> str:
         """Format game observation into a minimal prompt.
@@ -183,6 +184,20 @@ class BaselinePrompt:
                         lines.append(f"  {aid}: +???")
                     else:
                         lines.append(f"  {aid}: +{bonus:.1f}")
+
+        # Show messages received from other agents (from previous round)
+        received_messages = observation.get('received_messages', [])
+        if received_messages:
+            lines.append("")
+            lines.append("MESSAGES RECEIVED (from last round):")
+            for msg in received_messages:
+                sender = msg.get('from', '?')
+                text = msg.get('message', '')
+                channel = msg.get('channel', 'dm')
+                if channel == 'broadcast':
+                    lines.append(f"  {sender} (to all): {text}")
+                else:
+                    lines.append(f"  {sender} (private): {text}")
 
         return "\n".join(lines)
 
@@ -354,13 +369,64 @@ COMBAT RULES:
         if reasoning_block:
             parts.append(reasoning_block)
 
+        # Communication rules (if enabled)
+        if self.comm_scope != 'none':
+            comm_lines = [
+                "COMMUNICATION:",
+                "Before choosing your action, you may send ONE message this round.",
+                "Messages are cheap talk — non-binding and costless.",
+                "Recipients will see your message next round before choosing their action.",
+            ]
+            if self.comm_scope == 'dm':
+                comm_lines.append("You can send a private message to ONE connected agent. Only they will see it.")
+            elif self.comm_scope == 'broadcast':
+                comm_lines.append("Your message is sent to ALL connected agents. Everyone sees it.")
+            elif self.comm_scope == 'choice':
+                comm_lines.append("You choose: send a private message to ONE agent, or broadcast to ALL connected agents.")
+                comm_lines.append("Set message_to to a specific agent_id for private, or \"all\" for broadcast.")
+            parts.append("\n".join(comm_lines))
+
         # JSON template — no reasoning field, we read thinking traces directly
-        parts.append("""Your final output MUST be valid JSON with exactly these fields:
+        if self.comm_scope == 'none':
+            parts.append("""Your final output MUST be valid JSON with exactly these fields:
 {
   "action": "<one of the action names above>",
   "target": "<agent_id or null>"
 }
 target must be null (not the string "null") when no target is needed.
+Do not include any text outside the JSON.""")
+        elif self.comm_scope == 'dm':
+            parts.append("""Your final output MUST be valid JSON with exactly these fields:
+{
+  "message": "<your message to one agent, or empty string to stay silent>",
+  "message_to": "<agent_id of recipient>",
+  "action": "<one of the action names above>",
+  "target": "<agent_id or null>"
+}
+target must be null (not the string "null") when no target is needed.
+message_to must be a connected agent. Set message to "" to send no message.
+Do not include any text outside the JSON.""")
+        elif self.comm_scope == 'broadcast':
+            parts.append("""Your final output MUST be valid JSON with exactly these fields:
+{
+  "message": "<your message to all connected agents, or empty string to stay silent>",
+  "action": "<one of the action names above>",
+  "target": "<agent_id or null>"
+}
+target must be null (not the string "null") when no target is needed.
+Your message will be seen by all connected agents next round. Set message to "" to send no message.
+Do not include any text outside the JSON.""")
+        elif self.comm_scope == 'choice':
+            parts.append("""Your final output MUST be valid JSON with exactly these fields:
+{
+  "message": "<your message, or empty string to stay silent>",
+  "message_to": "<agent_id for private, or \"all\" for broadcast>",
+  "action": "<one of the action names above>",
+  "target": "<agent_id or null>"
+}
+target must be null (not the string "null") when no target is needed.
+message_to: use a specific agent_id for a private message, or "all" to broadcast to all connected agents.
+Set message to "" to send no message.
 Do not include any text outside the JSON.""")
 
         return "\n\n".join(parts)
@@ -378,6 +444,8 @@ def get_prompt_style(prompt_config: Dict, game_params: Optional[Dict] = None) ->
     show_reputation = prompt_config.get('show_reputation', False)
     framing = prompt_config.get('framing', 'neutral')
     reasoning_level = prompt_config.get('reasoning_level', 'default')
+    comm_scope = game_params.get('comm_scope', 'none') if game_params else 'none'
     return BaselinePrompt(game_params=game_params, objective_style=objective_style,
                           hide_resources=hide_resources, show_reputation=show_reputation,
-                          framing=framing, reasoning_level=reasoning_level)
+                          framing=framing, reasoning_level=reasoning_level,
+                          comm_scope=comm_scope)

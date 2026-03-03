@@ -39,6 +39,9 @@ class NeighborRecord:
     outcomes: Dict[str, int] = field(default_factory=lambda: {
         "attacks_won": 0, "attacks_lost": 0
     })
+    messages_received: int = 0   # Count of messages received from this neighbor
+    messages_sent: int = 0       # Count of messages sent to this neighbor
+    last_message_from: str = ""  # Last message text received from this neighbor
 
     def to_dict(self) -> dict:
         return {
@@ -49,6 +52,8 @@ class NeighborRecord:
             "my_actions_toward_them": dict(self.my_actions_toward_them),
             "their_actions_general": dict(self.their_actions_general),
             "outcomes": dict(self.outcomes),
+            "messages_received": self.messages_received,
+            "messages_sent": self.messages_sent,
         }
 
 
@@ -167,6 +172,29 @@ class AgentMemory:
                             rec.outcomes["attacks_won"] = rec.outcomes.get("attacks_won", 0) + 1
                         else:
                             rec.outcomes["attacks_lost"] = rec.outcomes.get("attacks_lost", 0) + 1
+
+    def record_messages(self, sent_message: Optional[dict],
+                        received_messages: List[dict]):
+        """Record sent and received messages.
+
+        Args:
+            sent_message: This agent's message dict (from/message/message_to) or None.
+            received_messages: List of message dicts received this round.
+        """
+        # Track sent message
+        if sent_message and sent_message.get('message'):
+            msg_to = sent_message.get('message_to')
+            if msg_to and msg_to != 'all':
+                rec = self._get_or_create_record(msg_to)
+                rec.messages_sent += 1
+
+        # Track received messages
+        for msg in received_messages:
+            sender = msg.get('from')
+            if sender and sender != self.agent_id:
+                rec = self._get_or_create_record(sender)
+                rec.messages_received += 1
+                rec.last_message_from = msg.get('message', '')
 
     def format_own_history(self) -> str:
         """Format last N actions for the prompt."""

@@ -38,6 +38,9 @@ mean_degree: 5.0              # Expected degree ⟨k⟩ for initial ER graph
 rewiring_prob: 0.0            # w: 0=static, 0.05=viscous, 0.3=fluid, 1.0=fully dynamic
 payoff_window: 5              # Rounds of resource changes used for rewiring decisions
 
+# Communication Scope (IV3)
+comm_scope: "none"              # none | dm | broadcast | choice
+
 # Agent Memory
 memory:
   enabled: true

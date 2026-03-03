@@ -104,6 +104,7 @@ class LLMAgent:
         
         self.reasoning_traces = []
         self._visible_agents = None
+        self._last_message = None  # Last message extracted from LLM response
     
     def _format_observation(self, observation: Dict) -> str:
         """
@@ -139,12 +140,17 @@ class LLMAgent:
 
                 # Validate required fields
                 if 'action' in parsed:
-                    return {
+                    result = {
                         'action': parsed['action'],
                         'target': parsed.get('target'),
                         'reasoning': parsed.get('reasoning', ''),
                         'thinking': thinking_content,
                     }
+                    # Extract communication fields if present
+                    if parsed.get('message'):
+                        result['message'] = parsed['message']
+                        result['message_to'] = parsed.get('message_to')
+                    return result
         except json.JSONDecodeError:
             pass
 
@@ -184,6 +190,27 @@ class LLMAgent:
             target_id=target if target else None
         )
     
+    def _store_message(self, action_dict: Dict):
+        """Store communication message from LLM response."""
+        msg_text = action_dict.get('message', '')
+        msg_to = action_dict.get('message_to')
+        if msg_text and msg_text.strip():
+            comm_scope = self.game_params.get('comm_scope', 'none')
+            # Enforce scope rules
+            if comm_scope == 'broadcast':
+                msg_to = 'all'
+            elif comm_scope == 'dm' and msg_to == 'all':
+                msg_to = None  # Invalid: DM scope can't broadcast
+            self._last_message = {
+                'from': self.agent_id,
+                'message': msg_text.strip(),
+                'message_to': msg_to,
+            }
+
+    def get_last_message(self) -> Optional[Dict]:
+        """Return the message from the last select_action call, or None."""
+        return self._last_message
+
     def select_action(self, observation: Dict) -> Action:
         """
         Select action based on observation using LLM.
@@ -196,6 +223,7 @@ class LLMAgent:
         """
         # Store visible agents for network target validation
         self._visible_agents = observation.get('visible_agents', None)
+        self._last_message = None  # Reset each round
 
         prompt = self._format_observation(observation)
 
@@ -270,6 +298,7 @@ class LLMAgent:
                 if action_dict:
                     action = self._action_dict_to_action(action_dict)
                     if action:
+                        self._store_message(action_dict)
                         return action
 
                 # JSON missing — send a follow-up requesting structured output
@@ -302,6 +331,7 @@ class LLMAgent:
                         if action_dict:
                             action = self._action_dict_to_action(action_dict)
                             if action:
+                                self._store_message(action_dict)
                                 # Log the retry trace
                                 self.reasoning_traces.append({
                                     "round": observation['round'],
@@ -356,7 +386,8 @@ class LLMAgent:
     def update_memory(self, round_num: int, action_str: str, target: Optional[str],
                       outcome: Optional[Dict], visible_agents: Optional[list],
                       round_actions: list, resource_changes: Dict,
-                      combat_results: list, all_resources: Dict):
+                      combat_results: list, all_resources: Dict,
+                      received_messages: Optional[list] = None):
         """Update agent memory after a round resolves.
 
         Args:
@@ -369,6 +400,7 @@ class LLMAgent:
             resource_changes: Per-agent resource changes.
             combat_results: Combat result dicts from the round.
             all_resources: Current resources for all agents (post-round).
+            received_messages: Messages received this round (list of dicts).
         """
         if not self.memory_enabled or self.memory is None:
             return
@@ -377,6 +409,9 @@ class LLMAgent:
             round_num, visible_agents, round_actions,
             resource_changes, combat_results, all_resources
         )
+        # Record communication
+        if received_messages:
+            self.memory.record_messages(self._last_message, received_messages)
 
     def get_reasoning_traces(self) -> list:
         """Get all reasoning traces for analysis."""
