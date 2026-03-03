@@ -4,220 +4,554 @@
 % =============================================================================
 % LITERATURE REVIEW (8-12 pages)
 % Rubric: Use of Literature (20% of Report)
+%
+% Structure follows the three IVs of the thesis (reasoning, information,
+% communication) mapped to mechanism design inputs (Hurwicz, 1960) and
+% narratively to Hobbes's three causes of conflict (Leviathan, 1651).
 % =============================================================================
 
 % -----------------------------------------------------------------------------
-% SECTION 2.1: Emergent Social Structure in Agent Systems
+% SECTION 2.1: The Origins of Order — From ABMs to LLMs
+% Context: classical ABM tradition → LLM agents as new paradigm
 % -----------------------------------------------------------------------------
-\section{Emergent Social Structure in Agent Systems}
-% TODO: The ABM tradition of bottom-up social emergence
-%   \cite{schelling1971} — segregation from mild preferences
+\section{The Origins of Order: From Agent-Based Models to LLM Agents}
+
+% TODO: 2.1.1 — The ABM tradition of bottom-up social emergence
+%   \cite{schelling1971} — segregation from mild preferences (foundational)
 %   \cite{epstein1996} — Sugarscape: wealth inequality, trade, conflict from simple rules
 %   \cite{cederman1997} — emergent political structures
 %   \cite{bonabeau2002} — ABM methodology overview
+%   \cite{axtell2022} — authoritative ABM methodology review
+%   Key insight: classical ABMs use FIXED behavioral rules.
+%   What happens when agents can reason about the rules?
 %
-% TODO: Cooperation as emergent phenomenon
+% TODO: 2.1.2 — Cooperation as emergent phenomenon
 %   \cite{axelrod1981,axelrod1984} — evolution of cooperation, tit-for-tat
 %   \cite{axelrod1997} — norms emerging from decentralized interaction
 %   \cite{nowak2006,nowak2006five} — five mechanisms for cooperation
 %   \cite{ostrom1990} — self-organization without central authority
 %   \cite{fehr2002altruistic} — altruistic punishment and norm enforcement
+%   \cite{skyrms2004stag} — Stag Hunt: coordination game framework
 %
-% TODO: Framing effects on cooperation (classic result)
-%   \cite{liberman2004} — "The Name of the Game": calling PD "Wall Street Game" vs
-%     "Community Game" drastically changes cooperation rates. Foundational for our
-%     framing findings (η²=0.90 for framing→Gini).
-%
-% TODO: Key insight: classical ABMs use FIXED behavioral rules.
-%   What happens when agents can reason about the rules?
-
-% -----------------------------------------------------------------------------
-% SECTION 2.2: Multi-Agent RL and Cooperation Dynamics
-% -----------------------------------------------------------------------------
-\section{Multi-Agent Reinforcement Learning}
-% TODO: MARL foundations
-%   \cite{sutton2018} — RL foundations
-%   \cite{hernandezleal2019} — comprehensive MARL survey
-%   \cite{huh2024} — comprehensive MARL survey (2024 update)
-%   \cite{lowe2017} — MADDPG, mixed cooperative-competitive
-%
-% TODO: Cooperation in MARL
-%   \cite{leibo2017} — ESSENTIAL: cooperation "changes dramatically as a function of
-%     environmental parameters." Identical manipulations have opposite effects.
-%   \cite{rachum2025} — emergent dominance hierarchies in RL agents.
-%     Relevant: hierarchies emerge from MARL without explicit design.
-%
-% TODO: The Hobbesian Trap — Kuusela & Roy (AAMAS 2024)
-%   - Level-0/1/2 reasoning in RL agents
-%   - Key finding: higher reasoning → MORE conflict, not less
-%   - "Hobbesian trap": rational agents arm because they model that others will arm
-%   - THIS IS THE METHODOLOGICAL TEMPLATE for the thesis
-%   - Our extension: prompt-based reasoning manipulation on LLMs
-
-% -----------------------------------------------------------------------------
-% SECTION 2.3: LLM Agents and Social Simulation
-% -----------------------------------------------------------------------------
-\section{LLM Agents in Social Simulation}
-% TODO: LLM agents as a new paradigm
+% TODO: 2.1.3 — LLM agents as a new paradigm for social simulation
 %   \cite{park2023generative} — Generative Agents: 25 agents, spontaneous social behavior
 %   \cite{park2024simulacra} — 1000 agents replicating real individuals (85% match)
 %   \cite{wang2024survey} — comprehensive LLM agents survey
 %   \cite{gao2024} — LLM-ABM integration survey
 %   \cite{taillandier2025} — integrating LLMs in ABM social simulation: position paper
-%     on hybrid approaches. Supports our validation discussion.
 %   \cite{riedl2025} — "Emergent Coordination in Multi-Agent Language Models":
-%     information-theoretic framework shows prompt design steers multi-agent LLMs
-%     from "mere aggregates to higher-order collectives." Mirrors our reasoning
-%     depth effect on emergent structure.
+%     information-theoretic framework. Prompt design steers multi-agent LLMs
+%     from "mere aggregates to higher-order collectives."
 %
-% TODO: LLMs in game-theoretic settings
+% TODO: 2.1.4 — LLMs in game-theoretic settings
 %   \cite{akata2023} — LLMs in repeated games, different patterns than humans
 %   \cite{akata2025} — cooperation biases exceeding human baselines (Nature Human Behav)
-%   \cite{pellert2025} — LLMs replicate AND predict human cooperation across game
-%     theory experiments. Complementary to Akata: LLMs can match human patterns.
+%   \cite{pellert2025} — LLMs replicate AND predict human cooperation
 %   \cite{fontana2024} — LLMs more cooperative than humans in PD
 %   \cite{brookins2023} — LLM behavior in canonical games
 %   \cite{phelps2023} — experimental economics methods for LLM behavior
-%   \cite{lore2024} — Strategic behavior of LLMs: game structure vs contextual framing
-%     (Scientific Reports). Key finding: framing effects dominate game structure effects.
-%     DIRECTLY comparable to our η²=0.90 framing result on Gemma 2.
+%   \cite{lore2024} — framing effects dominate game structure (Scientific Reports)
+%     DIRECTLY comparable to our framing results
 %
-% TODO: LLM social behavior
+% TODO: 2.1.5 — LLM social behavior and emergent norms
 %   \cite{ashery2025} — emergent social conventions in LLM populations (Science Advances)
 %   \cite{yuan2024norms} — LLMs near human-level on social norms
 %   \cite{horiguchi2024} — norm AND metanorm emergence
 %   \cite{leng2023} — reciprocity, social welfare, group identity effects
 %   \cite{lu2025cultural} — cultural tendencies in generative AI
+%   project sid!! minecraft constitutional ai.
 %
-% TODO: Escalation and conflict
+% TODO: 2.1.6 — Escalation and conflict in LLM agents
 %   \cite{hua2023waragent} — WarAgent: replicated alliance formations
 %   \cite{rivera2024} — all 5 LLMs showed escalation patterns
 %   \cite{mukobi2023} — Welfare Diplomacy benchmark
 %
-% TODO: Validation challenges
+% TODO: Transition: these studies show LLMs produce rich social behavior, but
+%   manipulate game structure or model identity as the IV.
+%   Nobody systematically varies the DEPTH of reasoning within a single model.
+%   To formalize what "varying agent reasoning" means, we turn to mechanism design.
+
+% -----------------------------------------------------------------------------
+% SECTION 2.2: Mechanism Design and the State of Nature (NEW)
+% The theoretical backbone: Hurwicz's inputs + Hobbes's three causes
+% -----------------------------------------------------------------------------
+\section{Mechanism Design and the State of Nature}
+
+% TODO: 2.2.1 — Hurwicz mechanism design framework
+%   \cite{hurwicz1960} — Optimality and Informational Efficiency in Resource Allocation
+%     Three inputs that determine outcomes in any social interaction:
+%     (1) the solution concept (how agents reason/optimize)
+%     (2) the type/information space (what agents know about each other)
+%     (3) the message space (how agents can communicate/commit)
+%   \cite{myerson1979} — Incentive Compatibility and the Bargaining Problem
+%     Revelation principle: optimal mechanisms can assume truthful reporting
+%   \cite{maskin2008} — Mechanism Design: How to Implement Social Goals (Nobel lecture)
+%
+% TODO: 2.2.2 — Hobbes and the State of Nature
+%   \cite{hobbes1651} — Leviathan: "the war of all against all"
+%     Three causes of quarrel in the state of nature:
+%     (1) Competition — agents pursue gain
+%     (2) Diffidence — agents arm out of fear/uncertainty
+%     (3) Glory/lack of common power — no enforcement to keep agents in awe
+%   IMPORTANT: the Hobbes mapping is NARRATIVE, not formal.
+%   Hobbes is pre-modern political theory, not game theory.
+%   The thesis uses Hurwicz as the formal framework and Hobbes as framing.
+%
+% TODO: 2.2.3 — The mapping: Hurwicz × Hobbes → Three IVs
+%   IV1: Reasoning depth (L0-L3) = solution concept / "competition"
+%     Strong mapping: how agents optimize IS the solution concept
+%   IV2: Network rewiring (w) = type space / "diffidence"
+%     MD mapping (strong): network topology determines who you can observe and
+%     interact with = the information structure = the type space. w manipulates
+%     how much agents can restructure their information channels.
+%     Hobbes mapping (moderate, two-layered):
+%       Layer 1: hidden resources (base default) = direct Hobbes diffidence.
+%         Agents face genuine type uncertainty about neighbour strength.
+%         Always present — the permanent backdrop of uncertainty.
+%       Layer 2: network rewiring w (the IV) = structural RESPONSE to diffidence.
+%         w=0: trapped with neighbours, can't escape threats → maximally constraining
+%         w=1: can flee dangerous neighbours, seek better partners → EXIT OPTION
+%       Nuance: higher w doesn't REMOVE uncertainty (resources still hidden).
+%       It gives agents agency over their social environment.
+%       Separates SOURCE of uncertainty (hidden resources) from STRUCTURAL
+%       CONDITIONS under which uncertainty operates (network fluidity).
+%   IV3: Communication & enforcement = message space / "lack of common power"
+%     Strong mapping: Hobbes's solution (Leviathan = enforcer) maps directly
+%     to mechanism design's enforcement/commitment mechanisms
+%
+% TODO: 2.2.4 — The Hobbesian Trap in multi-agent systems
+%   \cite{baliga2004} — Arms Races and Negotiations (Baliga & Sjöström):
+%     formal model of arms race dynamics with incomplete information
+%   \cite{baliga2012} — "The Hobbesian Trap" (Baliga & Sjöström):
+%     rational agents trapped in conflict even when both prefer peace.
+%     Formal game-theoretic treatment of Hobbes's insight.
+%   \cite{kuesela2024} — Kuusela & Roy (AAMAS 2024): "Higher Order Reasoning
+%     under Intent Uncertainty Reinforces the Hobbesian Trap"
+%     Key finding: higher reasoning (L0→L1→L2) → MORE conflict, not less.
+%     THIS IS THE METHODOLOGICAL TEMPLATE for the thesis.
+%     Our extension: from RL (Q-learning, IQL) to prompted LLM reasoning.
+%
+% TODO: 2.2.5 — Cooperative AI and commitment
+%   \cite{dafoe2020} — Dafoe et al. "Open Problems in Cooperative AI":
+%     identifies commitment as crucial for cooperation. Distinguishes
+%     capability (what agents CAN do) from tendency (what they DO).
+%     Our enforcement IV (contracts, credible commitment) directly addresses
+%     their identified open problem.
+%   \cite{conitzer2024foundations} — "Foundations of Cooperative AI" (AAAI):
+%     program equilibria, commitment devices, binding agreements.
+%     Theoretical basis for our Phase 2d (communication & enforcement).
+
+% -----------------------------------------------------------------------------
+% SECTION 2.3: Strategic Reasoning in Multi-Agent Systems (IV1)
+% Reasoning depth as the first independent variable
+% -----------------------------------------------------------------------------
+\section{Strategic Reasoning in Multi-Agent Systems}
+
+% TODO: 2.3.1 — Multi-Agent RL foundations (bridge from Kuusela to LLMs)
+%   \cite{sutton2018} — RL foundations
+%   \cite{hernandezleal2019} — comprehensive MARL survey
+%   \cite{huh2024} — MARL survey (2024 update)
+%   \cite{lowe2017} — MADDPG, mixed cooperative-competitive
+%   \cite{leibo2017} — cooperation "changes dramatically as a function of
+%     environmental parameters"
+%   \cite{rachum2025} — emergent dominance hierarchies in RL agents
+%
+% TODO: 2.3.2 — Chain-of-thought as computation, not explanation
+%   \cite{wei2022chain} — foundational CoT paper
+%   \cite{pfau2024dots} — "Let's Think Dot by Dot": even meaningless filler
+%     tokens improve performance because each token = additional forward pass.
+%     PROVES computational depth matters independently of semantic content.
+%   \cite{goyal2024think} — "Think Before You Speak": learnable pause tokens
+%     boost performance. Same conclusion: more compute → different behavior.
+%   Synthesis: L0→L3 prompts don't just change reasoning CONTENT — they
+%     change the AMOUNT OF COMPUTATION before choosing an action.
+%
+% TODO: 2.3.3 — K-Level Reasoning in LLM games
+%   \cite{zhang2024klevel} — K-Level Reasoning (NAACL 2025): recursive
+%     strategic depth in LLMs. Deeper reasoning improves performance but
+%     too much depth yields diminishing returns.
+%     DIRECTLY MAPS to our non-monotonic L0→L3 findings.
+%   \cite{jia2025cot} — tested 22 LLMs: CoT not universally effective for
+%     strategic reasoning. Helps at certain levels, limited elsewhere.
+%     Supports: reasoning depth INTERACTS WITH game structure.
+%   \cite{duan2024gtbench} — GTBench (NeurIPS 2024): CoT and ToT don't
+%     always help in strategic games, sometimes hurt.
+%   TMGBench (2025, Neurocomputing): second-order ToM provides minimal gain
+%     over first-order. Supports our L2→L3 transition dynamics.
+%
+% TODO: 2.3.4 — Theory of Mind in LLMs
+%   \cite{kosinski2024} — GPT-4 solves 75% false-belief tasks
+%   \cite{strachan2024} — GPT-4 at/above human on indirect requests, but
+%     competence-performance gap
+%   \cite{zhao2024tom} — systematic failures in complex narratives
+%   KEY DISTINCTION: we don't claim agents HAVE ToM. We claim prompting for
+%   opponent modeling changes computational depth, which changes behavior.
+
+% -----------------------------------------------------------------------------
+% SECTION 2.4: Information, Observation, and Memory (IV2) (NEW)
+% Information structure as the second independent variable
+% -----------------------------------------------------------------------------
+\section{Information, Observation, and Memory}
+
+% TODO: 2.4.1 — Information asymmetry in game theory
+%   \cite{harsanyi1967} — Games with Incomplete Information (3-part paper):
+%     Foundational: how do rational agents behave when they don't know
+%     each other's types? Bayesian Nash Equilibrium.
+%   \cite{aumann1976} — "Agreeing to Disagree": common knowledge framework
+%   \cite{camerer2003} — Behavioral Game Theory: real humans deviate from
+%     Bayesian rationality under incomplete information
+%
+% TODO: 2.4.2 — Information structure in LLM multi-agent systems
+%   \cite{liu2024llm_info} — Liu et al. (2024): information asymmetry effects
+%     in LLM agent interactions. Shows that what agents know about each other
+%     fundamentally changes strategic behavior. Directly relevant to our
+%     visibility/information IV.
+%   \cite{bianchi2024llm_negotiation} — Bianchi et al. (2024): LLM negotiation
+%     under different information conditions
+%   Our manipulation: visibility radius (who you can see) + hide_resources
+%     (what you know about visible agents)
+%
+% TODO: 2.4.3 — Memory architectures for LLM agents
+%   \cite{park2023generative} — Generative Agents memory stream:
+%     observation → reflection → retrieval with recency/importance/relevance scoring.
+%     Foundational architecture, but designed for social simulation not game theory.
+%   \cite{xu2025amem} — A-MEM (2025): agentic memory with self-organizing
+%     knowledge structures. More sophisticated than sliding window.
+%   Our approach: simpler game-theoretic memory (sliding window of own actions
+%     + per-neighbor observation summaries). Information is LOCAL: you only
+%     learn about agents in your visibility radius.
+%     Methodological contribution: no existing game-theory LLM paper has
+%     systematic memory architecture as an experimental variable.
+%
+% TODO: 2.4.4 — From "god view" to local information
+%   Most LLM game papers give agents FULL information (all other agents' actions).
+%   In real social systems, agents have LOCAL information + MEMORY.
+%   Our memory system replaces "god view" neighbor profiles with:
+%     - Own action history (sliding window)
+%     - Per-agent observation summaries (only what you observed)
+%     - Stale entries for agents no longer visible (last seen round X)
+%   This is a manipulation of Hurwicz's TYPE SPACE / Hobbes's "diffidence":
+%     less information → more uncertainty → different strategic behavior.
+%
+% TODO: 2.4.5 — Co-evolutionary network dynamics: structure shapes strategy shapes structure
+%   The information IV is operationalized as NETWORK REWIRING PROBABILITY w.
+%   This section reviews the co-evolutionary dynamics literature that grounds this choice.
+%
+%   Foundational co-evolutionary models:
+%   \cite{zimmermann2004} — Zimmermann & Eguíluz (PRE 2004): "Cooperation, social networks,
+%     and the emergence of leadership in a prisoner's dilemma with adaptive rewiring."
+%     Agents drop defecting neighbors, reconnect randomly. Cooperation emerges on
+%     adaptive networks even when impossible on static ones. Foundational for
+%     payoff-based rewiring mechanism. Key result: rewiring creates assortative
+%     mixing (cooperators cluster), enabling cooperation via network reciprocity.
+%   \cite{zimmermann2005} — Zimmermann, Eguíluz & San Miguel (2005): extended model,
+%     shows coexistence of cooperators and defectors depends on rewiring rate.
+%   \cite{santos2006pnas} — Santos, Pacheco & Lenaerts (PNAS 2006): "Social diversity
+%     promotes the emergence of cooperation in public goods games."
+%     Scale-free networks (heterogeneous degree) promote cooperation.
+%     Key insight: network HETEROGENEITY (not just topology) matters.
+%     Directly relevant: our rewiring creates emergent degree heterogeneity.
+%   \cite{santos2006nature} — Santos & Pacheco (Nature 2006): cooperation prevails
+%     on scale-free networks across all dilemma strengths.
+%
+%   The rewiring probability w as control parameter:
+%   \cite{pacheco2006} — Pacheco, Traulsen & Nowak (PRL 2006): "Coevolution of
+%     strategy and structure in complex networks with dynamical linking."
+%     w = probability of rewiring vs strategy update. Phase transition at
+%     critical w*: below = defection dominates, above = cooperation dominates.
+%     DIRECTLY maps to our IV: w ∈ {0, 0.05, 0.3, 1.0}.
+%   \cite{santos2006jeb} — Santos, Pacheco & Lenaerts (J Evol Biol 2006):
+%     active linking and cooperation in evolutionary games.
+%     Faster rewiring relative to strategy update → more cooperation.
+%   \cite{rand2011pnas} — Rand, Arbesman & Christakis (PNAS 2011): "Dynamic social
+%     networks promote cooperation in experiments with humans."
+%     CRITICAL REFERENCE: human experiments (N=785) confirm theoretical prediction.
+%     Dynamic networks increase cooperation from ~55% (static) to ~70% (dynamic).
+%     Key mechanism: cooperators cut ties to defectors, assortative mixing emerges.
+%     This is the EMPIRICAL grounding for our w manipulation.
+%
+%   Network reciprocity and spatial structure:
+%   \cite{ohtsuki2006nature} — Ohtsuki, Hauert, Lieberman & Nowak (Nature 2006):
+%     "A simple rule for the evolution of cooperation on graphs and social networks."
+%     b/c > k rule: cooperation evolves when benefit/cost exceeds average degree.
+%     Foundation for understanding how network structure enables cooperation.
+%   \cite{allen2017nature} — Allen et al. (Nature 2017): generalised b/c > k rule
+%     to arbitrary network structures. Extended Ohtsuki's result.
+%   \cite{nowak2006five} — Nowak (Science 2006): five rules for evolution of
+%     cooperation, including NETWORK RECIPROCITY as one of the five mechanisms.
+%     Our design tests whether network reciprocity operates with LLM agents.
+%
+%   Comprehensive reviews:
+%   \cite{gross2008} — Gross & Blasius (J Roy Soc Interface 2008): "Adaptive
+%     coevolutionary networks: a review." Comprehensive survey of models where
+%     network topology and node dynamics co-evolve. Classifies rewiring mechanisms.
+%   \cite{perc2010szolnoki} — Perc & Szolnoki (BioSystems 2010): "Coevolutionary
+%     games — a mini review." Covers strategy-topology co-evolution.
+%   \cite{akcay2018} — Akçay (Nature Communications 2018): "Collapse and rescue
+%     of cooperation in evolving dynamic networks." Shows networks can undergo
+%     catastrophic collapse of cooperation. Relevant to our Phase 2c analysis
+%     of whether cooperation is STABLE on adaptive networks.
+%
+%   Multi-action and complex strategy spaces:
+%   \cite{vansegbroeck2009} — Van Segbroeck et al. (BMC Evol Biol 2009): "Reacting
+%     differently to adverse ties promotes cooperation in social networks."
+%     Agents choose DIFFERENT rewiring strategies for different types of
+%     negative interactions. Relevant: our 6-action game creates more complex
+%     payoff landscapes than binary cooperate/defect.
+%   \cite{su2023} — Su et al. (Nature Computational Science 2023): "Evolution of
+%     cooperation with asymmetric social interactions." Most recent major paper.
+%     Shows asymmetric interactions (like our invest_other with 1:2.5 cost ratio)
+%     create different co-evolutionary dynamics than symmetric games.
+%
+%   LLM agents on networks (gap identification):
+%   \cite{piatti2024} — Piatti et al. (2024): "Cooperate or Collapse" — LLM agents
+%     in iterated social dilemmas WITH network structure (one of very few).
+%     But uses FIXED networks, no co-evolution. Our contribution: adaptive networks.
+%   Gap: NO existing work combines LLM agents + K-level reasoning + co-evolutionary
+%     network dynamics. This is the core novelty claim for the information IV.
+%
+%   Theoretical positioning — two layers of "diffidence":
+%   The information IV has a nuanced Hobbes mapping (see §2.2.3):
+%   - Hidden resources (base default) = DIRECT Hobbes diffidence. Agents always
+%     face type uncertainty about neighbour strength. This is the permanent
+%     backdrop — present in ALL conditions.
+%   - Network rewiring w (the IV) = structural RESPONSE to diffidence. Higher w
+%     doesn't remove uncertainty (resources still hidden), but gives agents an
+%     EXIT OPTION from threatening relationships.
+%   This separation is analytically powerful: it distinguishes the SOURCE of
+%   uncertainty from the STRUCTURAL CONDITIONS under which uncertainty operates.
+%   The MD mapping is cleaner: w directly manipulates the type space (who you
+%   can observe/interact with). See §2.2.3 for the full mapping table.
+
+% -----------------------------------------------------------------------------
+% SECTION 2.5: Communication Scope (IV3) (UPDATED Mar 2)
+% Communication scope as the third independent variable
+% -----------------------------------------------------------------------------
+\section{Communication Scope}
+
+% TODO: 2.5.1 — Cheap talk and strategic communication
+%   \cite{crawford1982} — Crawford & Sobel: "Strategic Information Transmission"
+%     Foundational cheap talk paper. Key insight: when talk is not binding,
+%     information transmission depends on alignment of interests.
+%     Directly maps to both our DM and broadcast conditions.
+%   \cite{farrell1996} — Cheap talk (survey): when is communication credible?
+%     Key question: does scope (private vs public) affect credibility?
+%   \cite{sally1995} — Sally (1995): meta-analysis of 35 years of PD experiments.
+%     Communication boosts cooperation by ~40%. But mechanism unclear:
+%     is it commitment, coordination, or empathy? Our DM vs broadcast
+%     manipulation helps disentangle: if public > private, coordination matters
+%     more than bilateral commitment.
+%
+% TODO: 2.5.2 — Private vs public communication in games
+%   The key theoretical distinction for our IV:
+%   - PRIVATE (DM): bilateral cheap talk. Enables secret deals, conspiracies,
+%     hidden coalitions. Only sender and receiver know. Information asymmetry
+%     between insiders and outsiders.
+%   - PUBLIC (broadcast): multilateral cheap talk. Enables coordination,
+%     public commitments, norm enforcement, collective action against
+%     aggressors. But no secrecy — targets can hear threats.
+%   \cite{schelling1960} — focal points: public communication creates shared
+%     knowledge that enables coordination (even without enforcement).
+%   \cite{baliga2004} — arms races with/without communication:
+%     communication can prevent conflict IF sufficiently informative.
+%     Scope matters: bilateral assurances vs public declarations.
+%
+% TODO: 2.5.3 — Communication in LLM multi-agent systems
+%   Existing work: LLM agents can negotiate, form agreements, deceive
+%   \cite{bianchi2024llm_negotiation} — LLM negotiation strategies
+%   \cite{hua2023waragent} — WarAgent: alliance communication (includes messaging
+%     but does not vary communication STRUCTURE as IV)
+%   Gap: no systematic manipulation of communication SCOPE as IV.
+%   Our four conditions (all cheap talk — no enforcement):
+%     (1) No communication (baseline — state of nature, no channel)
+%     (2) Direct message only (private — 1 message to 1 neighbour)
+%     (3) Broadcast only (public — 1 message to all neighbours)
+%     (4) Choice (agent selects DM or broadcast each round)
+%   These vary Hurwicz's MESSAGE SPACE along a single dimension: scope.
+%   The question: do WORDS alone create order, and does it matter who hears them?
+%   The choice condition adds a second question: when given full capability,
+%   which channel do agents PREFER? Channel choice becomes a DV.
+%
+% TODO: 2.5.4 — Interaction with network topology
+%   Communication scope interacts with network rewiring (w):
+%   - Static network (w=0) + broadcast = stable public sphere, fixed audience
+%   - Dynamic network (w=1) + broadcast = fluid public, changing audience
+%   - Static + DM = stable bilateral relationships, long-term deals possible
+%   - Dynamic + DM = fragile bilateral deals (partner may rewire away)
+%   This interaction is theoretically rich: does communication need structural
+%   stability to be effective? Or can cheap talk function on fluid networks?
+%
+% TODO: 2.5.5 — From cheap talk to enforcement (future work)
+%   \cite{dafoe2020} — "Open Problems in Cooperative AI": commitment is key
+%   \cite{conitzer2024foundations} — program equilibria as formal commitment
+%   \cite{hobbes1651} — The Leviathan as enforcer
+%   \cite{north1990} — institutions as enforcement mechanisms
+%   Framing for Discussion: if cheap talk (DM or broadcast) fails to sustain
+%     cooperation, this motivates Hobbes's claim that only a Leviathan
+%     (external enforcement) can escape the state of nature.
+%   If cheap talk DOES sustain cooperation, Hobbes was too pessimistic —
+%     words alone can create order under the right structural conditions.
+%   Binding contracts with enforcement = natural future extension.
+
+% -----------------------------------------------------------------------------
+% SECTION 2.6: Faithfulness and Validation (restructured)
+% Methodological concerns about using reasoning traces as data
+% -----------------------------------------------------------------------------
+\section{Faithfulness and Validation of Reasoning Traces}
+
+% TODO: 2.6.1 — CoT faithfulness: the problem
+%   \cite{turpin2023} — CoT can be unfaithful to internal computation (NeurIPS)
+%   \cite{lanham2023} — measuring faithfulness: early answering / truncation tests
+%   \cite{chen2025} — "Reasoning Models Don't Always Say What They Think":
+%     reasoning models construct fake rationales, <2% admit to using hints
+%   \cite{barez2025} — "Chain-of-Thought Is Not Explainability": CoT ≠
+%     mechanistic explanation. Supports our "computation, not explanation" frame.
+%
+% TODO: 2.6.2 — Causal analysis of reasoning traces
+%   \cite{paul2024} — measuring and improving CoT faithfulness
+%   \cite{bogdan2025anchors} — "Thought Anchors" (ICLR 2026 submission):
+%     counterfactual resampling at sentence level. Planning/uncertainty
+%     sentences are "thought anchors" that determine outcomes.
+%     APPLICABLE to identifying which reasoning types drive behavior.
+%   \cite{bogdan2025branches} — "Thought Branches" (ICLR 2026 submission):
+%     single CoT interpretation is inadequate; need distribution of
+%     trajectories. Off-policy interventions yield small effects.
+%
+% TODO: 2.6.3 — Our validation approach
+%   - Truncation test (Lanham): ablate reasoning sections, check if behavior changes
+%   - Thought Anchors resampling on subset of runs
+%   - TextGrad-inspired optimization: can we find minimal prompt changes that
+%     flip behavior? If so, reasoning has causal influence on output.
+%   - KEY FRAMING: we treat traces as BEHAVIORAL DATA, not as explanations
+%     of internal computation. The thesis measures what agents DO when given
+%     more computational depth, not what they "really think."
+%
+% TODO: 2.6.4 — Generative ABM validation
 %   \cite{larooij2025} — CRITICAL: generative ABMs productive when focusing on
 %     macro-level patterns, explanation, counterfactuals, and LLM limitations
 %   \cite{taillandier2025} — hybrid LLM+ABM approaches for transparency
 %   \cite{flache2017} — ABM validation challenges
-%   \cite{axtell2022} — authoritative ABM methodology review
 %   \cite{agarwal2025wolf} — WOLF: LLM framework for analyzing social science experiments
+%
+% TODO: 2.6.5 — Framing effects as confound and finding
+%   \cite{liberman2004} — "The Name of the Game": calling PD "Wall Street Game" vs
+%     "Community Game" drastically changes cooperation rates.
+%     Foundational for our framing findings.
+%   \cite{lore2024} — framing effects dominate game structure in LLMs
+%   Our finding: prompt framing (η²=0.90 for framing→Gini on Gemma 2)
+%     shows that HOW you ask matters as much as WHAT you ask.
 
 % -----------------------------------------------------------------------------
-% SECTION 2.4: Reasoning Depth as Computation
-% -----------------------------------------------------------------------------
-\section{Reasoning Depth as Computation in Strategic Settings}
-
-% TODO: 2.4.1 — Chain-of-thought as computation, not just explanation
-\subsection{CoT as Computation}
-%   \cite{wei2022chain} — foundational CoT paper
-%   \cite{pfau2024dots} — "Let's Think Dot by Dot": even meaningless filler tokens
-%     improve performance because each token = additional forward pass.
-%     PROVES computational depth matters independently of semantic content.
-%   \cite{goyal2024think} — "Think Before You Speak": learnable pause tokens
-%     boost performance. Same conclusion: more compute → different behavior.
-%   - Synthesis (Preprints.org 2025 survey): semantic content of reasoning steps
-%     may be secondary to the computational time they provide.
-%
-%   IMPLICATION: L0→L3 prompts don't just change reasoning content — they change
-%   the AMOUNT OF COMPUTATION before choosing an action.
-
-% TODO: 2.4.2 — K-Level Reasoning in LLM games
-\subsection{K-Level Reasoning in LLM Games}
-%   \cite{zhang2024klevel} — K-Level Reasoning (NAACL 2025): recursive strategic
-%     depth in LLMs. Deeper reasoning improves performance but too much depth
-%     yields diminishing returns. DIRECTLY MAPS to our non-monotonic L0→L3.
-%   \cite{jia2025cot} — tested 22 LLMs: CoT not universally effective for strategic
-%     reasoning. Helps at certain levels, limited elsewhere. Supports finding that
-%     reasoning depth INTERACTS WITH game structure.
-%   \cite{duan2024gtbench} — GTBench (NeurIPS 2024): CoT and ToT don't always help
-%     in strategic games, sometimes hurt. Our non-monotonic finding is consistent.
-%   - TMGBench (2025, Neurocomputing): second-order ToM provides minimal gain over
-%     first-order. LLMs show "logical inconsistencies and superficial ToM."
-%     Relevant to our L2→L3 transition.
-
-% TODO: 2.4.3 — Faithfulness and causal analysis of reasoning traces
-\subsection{Faithfulness and Causal Analysis of Reasoning Traces}
-%   \cite{turpin2023} — CoT can be unfaithful to internal computation (NeurIPS 2023)
-%   \cite{lanham2023} — measuring faithfulness: early answering / truncation tests
-%   \cite{chen2025} — "Reasoning Models Don't Always Say What They Think": reasoning
-%     models construct fake rationales, <2% admit to using hints
-%   \cite{barez2025} — "Chain-of-Thought Is Not Explainability": CoT ≠ mechanistic
-%     explanation. Supports our "computation, not explanation" framing.
-%   \cite{paul2024} — measuring and improving CoT faithfulness
-%   \cite{bogdan2025anchors} — "Thought Anchors" (ICLR 2026 submission):
-%     counterfactual resampling at sentence level. Planning/uncertainty sentences
-%     are "thought anchors" that determine outcomes. APPLICABLE to identifying
-%     which reasoning types (opponent modeling, threat assessment) drive behavior.
-%   \cite{bogdan2025branches} — "Thought Branches" (ICLR 2026 submission):
-%     single CoT interpretation is inadequate; need distribution of trajectories.
-%     Off-policy interventions (hand-editing) yield small effects; on-policy
-%     resampling produces larger, more consistent effects.
-%
-%   IMPLICATION: Our truncation test (Lanham) is a weaker intervention than
-%   resampling. Consider Thought Anchors approach on a subset of runs.
-
-% TODO: 2.4.4 — Theory of Mind in LLMs
-\subsection{Theory of Mind in LLMs}
-%   \cite{kosinski2024} — GPT-4 solves 75% false-belief tasks; "may have
-%     spontaneously emerged as byproduct of language skills"
-%   \cite{strachan2024} — GPT-4 at/above human on indirect requests, false beliefs
-%     BUT also competence-performance gap
-%   \cite{zhao2024tom} — systematic failures in complex narratives requiring deep ToM
-%
-%   KEY DISTINCTION: We don't claim agents HAVE ToM. We claim prompting for
-%   opponent modeling changes computational depth, which changes behavior.
-
-% -----------------------------------------------------------------------------
-% SECTION 2.5: Phase Transitions in Social Systems
+% SECTION 2.7: Phase Transitions in Social Systems (kept)
+% The measurement framework for detecting emergent order
 % -----------------------------------------------------------------------------
 \section{Phase Transitions in Social Systems}
-% TODO: Phase transitions as a framework
+
+% TODO: 2.7.1 — Phase transitions as a framework
 %   - Statistical mechanics analogy: order parameters, critical points
 %   - Spatial radius as control parameter (our strongest finding from Phase 1)
 %   - Cooperation-to-conflict transition at r=2→3
 %
-% TODO: Phase transitions in cooperation dynamics
+% TODO: 2.7.2 — Phase transitions in cooperation dynamics
 %   \cite{perc2017} — Physics Reports: comprehensive review of cooperation phase
 %     transitions in evolutionary game theory on networks. Spatial structure as
 %     control parameter. THE main reference for our phase transition analysis.
 %   \cite{wang2012perc} — sparse players + spatial structure → cooperation phase
 %     transitions in social dilemmas. Directly relevant to our radius sweep.
+%   \cite{perc2010szolnoki} — Coevolutionary games on networks:
+%     spatial structure as mechanism for cooperation (Perc & Szolnoki).
+%     Theoretical basis for our toroidal grid + interaction radius design.
+%   \cite{pacheco2006} — Pacheco et al. (PRL 2006): phase transition at critical
+%     rewiring probability w*. Below w*: defection dominates. Above w*:
+%     cooperation dominates. Our w ∈ {0, 0.05, 0.3, 1.0} sweeps this transition.
+%   \cite{akcay2018} — Akçay (Nature Comms 2018): catastrophic COLLAPSE of
+%     cooperation on evolving networks — shows cooperation phase transitions
+%     can be abrupt/hysteretic, not just gradual. Relevant to our EWS analysis.
+%
+% TODO: 2.7.3 — Early warning signals
 %   \cite{scheffer2009} — Nature: early warning signals for critical transitions.
 %     Variance increase, autocorrelation, skewness before transitions.
 %     Methodological basis for our EWS analysis.
 %   \cite{hofer2018} — critical transitions and EWS in repeated cooperation games.
 %     Bridges EWS methodology to game-theoretic cooperation dynamics.
 %
-% TODO: Phase transitions in multi-agent systems
-%   \cite{evangelou2024} — ML for phase transition detection in ABMs (Physical Review E).
-%     Methodological reference for automated transition detection.
-%   \cite{gu2022} — change point detection in multi-agent systems using higher-order
-%     features (Chaos). Alternative detection methodology.
+% TODO: 2.7.4 — Phase transitions in multi-agent systems
+%   \cite{evangelou2024} — ML for phase transition detection in ABMs (Phys Rev E).
+%   \cite{gu2022} — change point detection in multi-agent systems (Chaos).
 %   \cite{liykziit2026} — phase transition for budgeted multi-agent synergy (2026).
-%     Recent theoretical work on transitions in multi-agent coordination.
 %
-% TODO: Connect to Debraj's work
-%   \cite{mengesha2025natcomms} — Mengesha & Roy (Nature Communications): carbon pricing
-%     drives critical transition. ABM phase transition methodology directly from
-%     supervisor's group.
-%   \cite{mengesha2025iccs} — Mengesha & Roy (ICCS): game selection leads to emergent
-%     inequality. Co-evolution of game structure and strategies.
+% TODO: 2.7.5 — Connect to supervisor's group
+%   \cite{mengesha2025natcomms} — Mengesha & Roy (Nature Communications): carbon
+%     pricing drives critical transition. ABM phase transition methodology
+%     directly from supervisor's group.
+%   \cite{mengesha2025iccs} — Mengesha & Roy (ICCS): game selection leads to
+%     emergent inequality. Co-evolution of game structure and strategies.
 %
-% TODO: Connect to the thesis question
-%   - If reasoning depth shifts the critical point, that's a genuine interaction
-%     between cognition and structure
-%   - This is the "Origins" question: order emerges from the interaction of
-%     reasoning and environment, not from either alone
+% TODO: Synthesis: if reasoning depth or information structure shifts the critical
+%   point, that's a genuine interaction between cognition/knowledge and structure.
+%   This is the "Origins" question: order emerges from the interaction of
+%   reasoning, information, and environment — not from any one alone.
 
 % -----------------------------------------------------------------------------
-% SECTION 2.6: Research Gap
+% SECTION 2.8: Research Gap (rewritten for 3 IVs)
+% What nobody has done yet, and what this thesis does
 % -----------------------------------------------------------------------------
 \section{Research Gap}
-% TODO: Synthesize the gap:
-%   1. K-Level Reasoning tested in 2-player settings, not N-agent coordination
-%   2. LLM game studies test behavior, not emergent STRUCTURE
-%   3. No one has tested reasoning depth × game structure as a factorial
-%   4. Phase transitions in LLM social systems not yet studied
-%   5. Kuusela & Roy used RL; prompt-based reasoning manipulation is untested
+
+% TODO: Synthesize the gap across all three IVs:
 %
-% TODO: Position thesis contribution relative to gap
+%   GAP 1 (Reasoning depth):
+%   - K-Level Reasoning (Zhang et al.) tested in 2-player settings, not N-agent
+%   - Kuusela & Roy used RL agents; prompt-based reasoning manipulation untested
+%   - No one has tested reasoning depth × game structure as a factorial design
+%     with emergent structure as DV
+%
+%   GAP 2 (Information structure / network topology):
+%   - Most LLM game studies give agents FULL information on FIXED networks
+%   - Co-evolutionary network dynamics extensively studied in evolutionary GT
+%     (Zimmermann 2004, Santos 2006, Pacheco 2006, Rand 2011) but NEVER with
+%     LLM agents — all use evolutionary strategy updating, not prompted reasoning
+%   - Piatti et al. (2024) uses LLM agents on networks but FIXED topology only
+%   - No existing work combines K-level reasoning + adaptive network rewiring
+%   - Our IV: rewiring probability w ∈ {0, 0.05, 0.3, 1.0} (static → fluid)
+%   - This tests whether the cooperation-promoting effect of dynamic networks
+%     (Rand et al. 2011 PNAS) holds when agents reason strategically (L0-L3)
+%   - Hidden resources as base default (not IV) — creates type uncertainty
+%   - Memory always ON — prerequisite for meaningful social dynamics
+%
+%   GAP 3 (Communication scope):
+%   - LLM negotiation studies exist (WarAgent, Bianchi), but don't
+%     systematically vary communication SCOPE as IV
+%   - No study compares no-comm vs private (DM) vs public (broadcast)
+%     cheap talk in LLM multi-agent social dilemmas
+%   - Sally (1995) shows communication boosts cooperation ~40% in human
+%     experiments, but mechanism (commitment vs coordination) unclear
+%   - Our DM vs broadcast manipulation helps disentangle: if public > private,
+%     coordination matters more than bilateral commitment
+%   - Maps to Hurwicz's message space dimension (scope of channel)
+%
+%   GAP 4 (Phase transitions):
+%   - Phase transitions in LLM social systems not yet studied
+%   - No connection between reasoning depth and critical transition points
+%
+%   GAP 5 (Integration):
+%   - Nobody has studied all three mechanism design inputs simultaneously
+%   - The interaction effects (e.g., does information matter MORE at higher
+%     reasoning depth?) are completely unexplored
+%
+% TODO: Position thesis contribution:
+%   This thesis addresses these gaps by:
+%   1. Operationalizing reasoning depth as prompt-based L0-L3 on a SINGLE model
+%      (Qwen 3.5-27B), extending Kuusela & Roy from RL to LLM
+%   2. Implementing co-evolutionary network dynamics (payoff-based rewiring)
+%      with w as IV, extending Zimmermann (2004) / Rand (2011) from evolutionary
+%      GT to prompted LLM agents. First study combining K-level reasoning with
+%      adaptive network topology.
+%   3. Manipulating communication SCOPE (no-comm → DM → broadcast) as
+%      cheap talk, testing whether words alone create order and whether
+%      private vs public channels produce different emergent structures
+%   4. Running a systematic OAT + factorial design across all three IVs
+%   5. Measuring emergent structure via inequality metrics, network analysis,
+%      community detection, and phase transition analysis
+%   6. Using reasoning traces as behavioral data (not explanation) with
+%      faithfulness validation

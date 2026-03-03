@@ -1,5 +1,24 @@
 # Thesis Roadmap: The Origins of Order
 
+**RQ**: How do strategic reasoning, information structure, and communication scope each shape the emergence of social order in multi-agent LLM systems?
+
+**Three IVs** — formally: the three inputs of mechanism design (Hurwicz, 1960). Narratively: Hobbes's three causes of conflict in the state of nature (*Leviathan*, 1651).
+
+| IV | Manipulation | Mechanism Design | Hobbes | Mapping quality |
+|----|-------------|-----------------|--------|----------------|
+| 1. **Reasoning depth** (L0-L3) | K-level prompts | Solution concept | "Competition" — rational self-interest | Strong |
+| 2. **Network rewiring** (w ∈ {0, 0.05, 0.3, 1.0}) | Payoff-based rewiring probability | Type space | "Diffidence" — two-layered (see below) | Moderate |
+| 3. **Communication scope** (no-comm / DM / broadcast / choice) | Pre-action messaging phase | Message space | "Lack of common power" — can words alone create order? | Strong |
+
+**IV2 two-layer nuance:**
+- Layer 1: Hidden resources (base default, always ON) = direct Hobbes diffidence. Agents face genuine type uncertainty.
+- Layer 2: Network rewiring w (the IV) = structural RESPONSE to diffidence. Higher w gives EXIT OPTION from bad neighbours.
+- MD mapping is cleaner: w directly manipulates the type space (who you observe/interact with).
+
+**Base defaults (not IVs):** hidden resources ON, memory ON (window 10), 6 actions (invest_self/other, arm_self/other, attack, do_nothing), %-based economy.
+
+**Framing note**: mechanism design mapping is the formal backbone. Hobbes mapping is narrative — used for intro/discussion with caveats.
+
 **Timeline**: Feb 2026 - July 2026
 **Submission deadline**: July 15, 2026
 **Defence**: Late July 2026
@@ -201,18 +220,18 @@ Per Debraj (Feb 13): "Without understanding the system, it's impossible to say a
 
 ### Two-Stage Sweep Design
 
-**Stage 1: OAT Screening** (submitted Feb 28 night, 132 runs, ~13K SBU)
-Quick mode: 10 agents, 10 rounds, L1+L3, 2 reps per condition.
+**Stage 1: OAT Screening** (submitted Feb 28 night, 116 runs, ~12K SBU)
+Quick mode: 10 agents, 10 rounds, L1+L3, 2 reps per condition. invest_self OFF (default).
 Goal: identify which parameters produce richest dynamics (diverse actions, Gini variation, L1≠L3).
 Focus metrics: **cooperation ratio**, **Gini**, **E-I index**.
 Prompt shows explicit theta ratios (e.g., "cost-to-benefit ratio 1:1.5") per Debraj.
 
 | Category | Sweep | Values | Runs |
 |----------|-------|--------|------|
-| Conflict theta | conflict_cost_pct | [0, 5, 10, 20] | 16 |
+| Conflict theta | conflict_cost_pct | [2, 5, 10, 20] | 16 |
 | Conflict theta | attack_take_pct | [20, 40, 60, 80] | 16 |
-| Arming theta | arm_cost_pct (self) | [0, 5, 10, 20] | 16 |
-| Arming theta | arm_other_cost_pct | [0, 5, 10, 20] | 16 |
+| Arming theta | arm_cost_pct (self) | [5, 10, 20] | 12 |
+| Arming theta | arm_other_cost_pct | [5, 10, 20] | 12 |
 | Cooperation theta | invest_other_return_pct | [10, 15, 25] | 12 |
 | Cooperation theta | invest_other_cost_pct | [5, 10, 20] | 12 |
 | Spatial | interaction_radius | [1, 2, 3] | 12 |
@@ -267,43 +286,71 @@ All costs/returns are percentages of the acting agent's current resources.
 
 ---
 
-## Phase 2d: Credible Commitment (~Apr 1 - Apr 30)
-**Focus**: Can enforceable contracts solve the Hobbesian trap that no reasoning level escapes?
+## Phase 2d: Communication Scope (~Apr 1 - Apr 30)
+**Focus**: Can cheap talk — without enforcement — create social order? Does it matter who hears you?
 
 Approved by Debraj as **separate thesis chapter** alongside reasoning depth.
 
-### Design
-- Same game, same agents, add one mechanism: enforceable contracts with collateral
-- Agent proposes contract to neighbor ("we invest in each other this round")
-- Target accepts or refuses. If accepted: collateral locked. Deviation = lose collateral.
-- One contract per agent per round. Contract lasts one round.
+### Core Design: 3-Condition Communication Scope Sweep
 
-### Collateral Sweep
-| Condition | Description | Prediction |
-|-----------|-------------|------------|
-| No contract | Baseline anarchy | War equilibrium |
-| 0% collateral | Cheap talk (communication) | Minimal effect |
-| 10% collateral | Light commitment | Some cooperation |
-| 25% collateral | Moderate commitment | Transition zone? |
-| 50% collateral | Serious commitment | Stable cooperation? |
-| 100% collateral | Full commitment | Maximum cooperation |
+| Condition | Mechanism | Who hears | Game-theoretic prediction | LLM prediction |
+|-----------|-----------|-----------|--------------------------|----------------|
+| No-comm | No messaging phase | Nobody | Hobbesian trap | Same |
+| DM only | 1 private message to 1 neighbour | Recipient only | Minimal effect (bilateral) | Secret deals, conspiracies |
+| Broadcast only | 1 public message to all neighbours | All neighbours | Partial effect (coordination) | Public commitments, norms, shaming |
+| Choice | Agent selects DM or broadcast | Depends on choice | Full capability | Channel preference becomes DV |
 
-**Design**: 6 collateral levels × 20 reps = 120 runs
+**The key question**: Do WORDS alone create order, and does it matter who hears them?
+- DM enables HIDDEN coordination (conspiracies, bilateral deals)
+- Broadcast enables PUBLIC coordination (norms, collective action, shaming)
+- All messages are cheap talk (Crawford & Sobel 1982): non-binding, potentially deceptive
 
-### Extensions (if time permits)
-- Multi-party contracts (kartels, allianties, maffia)
-- Asymmetrische contracten (patronage, bescherming)
-- Contract duration (variabel, agent-chosen)
-- Delegation (mandaat aan een ander agent)
-- Agent-chosen collateral (agents kiezen zelf hoeveel ze inleggen)
-- Heterogeneous model mix (slim + dom, exploitatie-dynamiek)
+### Communication Mechanism
+- Each round has 2 phases: **message phase** → **action phase**
+- No-comm: skip messaging phase entirely
+- DM only: LLM outputs `{"message": "...", "to": "Agent_X"}` before action choice
+- Broadcast only: LLM outputs `{"message": "...", "to": "all"}` before action choice
+- Choice: LLM outputs `{"message": "...", "to": "Agent_X" OR "all"}` — agent decides channel per round. Channel choice logged as DV (% DM vs broadcast by level/round/position)
+- Messages stored in memory system alongside action observations
+- No structure imposed on message content — agents write what they want
+
+### Interaction with Network Rewiring (w)
+- Static (w=0) + DM = stable bilateral relationships, long-term deals
+- Static + broadcast = fixed public sphere, stable audience
+- Fluid (w=1) + DM = fragile deals (partner may rewire away)
+- Fluid + broadcast = changing audience each round
+
+### Full Experimental Design
+- 4 comm × 4 reasoning × 4 network = 64 cells (full factorial)
+- May reduce: fix w at 2 levels (static, fluid) → 4 × 4 × 2 = 32 cells × 20 reps = 640 runs
+- Or: run choice condition only at L1+L3 (most informative contrast)
+- Or: prioritize comm × reasoning first, add network interaction later
+
+### Hypotheses (counterintuitive predictions)
+1. **Cheap talk works for LLMs** — cooperation increases even without enforcement, violating game-theoretic rationality (Sally 1995 predicts ~40% boost in humans)
+2. **Broadcast > DM** — public commitment enables coordination that private deals cannot. If so: coordination mechanism > bilateral commitment mechanism
+3. **L3 weaponizes communication** — uses messages to manipulate (false promises, threats) while L1 uses them honestly
+4. **Concordance varies by level** — L0 ignores messages, L1 honors promises, L3 lies strategically
+5. **Communication × network interaction** — cheap talk more effective on static networks (stable relationships) than fluid ones
+
+### Message Analysis (messages as data)
+- What do agents say? Threats, promises, proposals, information sharing?
+- Concordance: message content vs actual action (promise to cooperate → did they?)
+- By reasoning level: who lies, who keeps promises, who threatens?
+- Emergent communication patterns: do agents develop norms? ("I'll invest if you invest")
+- DM vs broadcast: do agents use DMs for conspiracies and broadcasts for norms?
+
+### Future Work (Discussion section)
+- Binding contracts with enforcement (Hobbes's Leviathan, Conitzer 2024 program equilibria)
+- Multi-party contracts, conditional contracts
+- Heterogeneous model mix (different reasoning levels in same game)
 
 ### Robustness & Validation
 
 ### Prompt sensitivity
 - Report FormatSpread (Sclar et al., 2024) or PromptSensiScore (Zhuo et al., 2024)
 - Test semantically equivalent reformulations of L0-L3 prompts
-- **TextGrad Option B**: Run both original + TextGrad-optimized prompts as robustness check. If optimized prompts produce similar behavioral fingerprints → prompts are robust. If different → sensitivity finding.
+- **TextGrad Option B**: Run both original + TextGrad-optimized prompts as robustness check
 
 ### Faithfulness validation
 - Implement Lanham et al.'s early-answering test on subset of runs
@@ -317,10 +364,11 @@ Approved by Debraj as **separate thesis chapter** alongside reasoning depth.
 - Track prompted vs observed reasoning level divergence
 
 ### Deliverables
-- Cross-model comparison (1-2 plots)
-- Prompt sensitivity analysis (incl. TextGrad Option B comparison)
+- **Hero finding**: cheap talk effect size by reasoning level (does language alone break the trap?)
+- Cooperation trajectories: no-comm vs cheap talk vs contracts, per reasoning level
+- Message analysis: concordance, threats, lies by level
+- Prompt sensitivity analysis
 - Faithfulness validation results
-- Trace coding reliability report
 
 ---
 
@@ -341,12 +389,13 @@ Approved by Debraj as **separate thesis chapter** alongside reasoning depth.
 ### Writing Plan
 | Chapter | Content | Depends On | Outline status |
 |---------|---------|------------|----------------|
-| 1. Introduction | Hobbesian Trap framing → gap → contribution | Final results | TODO outline done |
-| 2. Literature Review | 6 sections: ABM, MARL, LLM agents, reasoning depth, phase transitions, gap | Reading | TODO outline done |
-| 3. Methods | Game design, reasoning levels, experimental design, metrics | Phase 2 experiments | TODO outline done |
-| 4. Results | System characterization, reasoning depth effects, origins factorial | Phase 2+3 analysis | Not started |
-| 5. Discussion | Interpretation, faithfulness, limitations, implications | Ch 4 results | TODO outline done |
-| 6. Conclusion | Answer to RQ, future work | Ch 5 | Not started |
+| 1. Introduction | MD × Hobbes framing → three IVs → gap → contribution | Final results | Needs update |
+| 2. Literature Review | MD (3 inputs), LLM agents, reasoning depth, co-evolutionary networks, communication, phase transitions, gap | Reading | TODO structure done (Mar 2) |
+| 3. Methods | Game design, three IVs (reasoning L0-L3, network w, comm scope), experimental design, metrics | Phase 2 experiments | TODO outline done (Mar 2) |
+| 4. Reasoning Depth | L0-L3 × game structure on Qwen 3.5-27B | Phase 2c | Not started |
+| 5. Network & Communication | Network rewiring (w) + communication scope (no-comm/DM/broadcast) | Phase 2c+2d | Not started |
+| 6. Discussion | Three IVs synthesized, interactions, faithfulness caveats, limitations, Hobbes revisited | Ch 4+5 results | Needs update |
+| 7. Conclusion | Answer to RQ, contracts as future work | Ch 6 | Not started |
 
 ### Suggested Writing Order
 1. Methods (know this best, write while running experiments)
@@ -510,37 +559,50 @@ See `notes/meeting_prep_27_feb.md` for full meeting notes.
 Slides archived: `notes/archive/slides/meeting27slidedeck.key`
 
 ### Sprint 3: Feb 27 - Mar 14
-**Phase**: Model transition + Qwen characterisation
-**Goal**: Deploy Qwen 3.5-27B, rerun baselines, implement stabilisation + network metrics
+**Phase**: Model transition + design decisions + Qwen characterisation
+**Goal**: Deploy Qwen 3.5-27B, finalize IV design, exploratory runs, start Methods writing
 **Sprint log**: `notes/sprint_3_feb27-mar14.md`
 
-#### Plan (3 phases within sprint)
+#### Plan (updated Mar 2)
 
-**Phase 1 — Baselines op Qwen (weekend + week 1)**
-- [ ] Deploy Qwen 3.5-27B (dense) on Snellius + validation test
-- [ ] Fingerprint: 20 neutral runs → baseline
-- [ ] K-level reasoning sweep: L0/L1/L2/L3 × 5 reps = 20 runs
-- [ ] Radius sweep: 4-6 radii × 3 reps × L0 = 12-18 runs
-- [ ] Invest_self ON vs OFF comparison (2×5 reps)
+**Phase 1 — Qwen deployment + OAT screening (done/running)**
+- [x] Deploy Qwen 3.5-27B (dense) on Snellius + validation test
+- [x] OAT screening sweeps submitted (116 runs, 9 param sweeps × L1+L3)
+- [x] Engine rewrite: unified %-based economy
+- [x] Persistent agent memory implemented
+- [x] Early stopping implemented (two-phase adaptive)
 
-**Phase 2 — Nieuwe mechaniek (week 2-3)**
-- [ ] Implement utility-based movement (Schelling-type)
-- [ ] K-level × radius factorial on best params from Phase 1
+**Phase 2 — Design decisions (done Mar 2)**
+- [x] Hidden resources as base default (implemented)
+- [x] Dynamic network with payoff-based rewiring (w as IV) — design finalized
+- [x] Communication scope (no-comm/DM/broadcast) — design finalized
+- [x] Memory always ON — decided
+- [x] Literature review TODOs updated with network co-evolution papers
+- [x] Methods TODOs updated for all three IVs
 
-**Phase 3 — Contracts (week 3+)**
-- [ ] Contract mechanism design + implementation
-- [ ] Separate chapter, builds on Phase 1-2 params
+**Phase 3 — Week 2: Exploratory runs + implementation (Mar 3-14)**
+- [ ] Run max emergence exploratory runs on OpenRouter (config ready)
+- [ ] Analyze OAT screening results from Snellius
+- [ ] Start network rewiring implementation (replace spatial.py)
+- [ ] Methods chapter writing (TODOs → prose)
+- [ ] Discuss network + communication design with Debraj (Mar 14)
 
 #### Done
-- [x] Stabilisation metrics implemented (rolling std, Gini/coop/entropy convergence)
-- [x] Network analysis + Leiden + ingroup/outgroup integrated into pipeline
-- [x] production_design.md archived (superseded by Qwen switch)
-- [x] Test scripts for Qwen 3.5-27B created
+- [x] Stabilisation metrics implemented
+- [x] Network analysis + Leiden + ingroup/outgroup integrated
+- [x] Qwen 3.5-27B tested + benchmarked (5.8x speedup concurrent)
+- [x] TextGrad pipeline built + submitted
+- [x] L3 prompt rewritten (recursive reasoning)
+- [x] Memory system: local observations, stale entries, hide_resources support
+- [x] Three IVs finalized: reasoning L0-L3, network w, communication scope
+- [x] Deep research: network rewiring literature reviewed and saved
 
 #### Still TODO
-- [ ] TextGrad investigation (Debraj suggestion)
-- [ ] Reasoning model traces: use Qwen's own CoT instead of instructed field
-- [ ] Literature: Turpin, Lanham, TextGrad paper, Zhang K-Level
+- [ ] Network rewiring implementation
+- [ ] Communication mechanism implementation
+- [ ] Methods chapter prose (write from TODOs)
+- [ ] Analyze Snellius OAT results
+- [ ] TextGrad analysis
 
 ---
 
@@ -578,8 +640,23 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Feb 27 | K-instructed prompting is defensible | Even though we now use a reasoning model, instructed K-level prompting remains a valid methodology for varying reasoning depth. | Explicit approval |
 | Feb 27 | Invest_self ON as baseline, not excluded condition | Stalemate (Gini 0.000) is itself an interesting result and provides context for all other conditions. | "Show it as a baseline" |
 | Feb 28 | %-based economy (percentage_costs) | All costs/returns scale with agent's current resources. invest_self: -10%/+20%, invest_other: -10%/+15%, arm: -10%, conflict: -5%. Ensures actions stay meaningful at any wealth level. Backward compat via flag. | - |
-| Feb 28 | Two-stage screening sweeps (OAT then factorial) | Stage 1: 5 OAT sweeps × L1+L3 × memory × 2 reps = 128 runs. Stage 2: focused factorial on top params. Standard fractional factorial / screening approach. | - |
-| Feb 28 | Sweep action_order (sim vs seq) | Sequential creates first-mover advantage, may interact with reasoning depth. Included in screening. | - |
+| Feb 28 | Two-stage screening sweeps (OAT then factorial) | Stage 1: 9 OAT sweeps × L1+L3 × 2 reps = 116 runs (invest_self OFF default). Stage 2: focused factorial on top params at production scale. Standard screening approach. | - |
+| Feb 28 | invest_self OFF as default in all param sweeps | Even +2% net gain causes L1 agents to choose invest_self 100%. Must be OFF to force social dynamics. invest_self ON tested only in dedicated toggle sweep. | Fixed after first nightrun showed 100% invest_self |
+| Feb 28 | No zero-cost values in sweeps | 0-cost arming = free arming (no dilemma). 0-cost conflict = free attacks. Removed: arm [0,5,10,20]→[5,10,20], conflict [0,5,10,20]→[2,5,10,20]. | Fixed after first nightrun |
+| Mar 1 | Publishable checklist rewritten for AAMAS | Restructured from generic quality list to AAMAS-targeted paper guide. OCAR story structure, Kuusela's patterns, 8-page budget, declarative section titles, 3 focus metrics. | - |
+| Mar 1 | Communication via cheap talk in credible commitment chapter | LLMs not communicating wastes their core capability. Initially: no-comm → cheap talk → contracts. **Updated Mar 2**: contracts dropped, replaced by communication SCOPE (no-comm → DM → broadcast). See Mar 2 decisions. | - |
+| Mar 1 | RQ updated: three IVs grounded in mechanism design + Hobbes | Three IVs = mechanism design's three formal inputs (exact mapping). Hobbes's three causes of conflict used as narrative frame with caveats: reasoning→competition (strong, empirical), info→diffidence (moderate, causal chain), communication→common power (strong, Baliga & Sjöström 2004). MD mapping is the formal backbone; Hobbes is the intro/discussion story. | - |
+| Mar 1 | Memory default ON, god-view removed | Without memory, do_nothing is Nash equilibrium (invest_other costs 10%, returns 0 to investor). God-view profiles leaked omniscient info. Memory OFF = no history (clean IV). | - |
+| Mar 1 | vLLM reasoning field = `msg.reasoning` not `msg.reasoning_content` | 4000+ thinking tokens generated but not saved. Fix: check both attrs. | - |
+| Mar 1 | Wall time 4h→8h for screening sweeps | L1 ~37min/run + L3 ~67min/run. 6-8 runs/task = up to 7h. | - |
+| Mar 2 | Hidden resources as base default (not IV) | Agents see only own resources, neighbours show `???`. Creates genuine type uncertainty (Harsanyi). Implemented in prompts.py + memory.py. May test in OAT pilots. | - |
+| Mar 2 | Dynamic network with payoff-based rewiring replaces fixed grid | ER initial graph ⟨k⟩≈4-6, break-one-make-one, min degree≥1. w as IV: {0, 0.05, 0.3, 1.0}. Literature: Zimmermann 2004, Pacheco 2006, Rand 2011. Solves Debraj's "random movement" objection. | Debraj said utility-based movement needed (Feb 27) |
+| Mar 2 | Communication scope (no-comm/DM/broadcast) replaces contracts | Contracts felt arbitrary — enforcement engine is a design choice, not emergence. DM vs broadcast = clean manipulation of communication SCOPE (private vs public cheap talk). Contracts → future work. | - |
+| Mar 2 | Memory always ON (not IV) | Memory is prerequisite for meaningful social dynamics (reciprocity, reputation). Without it, do_nothing dominates. Not an experimental variable — a base requirement. | - |
+| Mar 2 | bf16 over FP8 for Qwen 3.5-27B | FP8 benchmark: 26% slower due to DeepGEMM overhead at 27B scale. VRAM saving (28 vs 52 GiB) not worth the speed loss. | - |
+| Mar 2 | Communication scope: 4th level "choice" added | Agent selects DM or broadcast per round. Channel preference becomes a DV. Tests not just effect of communication but agent preference for private vs public coordination. | - |
+| Mar 3 | Coalition attacks (shared combat) | Multiple agents attacking the same target combine strengths. Snapshot-based simultaneous resolution (no order dependence). Spoils proportional to strength contribution. Enables emergent coalitions without explicit coordination. arm_other = mechanism for strengthening coalition partners. Interesting interaction with communication scope (coordinate attacks via DM/broadcast). | - |
+| Mar 3 | Methods §3.1 restructurering: follow formal tuple | §3.1 now structured as N → S → A → O → T → u, following the formal game tuple. Transition function T was nowhere explicitly described — now fully specified (6-step resolution including coalition attacks, snapshot combat, simultaneous resolution). | - |
 
 ---
 
@@ -600,3 +677,4 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Model transition delays | Medium | All prior results are exploratory. Qwen 3.5 may behave differently. Budget time for re-characterisation. | New |
 | Qwen 3.5-27B reasoning depth effects differ from Gemma 2 | Medium | 27B dense (all params active). Pilot first, compare behavioral fingerprints with Gemma 2 results. | New |
 | SBU budget for double experiments | Low | 75K extra SBU goedgekeurd. Ruim budget voor beide chapters + extensies. | ✅ Resolved |
+| Network rewiring: LLM agents may not rewire "rationally" | Medium | Co-evolutionary literature (Zimmermann 2004, Rand 2011) uses evolutionary strategy updating (imitate-the-best). Our agents REASON about rewiring. Risk: prompt artifacts cause irrational neighbor retention/dropping, breaking comparison to theoretical baselines. Mitigation: (1) exploratory runs to verify agents actually drop low-payoff neighbors, (2) compare rewiring patterns to evolutionary GT predictions, (3) if agents don't rewire sensibly, rewiring could be made automatic (payoff-based rule) rather than agent-chosen — but this weakens the "reasoning about structure" claim. | New |

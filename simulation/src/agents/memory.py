@@ -9,6 +9,16 @@ Information is local: agents only learn about what they personally observe
 or experience. Actions directed at you are always known (you feel the impact),
 and your own actions are always known. Third-party actions are only observed
 when both actors are in your visibility radius.
+
+Design references:
+- Memory stream architecture inspired by Generative Agents (Park et al., 2023),
+  simplified for game-theoretic settings: sliding window + per-agent summaries
+  instead of retrieval scoring (recency/importance/relevance).
+- Local information principle: agents observe only within their visibility radius,
+  implementing Harsanyi's (1967-68) incomplete information framework.
+  This replaces "god view" neighbor profiles with local observations.
+- Memory as IV: no existing game-theory LLM paper uses memory architecture as
+  an experimental variable. This is a methodological contribution.
 """
 
 from __future__ import annotations
@@ -142,18 +152,21 @@ class AgentMemory:
                     rec.their_actions_general[act] = rec.their_actions_general.get(act, 0) + 1
 
         # Process combat results involving me as defender (always known)
+        # Coalition format: attackers is a list, winner is "coalition" or "defender"
         for combat in combat_results:
-            attacker = combat.get("attacker")
+            attackers = combat.get("attackers", [])
             defender = combat.get("defender")
             winner = combat.get("winner")
 
-            if defender == self.agent_id and attacker != self.agent_id:
-                # I was attacked — record in their_actions_toward_me (attack already recorded above)
-                rec = self._get_or_create_record(attacker)
-                if winner == attacker:
-                    rec.outcomes["attacks_won"] = rec.outcomes.get("attacks_won", 0) + 1
-                else:
-                    rec.outcomes["attacks_lost"] = rec.outcomes.get("attacks_lost", 0) + 1
+            if defender == self.agent_id:
+                coalition_won = (winner == "coalition")
+                for attacker in attackers:
+                    if attacker != self.agent_id:
+                        rec = self._get_or_create_record(attacker)
+                        if coalition_won:
+                            rec.outcomes["attacks_won"] = rec.outcomes.get("attacks_won", 0) + 1
+                        else:
+                            rec.outcomes["attacks_lost"] = rec.outcomes.get("attacks_lost", 0) + 1
 
     def format_own_history(self) -> str:
         """Format last N actions for the prompt."""
@@ -188,13 +201,15 @@ class AgentMemory:
         return "\n".join(lines)
 
     def format_neighbor_memory(self, currently_visible: Optional[List[str]],
-                               current_round: int) -> str:
+                               current_round: int,
+                               hide_resources: bool = False) -> str:
         """Format neighbor observations for the prompt.
 
         Args:
             currently_visible: Agent IDs visible this round (None = all).
             current_round: Current round number (engine round, i.e. next round to play).
                            Rounds played = current_round - 1.
+            hide_resources: If True, show '?' instead of remembered resource values.
         """
         if not self.neighbor_observations:
             return ""
@@ -217,7 +232,10 @@ class AgentMemory:
             parts = []
 
             # Resources and seen count
-            res_str = f"{rec.last_known_resources:.0f}" if rec.times_seen > 0 else "?"
+            if hide_resources:
+                res_str = "?"
+            else:
+                res_str = f"{rec.last_known_resources:.0f}" if rec.times_seen > 0 else "?"
             seen_str = f"seen {rec.times_seen}/{rounds_played} rounds"
             if not is_visible and rec.last_seen_round > 0:
                 seen_str += f", last seen round {rec.last_seen_round}"

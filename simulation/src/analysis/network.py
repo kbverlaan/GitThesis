@@ -4,6 +4,21 @@ Network analysis module for detecting emergent social structures.
 This module constructs interaction networks from simulation history and computes
 structural metrics including community detection, hierarchy analysis, and temporal
 stability measures.
+
+Design references:
+- Community detection: Leiden algorithm (Traag et al., 2019) at multiple
+  resolutions. Leiden improves on Louvain by guaranteeing connected communities.
+- Normalized Mutual Information (NMI): measures partition similarity across
+  time windows (Strehl & Ghosh, 2002). Used for community stability.
+- Elo ratings: chess-style rating system (Elo, 1978) adapted for combat
+  outcomes. Tracks emergent dominance hierarchy over time.
+- E-I index: ratio of external to internal group ties (Krackhardt & Stern, 1988).
+  Measures ingroup vs outgroup interaction given a community partition.
+- David's Scores + Landau's h: hierarchy steepness and linearity measures
+  from animal behavior (de Vries, 1998). Quantifies how linear (transitive)
+  the dominance hierarchy is.
+- Windowed networks: sliding window approach captures temporal evolution of
+  social structure, avoiding aggregation bias from full-history networks.
 """
 
 import numpy as np
@@ -477,30 +492,31 @@ def compute_elo_ratings(history: List[Dict], k_factor: int = 32) -> Dict[str, An
         combat_results = round_data.get('combat_results', [])
 
         for combat in combat_results:
-            attacker = combat.get('attacker')
+            attackers = combat.get('attackers', [])
             defender = combat.get('defender')
             winner = combat.get('winner')
 
-            if not attacker or not defender or not winner:
+            if not attackers or not defender or not winner:
                 continue
 
-            # Update Elo ratings
-            rating_a = ratings[attacker]
-            rating_d = ratings[defender]
+            coalition_won = (winner == 'coalition')
 
-            expected_a = 1 / (1 + 10 ** ((rating_d - rating_a) / 400))
+            # Update Elo for each attacker-defender pair (same outcome)
+            for attacker in attackers:
+                rating_a = ratings[attacker]
+                rating_d = ratings[defender]
 
-            if winner == attacker:
-                score_a = 1.0
-                win_matrix[attacker][defender] += 1
-            elif winner == defender:
-                score_a = 0.0
-                win_matrix[defender][attacker] += 1
-            else:
-                score_a = 0.5
+                expected_a = 1 / (1 + 10 ** ((rating_d - rating_a) / 400))
 
-            ratings[attacker] += k_factor * (score_a - expected_a)
-            ratings[defender] += k_factor * ((1 - score_a) - (1 - expected_a))
+                if coalition_won:
+                    score_a = 1.0
+                    win_matrix[attacker][defender] += 1
+                else:
+                    score_a = 0.0
+                    win_matrix[defender][attacker] += 1
+
+                ratings[attacker] += k_factor * (score_a - expected_a)
+                ratings[defender] += k_factor * ((1 - score_a) - (1 - expected_a))
 
         rating_history.append(dict(ratings))
 
@@ -611,17 +627,19 @@ def hierarchy_metrics(history: List[Dict]) -> Dict[str, Any]:
     for round_data in history:
         combat_results = round_data.get('combat_results', [])
         for combat in combat_results:
-            attacker = combat.get('attacker')
+            attackers = combat.get('attackers', [])
             defender = combat.get('defender')
             winner = combat.get('winner')
 
-            if not attacker or not defender or not winner:
+            if not attackers or not defender or not winner:
                 continue
 
-            if winner == attacker:
-                win_matrix[attacker][defender] += 1
-            elif winner == defender:
-                win_matrix[defender][attacker] += 1
+            coalition_won = (winner == 'coalition')
+            for attacker in attackers:
+                if coalition_won:
+                    win_matrix[attacker][defender] += 1
+                else:
+                    win_matrix[defender][attacker] += 1
 
     # David's Scores
     david_scores = {}

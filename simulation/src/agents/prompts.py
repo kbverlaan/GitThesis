@@ -172,13 +172,17 @@ class BaselinePrompt:
                 lines.append(f"  {aid}: {resources:.1f}{marker}{broke_marker}")
 
         # Arm bonuses — single pool of combat bonus per agent, decaying
+        # When hiding resources, only show own arm bonus (others' combat strength is hidden)
         arm_bonuses = observation.get('arm_bonuses', observation.get('active_arms', {}))
         if arm_bonuses:
             lines.append("")
             lines.append("ARM BONUSES (combat strength = resources + arm bonus):")
             for aid, bonus in sorted(arm_bonuses.items()):
                 if isinstance(bonus, (int, float)) and bonus > 0:
-                    lines.append(f"  {aid}: +{bonus:.1f}")
+                    if self.hide_resources and aid != agent_id:
+                        lines.append(f"  {aid}: +???")
+                    else:
+                        lines.append(f"  {aid}: +{bonus:.1f}")
 
         return "\n".join(lines)
 
@@ -292,7 +296,9 @@ class BaselinePrompt:
         if own_history:
             parts.append(own_history)
 
-        neighbor_mem = memory.format_neighbor_memory(visible, current_round)
+        neighbor_mem = memory.format_neighbor_memory(
+            visible, current_round, hide_resources=self.hide_resources
+        )
         if neighbor_mem:
             parts.append(neighbor_mem)
 
@@ -301,29 +307,28 @@ class BaselinePrompt:
     def _format_actions(self) -> str:
         """Format available actions, reasoning block, and JSON template."""
         allow_invest_self = self.game_params.get('allow_invest_self', True)
-        invest_self_cost_pct = self.game_params.get('invest_self_cost_pct', 10)
-        invest_self_return_pct = self.game_params.get('invest_self_return_pct', 20)
+        invest_self_pct = self.game_params.get('invest_self_pct', 2)
         invest_other_cost_pct = self.game_params.get('invest_other_cost_pct', 10)
         invest_other_return_pct = self.game_params.get('invest_other_return_pct', 15)
         arm_cost_pct = self.game_params.get('arm_cost_pct', 10)
-        arm_other_cost_pct = self.game_params.get('arm_other_cost_pct', 10)
+        arm_multiplier = self.game_params.get('arm_multiplier', 2.0)
+        arm_other_cost_pct = self.game_params.get('arm_other_cost_pct', arm_cost_pct)
         arm_decay = self.game_params.get('arm_decay', 0.5)
         attack_take_pct = self.game_params.get('attack_take_pct', 40)
         conflict_cost_pct = self.game_params.get('conflict_cost_pct', 5)
 
-        # Compute theta ratios for explicit display
-        invest_self_ratio = f"1:{invest_self_return_pct/invest_self_cost_pct:.1f}" if invest_self_cost_pct > 0 else "free"
+        # Compute theta ratio for invest_other
         invest_other_ratio = f"1:{invest_other_return_pct/invest_other_cost_pct:.1f}" if invest_other_cost_pct > 0 else "free"
 
         actions = []
 
         if allow_invest_self:
-            net = invest_self_return_pct - invest_self_cost_pct
-            actions.append(f"- invest_self: spend {invest_self_cost_pct}% of your resources, gain {invest_self_return_pct}% (net +{net}% for you, cost-to-benefit ratio {invest_self_ratio})")
+            actions.append(f"- invest_self: gain {invest_self_pct}% of your resources (no cost)")
 
         actions.append(f"- invest_other: spend {invest_other_cost_pct}% of your resources, TARGET gains {invest_other_return_pct}% of your resources (cost-to-benefit ratio {invest_other_ratio}, grows the total economy)")
-        actions.append(f"- arm_self: spend {arm_cost_pct}% of your resources (removed from economy), adds that amount to your combat strength. Your total combat strength = resources + arm bonus.")
-        actions.append(f"- arm_other: spend {arm_other_cost_pct}% of your resources (removed from economy), adds that amount to TARGET's combat strength. TARGET's resource count does NOT increase — only their fighting power.")
+        arm_bonus_example = arm_cost_pct * arm_multiplier
+        actions.append(f"- arm_self: spend {arm_cost_pct}% of your resources, gain {arm_bonus_example}% as combat bonus (cost x{arm_multiplier}). Your total combat strength = resources + arm bonus.")
+        actions.append(f"- arm_other: spend {arm_other_cost_pct}% of your resources, TARGET gains {arm_other_cost_pct * arm_multiplier}% as combat bonus (cost x{arm_multiplier}). TARGET's resource count does NOT increase — only their fighting power.")
         actions.append(f"- attack: you pay {conflict_cost_pct}% of your resources, opponent pays {conflict_cost_pct}% of theirs. Winner takes {attack_take_pct}% of loser's remaining resources. Loser keeps the rest.")
         actions.append("- do_nothing: no cost, no effect")
 
@@ -336,11 +341,13 @@ AVAILABLE ACTIONS:
 
 COMBAT RULES:
 - Combat strength = your resources + your arm bonus (agents not listed under ARM BONUSES have arm bonus = 0)
-- arm_self adds {arm_cost_pct}% of your resources to your arm bonus
-- arm_other adds {arm_other_cost_pct}% of your resources to TARGET's arm bonus
+- arm_self costs {arm_cost_pct}% of your resources, adds {arm_cost_pct} x {arm_multiplier} = {arm_bonus_example}% as combat bonus
+- arm_other costs {arm_other_cost_pct}% of your resources, adds {arm_other_cost_pct} x {arm_multiplier} = {arm_other_cost_pct * arm_multiplier}% to TARGET's combat bonus
 - All arm bonuses decay at the END of each round: they halve (x{arm_decay})
-- Win probability = your_strength / (your_strength + opponent_strength)
-- Attack expected value = win_prob x {attack_take_pct}% x opponent_resources - lose_prob x {attack_take_pct}% x your_resources - {conflict_cost_pct}% x your_resources"""]
+- If multiple agents attack the same target, their combat strengths combine into one fight
+- Win probability = total_attacker_strength / (total_attacker_strength + defender_strength)
+- If attackers win, spoils are split proportionally by each attacker's strength contribution
+- Attack expected value (1v1) = win_prob x {attack_take_pct}% x opponent_resources - lose_prob x {attack_take_pct}% x your_resources - {conflict_cost_pct}% x your_resources"""]
 
         # Reasoning block — separate section before JSON template
         reasoning_block = REASONING_BLOCKS.get(self.reasoning_level)

@@ -5,9 +5,25 @@ Handles game state, action resolution, and combat mechanics.
 All costs/returns are percentages of the acting agent's current resources.
 Arm bonuses are additive (combat strength = resources + arm bonus) and
 decay by a configurable factor each round.
+
+Design references:
+- Game structure: N-agent resource game with invest/arm/attack actions,
+  inspired by Sugarscape (Epstein & Axtell, 1996) and the cooperation-conflict
+  dilemma in Axelrod (1984) and Skyrms (2004, Stag Hunt).
+- Combat resolution: probabilistic, strength-proportional (Lanchester-type).
+  Win probability = attacker_strength / total_strength. Coalition attacks:
+  when multiple agents attack the same target, strengths combine (snapshot-based
+  simultaneous resolution).
+- Arm decay: exponential decay models transient military advantage,
+  creating pressure for repeated investment (cf. arms race dynamics,
+  Baliga & Sjöström, 2004).
+- Parameter space: cost/benefit ratios (theta) determine the cooperation-conflict
+  gradient. invest_other_return > invest_other_cost creates a social dilemma:
+  cooperation is collectively optimal but individually costly.
 """
 
 import numpy as np
+from collections import defaultdict
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, field
 from enum import Enum
@@ -62,11 +78,13 @@ class GameEngine:
     def __init__(self,
                  agent_ids: List[str],
                  initial_resources,  # float (equal) or Dict[str, float] (per-agent)
-                 invest_self_cost_pct: float = 10,
-                 invest_self_return_pct: float = 20,
+                 invest_self_pct: float = 2,
+                 invest_self_cost_pct: float = None,  # Legacy — ignored if invest_self_pct is set
+                 invest_self_return_pct: float = None,  # Legacy — ignored if invest_self_pct is set
                  invest_other_cost_pct: float = 10,
                  invest_other_return_pct: float = 15,
                  arm_cost_pct: float = 10,
+                 arm_multiplier: float = 2.0,
                  arm_other_cost_pct: float = None,  # defaults to arm_cost_pct
                  arm_decay: float = 0.5,
                  attack_take_pct: float = 40,
@@ -82,12 +100,14 @@ class GameEngine:
         Args:
             agent_ids: List of agent identifiers
             initial_resources: Starting resources (float for equal, dict for per-agent)
-            invest_self_cost_pct: % of resources spent on invest_self
-            invest_self_return_pct: % of resources gained from invest_self
+            invest_self_pct: flat % gain from invest_self (e.g., 2 = gain 2% of own resources)
+            invest_self_cost_pct: Legacy param, ignored if invest_self_pct is set
+            invest_self_return_pct: Legacy param, ignored if invest_self_pct is set
             invest_other_cost_pct: % of resources spent on invest_other
             invest_other_return_pct: % of YOUR resources the target receives
                 (e.g., 15 means you pay 10%, target gets 15%)
-            arm_cost_pct: % of resources spent on arm_self (becomes combat bonus)
+            arm_cost_pct: % of resources spent on arm_self
+            arm_multiplier: combat bonus = cost × multiplier (e.g., 2.0 = pay 10, get +20 bonus)
             arm_other_cost_pct: % of resources spent on arm_other (defaults to arm_cost_pct)
             arm_decay: decay factor per round (0.5 = halve each round)
             attack_take_pct: % of loser's resources taken by winner
@@ -96,11 +116,11 @@ class GameEngine:
         """
         self.max_rounds = max_rounds
         self.params = {
-            "invest_self_cost_pct": invest_self_cost_pct,
-            "invest_self_return_pct": invest_self_return_pct,
+            "invest_self_pct": invest_self_pct,
             "invest_other_cost_pct": invest_other_cost_pct,
             "invest_other_return_pct": invest_other_return_pct,
             "arm_cost_pct": arm_cost_pct,
+            "arm_multiplier": arm_multiplier,
             "arm_other_cost_pct": arm_other_cost_pct if arm_other_cost_pct is not None else arm_cost_pct,
             "arm_decay": arm_decay,
             "attack_take_pct": attack_take_pct,
@@ -175,10 +195,10 @@ class GameEngine:
             elif action.action_type == ActionType.ARM_OTHER:
                 self._resolve_arm_other(action, round_log)
 
-        # Process attacks last (after arms are updated)
-        for action in valid_actions:
-            if action.action_type == ActionType.ATTACK:
-                self._resolve_attack(action, round_log)
+        # Process attacks last (after arms are updated) — coalition grouping
+        attack_actions = [a for a in valid_actions if a.action_type == ActionType.ATTACK]
+        if attack_actions:
+            self._resolve_attacks_grouped(attack_actions, round_log)
 
         # Apply resource changes
         for agent_id, change in round_log["resource_changes"].items():
@@ -194,10 +214,9 @@ class GameEngine:
         return round_log
 
     def _resolve_invest_self(self, action: Action, round_log: Dict):
-        """Resolve invest-self action: pay cost%, gain return%."""
+        """Resolve invest-self action: flat % gain of own resources."""
         agent_id = action.agent_id
-        round_log["resource_changes"][agent_id] -= self._pct(agent_id, self.params["invest_self_cost_pct"])
-        round_log["resource_changes"][agent_id] += self._pct(agent_id, self.params["invest_self_return_pct"])
+        round_log["resource_changes"][agent_id] += self._pct(agent_id, self.params["invest_self_pct"])
 
     def _resolve_invest_other(self, action: Action, round_log: Dict):
         """Resolve invest-other action.
@@ -215,72 +234,113 @@ class GameEngine:
         round_log["resource_changes"][target_id] += self._pct(agent_id, self.params["invest_other_return_pct"])
 
     def _resolve_arm_self(self, action: Action, round_log: Dict):
-        """Resolve arm-self: pay arm_cost_pct%, that amount becomes combat bonus."""
+        """Resolve arm-self: pay arm_cost_pct%, gain cost × arm_multiplier as combat bonus."""
         agent_id = action.agent_id
-        bonus = self._pct(agent_id, self.params["arm_cost_pct"])
-        round_log["resource_changes"][agent_id] -= bonus
+        cost = self._pct(agent_id, self.params["arm_cost_pct"])
+        bonus = cost * self.params["arm_multiplier"]
+        round_log["resource_changes"][agent_id] -= cost
         # Add to existing bonus (stacking allowed)
         self.state.arm_bonuses[agent_id] = self.state.arm_bonuses.get(agent_id, 0.0) + bonus
 
     def _resolve_arm_other(self, action: Action, round_log: Dict):
-        """Resolve arm-other: pay arm_other_cost_pct%, that amount becomes TARGET's combat bonus."""
+        """Resolve arm-other: pay arm_other_cost_pct%, target gets cost × arm_multiplier as combat bonus."""
         agent_id = action.agent_id
         target_id = action.target_id
 
         if target_id not in self.state.agents:
             return
 
-        bonus = self._pct(agent_id, self.params["arm_other_cost_pct"])
-        round_log["resource_changes"][agent_id] -= bonus
+        cost = self._pct(agent_id, self.params["arm_other_cost_pct"])
+        bonus = cost * self.params["arm_multiplier"]
+        round_log["resource_changes"][agent_id] -= cost
         self.state.arm_bonuses[target_id] = self.state.arm_bonuses.get(target_id, 0.0) + bonus
 
-    def _resolve_attack(self, action: Action, round_log: Dict):
-        """Resolve attack: probabilistic combat based on strength = resources + arm bonus."""
-        attacker_id = action.agent_id
-        defender_id = action.target_id
+    def _resolve_attacks_grouped(self, attack_actions: List[Action], round_log: Dict):
+        """Group attacks by target and resolve as coalition combats.
 
-        if defender_id not in self.state.agents:
-            return
+        Snapshot-based simultaneous resolution: all combat strengths are frozen
+        before any combat resolves, so an agent involved in multiple combats
+        (e.g., attacking one target while being attacked by others) uses the
+        same strength everywhere. No order dependence.
+        """
+        # Snapshot combat strengths for all agents involved in any attack
+        involved = set()
+        for action in attack_actions:
+            involved.add(action.agent_id)
+            involved.add(action.target_id)
 
-        # Combat strength = resources + arm bonus (additive)
-        attacker_power = self.state.resources[attacker_id] + self.state.arm_bonuses.get(attacker_id, 0.0)
-        defender_power = self.state.resources[defender_id] + self.state.arm_bonuses.get(defender_id, 0.0)
+        snapshots = {}
+        for aid in involved:
+            if aid in self.state.agents:
+                snapshots[aid] = self.state.resources[aid] + self.state.arm_bonuses.get(aid, 0.0)
 
-        # Probabilistic combat resolution
-        total_power = attacker_power + defender_power
+        # Group attacks by target
+        attacks_by_target = defaultdict(list)
+        for action in attack_actions:
+            if action.target_id in self.state.agents:
+                attacks_by_target[action.target_id].append(action)
+
+        # Resolve each coalition attack independently
+        for defender_id, attacker_actions in attacks_by_target.items():
+            self._resolve_coalition_attack(attacker_actions, defender_id, snapshots, round_log)
+
+    def _resolve_coalition_attack(self, attacker_actions: List[Action],
+                                   defender_id: str, snapshots: Dict[str, float],
+                                   round_log: Dict):
+        """Resolve coalition attack: multiple attackers vs one defender.
+
+        When a single attacker targets the defender, this is equivalent to
+        the old 1v1 combat. When multiple attackers target the same defender,
+        their combat strengths combine. Spoils are split proportionally.
+        """
+        attacker_ids = [a.agent_id for a in attacker_actions]
+
+        # Combat strengths from snapshot
+        attacker_powers = {aid: snapshots.get(aid, 0.0) for aid in attacker_ids}
+        coalition_power = sum(attacker_powers.values())
+        defender_power = snapshots.get(defender_id, 0.0)
+
+        # Probabilistic combat resolution (single roll for the group)
+        total_power = coalition_power + defender_power
         if total_power > 0:
-            attacker_win_prob = attacker_power / total_power
+            attacker_win_prob = coalition_power / total_power
         else:
             attacker_win_prob = 0.5
 
-        attacker_wins = np.random.random() < attacker_win_prob
+        coalition_wins = np.random.random() < attacker_win_prob
 
-        # Apply conflict costs (each fighter pays own %)
-        round_log["resource_changes"][attacker_id] -= self._pct(attacker_id, self.params["conflict_cost_pct"])
+        # Conflict costs: each participant pays own %
+        for aid in attacker_ids:
+            round_log["resource_changes"][aid] -= self._pct(aid, self.params["conflict_cost_pct"])
         round_log["resource_changes"][defender_id] -= self._pct(defender_id, self.params["conflict_cost_pct"])
 
         # Transfer resources
         take_pct = self.params["attack_take_pct"] / 100.0
-        if attacker_wins:
-            defender_resources = self.state.resources[defender_id] + round_log["resource_changes"][defender_id]
-            transfer = defender_resources * take_pct
-            round_log["resource_changes"][defender_id] -= transfer
-            round_log["resource_changes"][attacker_id] += transfer
-            winner = attacker_id
+        if coalition_wins:
+            # Coalition takes from defender, split proportionally by strength
+            defender_effective = self.state.resources[defender_id] + round_log["resource_changes"][defender_id]
+            total_transfer = max(0, defender_effective * take_pct)
+            round_log["resource_changes"][defender_id] -= total_transfer
+
+            for aid in attacker_ids:
+                share = (attacker_powers[aid] / coalition_power) if coalition_power > 0 else (1.0 / len(attacker_ids))
+                round_log["resource_changes"][aid] += total_transfer * share
         else:
-            attacker_resources = self.state.resources[attacker_id] + round_log["resource_changes"][attacker_id]
-            transfer = attacker_resources * take_pct
-            round_log["resource_changes"][attacker_id] -= transfer
-            round_log["resource_changes"][defender_id] += transfer
-            winner = defender_id
+            # Defender takes from each attacker
+            for aid in attacker_ids:
+                attacker_effective = self.state.resources[aid] + round_log["resource_changes"][aid]
+                transfer = max(0, attacker_effective * take_pct)
+                round_log["resource_changes"][aid] -= transfer
+                round_log["resource_changes"][defender_id] += transfer
 
         round_log["combat_results"].append({
-            "attacker": attacker_id,
+            "attackers": attacker_ids,
             "defender": defender_id,
-            "attacker_power": attacker_power,
+            "attacker_powers": attacker_powers,
+            "coalition_power": coalition_power,
             "defender_power": defender_power,
-            "winner": winner,
-            "attacker_win_prob": attacker_win_prob
+            "winner": "coalition" if coalition_wins else "defender",
+            "attacker_win_prob": attacker_win_prob,
         })
 
     def _decay_arms(self):
@@ -322,7 +382,8 @@ class GameEngine:
             elif action.action_type == ActionType.ARM_OTHER:
                 self._resolve_arm_other(action, round_log)
             elif action.action_type == ActionType.ATTACK:
-                self._resolve_attack(action, round_log)
+                # Sequential mode: single action, so always 1v1 coalition
+                self._resolve_attacks_grouped([action], round_log)
         else:
             round_log["actions"].append({
                 "agent": action.agent_id,

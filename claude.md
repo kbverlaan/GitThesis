@@ -16,9 +16,16 @@ At the end of this journey, Koen must be able to confidently say: "I wrote this 
 
 ## Project Context
 
-**RQ**: How does reasoning depth interact with game structure to shape emergent social order in multi-agent LLM systems?
+**RQ**: How do strategic reasoning, information structure, and communication scope each shape the emergence of social order in multi-agent LLM systems?
 
-**Design** (updated Feb 18): Reasoning depth (L0-L3) is manipulated via prompt instruction on a single model (Gemma 2 27B), crossed with game structure parameters (spatial radius, costs/benefits). Phase 1 characterizes the system. Phase 2 is the reasoning depth × structure factorial. The thesis aims for publishable quality.
+**Three IVs** — formally the three inputs of mechanism design (Hurwicz, 1960); narratively mapped to Hobbes's three causes of conflict (*Leviathan*, 1651) with caveats:
+1. **Reasoning depth** (L0-L3) — MD's solution concept / Hobbes's "competition" (strong mapping)
+2. **Network rewiring** (w ∈ {0, 0.05, 0.3, 1.0}) — MD's type space / Hobbes's "diffidence" (moderate: two-layered — hidden resources = source, w = structural response)
+3. **Communication scope** (no-comm → DM → broadcast → choice) — MD's message space / Hobbes's "lack of common power" (strong mapping)
+
+**Base defaults** (not IVs): hidden resources ON, memory ON (window 10), 6 actions, %-based economy.
+
+**Design** (updated Mar 2): Three IVs manipulated independently on Qwen 3.5-27B (dense). Phase 2c: parameter characterisation + reasoning depth. Phase 2d: communication scope (no-comm/DM/broadcast/choice). Information IV = network rewiring probability w. Contracts moved to future work. The thesis aims for publishable quality (AAMAS 2027).
 
 **Timeline**: Feb 2026 - Jul 15 2026 (submission), defence late July.
 **Meetings**: Biweekly Fridays 14:00 with Debraj (next: Feb 27).

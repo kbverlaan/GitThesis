@@ -1,47 +1,59 @@
 # Sprint 3: Feb 27 - Mar 14
-**Phase**: Model Transition + Qwen Characterisation
+**Phase**: Model Transition + Design Decisions + Qwen Characterisation
 **Meeting**: Mar 14 at 14:00 with Debraj
 
 ---
 
-## Sprint Goals
+## Sprint Goals (updated Mar 2)
 
-### Phase 1: Baselines op Qwen (dit weekend + week 1)
-- [ ] Deploy Qwen 3.5-27B (dense) op Snellius — validatie test
-- [ ] Fingerprint: 20 neutral runs → baseline gedrag
-- [ ] K-level reasoning sweep: L0/L1/L2/L3 × 5 reps = 20 runs
-- [ ] Radius sweep: 4-6 radii × 3 reps × L0 = 12-18 runs
-- [ ] Invest_self ON baseline: vergelijking ON vs OFF (2×5 reps)
-- [ ] Analyseer stabilisatie (nieuw!) + vergelijk met Gemma 2 resultaten
+### Phase 1: Qwen deployment + OAT screening (done/running)
+- [x] Deploy Qwen 3.5-27B (dense) op Snellius — validatie test ✅
+- [x] OAT screening sweeps submitted (116 runs, 9 param sweeps × L1+L3) ✅
+- [x] Engine rewrite: unified %-based economy ✅
+- [x] Persistent agent memory implemented ✅
+- [x] Early stopping implemented (two-phase adaptive) ✅
+- [x] bf16 over FP8 besloten (26% slower, VRAM niet bottleneck) ✅
 
-### Phase 2: Nieuwe mechaniek (week 2-3)
-- [ ] Utility-based movement implementeren (Schelling-type)
-- [ ] K-level × radius factorial op beste params uit Phase 1
+### Phase 2: Design decisions (done Mar 2)
+- [x] Hidden resources as base default — implemented in prompts.py + memory.py ✅
+- [x] Dynamic network with payoff-based rewiring — design finalized (w as IV) ✅
+- [x] Communication scope: no-comm / DM / broadcast — design finalized ✅
+- [x] Memory always ON — decided (prerequisite, not IV) ✅
+- [x] Literature review TODOs: network co-evolution papers added ✅
+- [x] Methods TODOs: all three IVs fully outlined ✅
+- [x] Deep research: network rewiring literature saved ✅
 
-### Analysis: Embedding Time Series (Debraj suggestie, week 2)
-- [ ] Script: lees _traces.json → concateneer prompt+response per agent-round → embed met text-embedding-3-small → T×D matrix
-- [ ] Rolling statistics: mean embedding (semantic center of mass), covariance (diversity)
-- [ ] UMAP/PCA plot van embedding trajectories, gekleurd per reasoning level
-- [ ] Doel: visueel + statistisch bewijs dat L0/L1/L2/L3 distinct reasoning regimes zijn
-- Data: al beschikbaar in _traces.json (geen logging changes nodig)
+### Phase 3: Week 2 — Exploratory runs + implementation (Mar 3-14)
+- [ ] Run max emergence exploratory runs on OpenRouter (config ready)
+- [ ] Analyze OAT screening results from Snellius (nightrun v3)
+- [ ] Start network rewiring implementation (replace spatial.py with dynamic graph)
+- [ ] Methods chapter writing (TODOs → prose)
+- [ ] Prepare Debraj meeting: present IV design decisions for approval
+
+### Analysis: Embedding Time Series (Debraj suggestie, stretch)
+- [ ] Script: lees _traces.json → embed met text-embedding-3-small → T×D matrix
+- [ ] UMAP/PCA plot van embedding trajectories per reasoning level
+- Deprioritized vs network implementation
 
 ### Infrastructure (doorlopend)
-- [x] TextGrad prompt optimization → RUNNING (job 20151816, instruction clarity focus)
-  - Evaluator: Opus 4.6 via OpenRouter, focus op instruction clarity (niet reasoning depth)
-  - Resultaat is diagnostic — prompts worden handmatig herzien, niet automatisch toegepast
-- [x] Reasoning model traces: Qwen's native <think> CoT wordt gelogd in _traces.json
+- [x] TextGrad prompt optimization → RUNNING (job 20151816)
+- [x] Reasoning model traces: Qwen's native <think> CoT gelogd
 - [x] Ingroup/outgroup metrics geïntegreerd (network.py)
 - [x] Stabilisatiemetrics geïntegreerd (metrics.py)
+- [x] Max emergence exploratory config klaar (experiments/max_emergence_exploratory.yaml)
+- [x] OpenRouter config voor Qwen 3.5-27B klaar
 
 ---
 
 ## Deliverables voor Debraj (Mar 14)
-- Qwen 3.5 baseline: Gini, coop%, action dist, stabilisatie
-- K-level vergelijking: Qwen vs Gemma 2 behavioral fingerprints
-- Phase transition plot (Gini vs radius) op Qwen
-- **Embedding time series**: UMAP/PCA plot van reasoning trajectories per level
-- Plan voor utility-based movement
-- TextGrad diagnostic assessment
+- OAT screening resultaten: welke params creëren dilemma's?
+- **IV design presentatie**: reasoning L0-L3, network w, communication scope
+- Network rewiring literatuur + design (Zimmermann/Rand/Pacheco)
+- Communication scope design (no-comm/DM/broadcast)
+- Hidden resources + memory als base defaults
+- Exploratory run resultaten (als beschikbaar)
+- Plan voor network implementatie
+- TextGrad diagnostic assessment (als klaar)
 
 ---
 
@@ -94,6 +106,51 @@
   - Qwen 3.5-27B, 10 agents, 20 rounds, L1 reasoning, memory on vs off, 3 reps
   - Submit script: `snellius/submit_memory_comparison.sh`
 
+### Mon Mar 2 — Design Decisions Day
+
+**Three IVs finalized:**
+1. **Reasoning depth** L0-L3 (solution concept) — unchanged
+2. **Network rewiring** w ∈ {0, 0.05, 0.3, 1.0} (type space) — replaces visibility radius
+   - ER initial graph ⟨k⟩≈4-6, payoff-based rewiring (Zimmermann 2004)
+   - Break-one-make-one, min degree ≥ 1
+   - Key lit: Rand et al. 2011 PNAS (human experiments confirm)
+3. **Communication scope** no-comm / DM / broadcast (message space) — replaces contracts
+   - All cheap talk (Crawford & Sobel 1982), no enforcement
+   - DM = private bilateral deals, broadcast = public coordination
+   - Contracts → future work (Discussion section)
+
+**Base defaults decided:**
+- Hidden resources: always ON. Implemented in prompts.py (neighbours show `???`, arm bonuses `+???`) and memory.py (`?` for remembered resources)
+- Memory: always ON (window 10). Not an IV — prerequisite for social dynamics
+
+**Two-layer Hobbes nuance documented:**
+- Layer 1: Hidden resources = direct "diffidence" (type uncertainty, always present)
+- Layer 2: Network rewiring w = structural RESPONSE to diffidence (exit option)
+- MD mapping cleaner: w directly manipulates type space
+
+**Literature review updated:**
+- §2.4.5: 60+ lines of network co-evolution TODOs (Zimmermann, Santos, Pacheco, Rand, Ohtsuki, Gross, Akçay, Van Segbroeck, Su, Allen)
+- §2.5: Rewritten as "Communication Scope" (no-comm/DM/broadcast, Sally 1995)
+- §2.7: Added network phase transition refs (Pacheco w*, Akçay collapse)
+- §2.8: Updated gaps + contribution for new IVs
+
+**Methods updated:**
+- §3.3.2: Full network rewiring design + two-layer Hobbes nuance
+- §3.3.3: Communication scope with implementation details
+- §3.4.4: Network topology experiments
+- §3.4.5: Communication scope experiments (48-cell factorial estimate)
+
+**Other:**
+- bf16 over FP8 besloten (benchmark: 26% slower, VRAM niet bottleneck)
+- Temporal reasoning block added to base prompt (all K-levels)
+- Max emergence exploratory config created (experiments/max_emergence_exploratory.yaml)
+- OpenRouter config updated for Qwen 3.5-27B ($0.30/$2.40 per M)
+- Deep research saved: notes/deep_research_network_rewiring.md
+- Risk register: added LLM rational rewiring risk
+- design_questions.md: hidden resources + network rewiring → DECIDED
+
+---
+
 ## Decisions This Sprint
 | Date | Decision | Reasoning |
 |------|----------|-----------|
@@ -125,6 +182,11 @@
 | Mar 1 | Publishable checklist rewritten for AAMAS | OCAR story structure, Kuusela's patterns, 8-page budget, declarative section titles, 3 focus metrics, dual theoretical framework (MD + Hobbes). |
 | Mar 2 | Stay with bf16, not FP8 | FP8 benchmark (job 20205606): 238s/round vs 188s/round bf16 — 26% slower. DeepGEMM overhead not worth it at 27B scale on single H100. FP8 saves VRAM (28 vs 52 GiB) but VRAM is not the bottleneck. |
 | Mar 2 | Temporal reasoning in base prompt (all levels) | Added "This is a repeated game..." block to base prompt. All K-levels get identical temporal instruction. Ensures K-level manipulation is purely about social modeling depth, not whether agents think long-term. Insight from reading Camerer (2004): CH is about static strategic depth, our game requires temporal reasoning — must separate these two dimensions. |
+| Mar 2 | Hidden resources as base default | Agents see only own resources, neighbours `???`. Creates genuine type uncertainty (Harsanyi). Not an IV — always ON. Implemented in prompts.py + memory.py. |
+| Mar 2 | Dynamic network replaces fixed spatial grid | ER G(n,p) ⟨k⟩≈4-6, payoff-based rewiring (Zimmermann 2004), break-one-make-one, min degree≥1. w as IV. Solves Debraj's "random movement" objection. |
+| Mar 2 | Network rewiring probability w as information IV | w ∈ {0, 0.05, 0.3, 1.0}. Maps to MD type space (who you observe/interact with). Two-layer Hobbes mapping: hidden resources = source of diffidence, w = structural response. |
+| Mar 2 | Communication scope replaces contracts as IV3 | No-comm / DM (private) / broadcast (public). All cheap talk — no enforcement. Private vs public = conspiracy vs institution. Contracts → future work. |
+| Mar 2 | Memory always ON (not IV) | Prerequisite for social dynamics. Without memory, do_nothing dominates. Sliding window 10 rounds + per-neighbour observations. |
 
 ---
 

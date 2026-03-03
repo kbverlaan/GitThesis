@@ -1,4 +1,5 @@
-\chapter{Methods} % Chapter 3
+\setcounter{chapter}{2}
+\chapter{Methods}
 \label{Methods}
 
 % =============================================================================
@@ -24,54 +25,238 @@
 % SECTION 3.1: Game Design
 % -----------------------------------------------------------------------------
 \section{Coordination Game Design}
-% TODO: Formal game specification (AAMAS expects this)
-%   - State space S: agent resources R_i ∈ R+, positions on grid, arm_bonus
-%   - Action space A: {do_nothing, invest_other(target), arm_self, attack(target)}
-%     NOTE: invest_self is OFF by default (trivially dominant, kills dilemma)
-%   - Observation function O: depends on interaction_radius (local visibility)
-%   - Transition function T: simultaneous resolution, %-based economy
-%   - Reward: R_i(t+1) — pure resource maximization, no utility function
+% TODO: Koen — RESTRUCTURERING: volg het formele tuple G = <N, S, A, O, T, u>
+%   De sectie moet de lezer door elk onderdeel van het model leiden.
+%   Huidige structuur: tuple definitie → prose over acties → tabel.
+%   Nieuwe structuur: tuple definitie → per onderdeel uitwerken.
+%   Hieronder de voorgestelde opbouw met instructies per deel.
+
+Our coordination game is defined as a tuple $G = \langle \mathcal{N}, \mathcal{S}, \mathcal{A}, O, T, u \rangle$:
+
+\begin{itemize}
+    \item $\mathcal{N} = \{1, \ldots, n\}$: a set of $n = 30$ agents.
+    \item $\mathcal{S} = (\mathbf{R}(t), \mathbf{B}(t), G(t))$: the state at round $t$, consisting of resource vectors $\mathbf{R}(t) \in \mathbb{R}_{+}^{n}$, arm bonus vectors $\mathbf{B}(t) \in \mathbb{R}_{+}^{n}$, and a social network $G(t) = (V, E(t))$ where $V = \mathcal{N}$ and the edge set $E(t)$ evolves through rewiring (Section~\ref{sec:topology}).
+    \item $\mathcal{A} = \{\texttt{do\_nothing},\; \texttt{invest\_other}(j),\; \texttt{arm\_self},\; \texttt{arm\_other}(j),\; \texttt{attack}(j)\}$: the action set, where $j \in \mathcal{N}_i(t)$ denotes a network neighbour of agent $i$. Agents may only target direct connections.
+    \item $O_i(t) \subseteq \mathcal{S}$: the observation function. Agent $i$ observes its own resources and arm bonus, but \textit{not} the resources of neighbours. Agent $i$ observes the recent actions and combat outcomes involving its network neighbourhood $\mathcal{N}_i(t)$, accumulated through persistent local memory (Section~\ref{sec:memory}).
+    \item $T: \mathcal{S} \times \mathcal{A}^n \rightarrow \mathcal{S}$: the transition function. All agents act simultaneously; actions are resolved in a single step. All costs and returns are percentages of the acting agent's current resources.
+    \item $u_i(t) = R_i(t+1) - R_i(t)$: the payoff for agent $i$, defined as the change in resources. Agents are instructed to maximise their absolute resource count.
+\end{itemize}
+
+%AGENTS N - Rewrite, niet heel scherp
+The game is played by 30 homogeneous LLM-driven agents. Section \ref{sec:agent_architecture} explores the exact architecture and rationale behind choosing Qwen 3.5-27B as model. 
+The amount of agents in our simulations was bound by two facts: the most-cited LLM-driven agent-based model used 25 agents and proved enough for rich emergent social structures. 
+The number also falls in the range to detect communities in small networks. %what?
+Additionally, a single H100 is able to process 32 concurrent sequences in vLLM. Our choice of 30 sits rounded in the middle. 
+
+% ---------------------------------------------------------------------------
+% TODO: Koen — STATE S (kort, 3-5 zinnen)
+%   - Resources R_i(t): non-negative reals, initial R_i(0) = 100 for all i
+%   - Arm bonuses B_i(t): combat bonus, decays by δ each round
+%   - Network G(t) = (V, E(t)): verwijs naar §3.1.1 (Interaction Topology)
+%     voor initialisatie (ER graph) en rewiring mechanism
+%   - %-based economy: scale invariance, both rich and poor face same dilemmas
+%     → \cite{EpsteinAxtell1996}
+% ---------------------------------------------------------------------------
+
+%STATE S
+The state $S$ is defined by two vectors and a network. 
+Resources $R_i(t)$ is a vector of non-negative reals and is initialized for all agents at $R_i = 100$. 
+Arm bonuses $B_i(t)$ are also tracked through a vector and represent an agent's strenght during combat when summed with their resources. Every round, all arm bonuses decay with $\delta$.
+The network 
+
+
+% ---------------------------------------------------------------------------
+% TODO: Koen — ACTIONS A (de huidige prose, hergestructureerd)
+%   Dit is het langste deel — de acties zijn het hart van het model.
+%   Behoud de bestaande tekst hieronder, maar frame het expliciet als
+%   "Action Set" met de cooperative/military/passive driedeling.
+% ---------------------------------------------------------------------------
+
+Our game is designed to produce rich emergent dynamics by utilizing minimally sufficient components, following the \textit{Generative Sufficiency} precedent set by Epstein \cite{?}. The step away from classical games researched thoroughly in game theory, such as the Prisoners Dilemma or Stag Hunt, is motivated by the absence of emergent behaviour possible using large-language model driven agent architectures. The six actions prove to be rich enough for dynamics such as coalition-forming, arms races, bandwagoning, mobbing, hierachies and signalling, where classical games simply wouldn't suffice without modifications. Our game can be seen as an extension to the classical stag hunt, though staying minimal to causually analyse the outcomes.
+
+All costs and returns are a percentage of the actor's resources $R_i(t)$. This design choice rests on assuring scale invariance, meaning both rich and poor agents face similar dilemmas disregarding their wealth and aligns with canonical ABM practice \cite{EpsteinAxtell1996}.
+There are two \textbf{cooperative} actions, \texttt{invest\_other} and \texttt{invest\_self}, which grow the total economy. However, investing in another agent costs the actor $c_{\text{inv}}\%$ of their resources, making the action only valuable for their own wealth if they expect reciprocity in the following rounds. Investing in oneself removes that uncertainty, but the net percentage gain ($g_{\text{self}}$) is smaller and the actor is limited by their own wealth. Both actions simultaneously exhibit a signalling function: investing in others can be seen as goodwill, trust and an invitation for cooperation, while investing in oneself can be seen as asocial, though practical. Additionally, the cost of investing in another agent ($c_{\text{inv}}$) is smaller than the return for the target ($r_{\text{inv}}$), creating a social dilemma: individually investing is costly, but collectively the action is net-positive.
+
+Three \textbf{military} actions introduce additional dynamics: \texttt{arm\_self} creates extra combat power ($B_i$) for a limited time and can be used both offensively and defensively. Seeing a neighbor arm themselves poses a threat either way, as their intentions are not known to the agent. Actors can also decide to \texttt{arm\_other}, increasing the combat power of a neighbor. Arming other agents can signal extreme trust and enables stronger agents to substantially strengthen a weaker neighbor for a limited time. The combat bonuses are subject to a decay ($\delta$) to prevent permanent escalation. Keeping high combat bonuses requires repeated arming. %baliga 2004 cite, maar nog niet gelezen!
+
+% TODO: Koen — attack sterker schrijven: dit is de actie die alles drijft!
+The \texttt{attack} action is a direct way to transfer wealth between agents. Both the actor and target pay conflict cost ($c_{\text{war}}$) after which their chances of winning the conflict is decided by the ratio of their resources + combat bonus. The winner takes $\alpha\%$ of the losers resources, disregarding who was the initiator of the attack.
+% TODO: Koen — combat is probabilistisch (Lanchester-type), niet deterministisch.
+%   Sterkere agent wint WAARSCHIJNLIJKER, niet altijd. 1 zin toevoegen.
+% TODO: Koen — coalition attacks toevoegen:
+%   When multiple agents attack the same target in a round, their combat
+%   strengths combine into a single coalition attack. Win probability =
+%   sum(attacker strengths) / (sum(attacker strengths) + defender strength).
+%   Spoils split proportionally by strength contribution. All combats resolve
+%   simultaneously using snapshotted strengths (no order dependence).
+%   This enables emergent coalitions without explicit coordination — agents
+%   independently choosing the same target form a de facto alliance.
+%   arm_other becomes the mechanism for actively strengthening coalition partners.
+%   Interesting interaction with communication scope IV: DM enables secret
+%   coordination of attacks, broadcast enables public calls-to-arms.
+
+Lastly, agents are allowed to do nothing in any given round with the \texttt{do\_nothing} action. Although the action itself costs nothing and gains nothing in terms of resources, the loss of opportunity is to be considered.
+
+% ---------------------------------------------------------------------------
+% TODO: Koen — OBSERVATION O (kort, 4-5 zinnen)
+%   - Agent i observes own R_i and B_i fully
+%   - Neighbour resources HIDDEN ("???") — creates type uncertainty (Harsanyi)
+%   - Observation scope: 1-hop (direct connections only)
+%   - Actions and combat outcomes involving neighbours are visible
+%   - Memory accumulates observations → verwijs naar §3.2.3
+%   - Dit is NIET de IV — hidden resources en memory zijn base defaults.
+%     De IV is network rewiring w (§3.3.2), die bepaalt WIE je buren zijn.
+% ---------------------------------------------------------------------------
+
+% ---------------------------------------------------------------------------
+% TODO: Koen — TRANSITION FUNCTION T (dit is nu NERGENS expliciet!)
+%   Dit is belangrijk om te beschrijven — het is de kern van de engine.
+%   Per ronde, gegeven action profile a = (a_1, ..., a_n):
 %
-% TODO: %-based economy (unified engine+prompt params, decision Mar 1)
-%   - All costs and returns are % of actor's resources (not absolute values)
-%   - invest_other: costs invest_other_cost_pct% of your resources,
-%     target receives invest_other_return_pct% of your resources
-%   - arm_self: costs arm_cost_pct% → becomes additive combat bonus,
-%     bonus decays by arm_decay (×0.5) each round
-%   - attack(target): winner takes attack_take_pct% of loser's resources,
-%     both pay conflict_cost_pct%. Combat: probabilistic, strength = resources + arm_bonus
-%   - do_nothing: free, no effect
+%   1. Validatie: agents met R_i < 0.01 kunnen geen actie uitvoeren
+%   2. Non-attack resolutie (simultaan):
+%      - invest_self: R_i += g_self% × R_i
+%      - invest_other(j): R_i -= c_inv% × R_i, R_j += r_inv% × R_i
+%      - arm_self: R_i -= c_arm% × R_i, B_i += c_arm × m
+%      - arm_other(j): R_i -= c_arm,j% × R_i, B_j += c_arm,j × m
+%   3. Attack resolutie (na arm updates, snapshot-based):
+%      a. Snapshot: s_i = R_i + B_i voor alle betrokken agents
+%      b. Groepeer attacks per target → coalition attacks
+%      c. Per groep: coalition_power = sum(s_atk), defender_power = s_def
+%         Win prob = coalition_power / (coalition_power + defender_power)
+%         Eén worp → coalition of defender wint
+%      d. Conflict cost: elke deelnemer betaalt c_war% × eigen R
+%      e. Spoils: winner takes α% van loser, coalition splitst proportioneel
+%      f. Agent kan in meerdere gevechten tegelijk zitten (aanvaller in
+%         het ene, verdediger in het andere) — snapshot voorkomt volgorde-effect
+%   4. Resource update: R_i(t+1) = max(0, R_i(t) + ΔR_i)
+%   5. Arm decay: B_i(t+1) = B_i(t) × δ (remove if < 0.01)
+%   6. Network rewiring (if w > 0): zie §3.1.1
 %
-% TODO: Game parameters table
-%   Base params: invest_other_cost=10%, invest_other_return=25%,
-%     attack_take=40%, conflict_cost=5%, arm_cost=10%, arm_decay=0.5
-%   Spatial: toroidal grid, interaction_radius=2 (default)
-%   Agents: 10 (default), simultaneous action resolution
-%   Rounds: max_rounds=50 with early stopping (see 3.3)
+%   Key design choices om te benoemen:
+%   - Simultaan: geen first-mover advantage
+%   - %-based: scale invariance
+%   - Snapshot combat: geen volgorde-afhankelijkheid bij meerdere gevechten
+%   - Non-attack before attack: arm bonuses tellen mee in combat dezelfde ronde
+% ---------------------------------------------------------------------------
+
+% ---------------------------------------------------------------------------
+% TODO: Koen — PAYOFF u (kort, 2-3 zinnen)
+%   - u_i(t) = R_i(t+1) - R_i(t): netto resource verandering per ronde
+%   - Agenten maximaliseren absolute resource count (instructie in prompt)
+%   - Geen aparte utility function (geen risico-aversie, geen social prefs)
+%   - Payoff is direct observeerbaar door de agent (ze zien hun eigen R)
+%   - Dit is ook de basis voor network rewiring: "lowest cumulative payoff"
+%     neighbour wordt ge-dropped (§3.1.1)
+% ---------------------------------------------------------------------------
+
+\begin{table}[ht]
+\centering
+\caption{Game parameters. All action costs and returns are percentages of the acting agent's current resources $R_i(t)$. Default values are used unless explicitly varied.}
+\label{tab:base_params}
+\begin{tabular}{lp{6.2cm}ll}
+\hline
+\textbf{Action} & \textbf{Effect} & \textbf{Parameter} & \textbf{Default} \\
+\hline
+\texttt{invest\_other}$(j)$
+    & Agent pays $c_{\text{inv}}\%$ of $R_i$; target $j$ receives $r_{\text{inv}}\%$ of $R_i$. Grows the total economy.
+    & $c_{\text{inv}}$ / $r_{\text{inv}}$
+    & 10\% / 15\% \\[6pt]
+\texttt{invest\_self}\textsuperscript{a}
+    & Agent gains $g_{\text{self}}\%$ of $R_i$ (no cost).
+    & $g_{\text{self}}$
+    & 2\% \\[6pt]
+\texttt{arm\_self}
+    & Agent pays $c_{\text{arm}}\%$ of $R_i$ (removed from economy); combat bonus $B_i$ increases by $c_{\text{arm}} \cdot m$. Bonus decays by $\delta$ each round.
+    & $c_{\text{arm}}$ / $m$ / $\delta$
+    & 10\% / 2.0 / 0.5 \\[6pt]
+\texttt{arm\_other}$(j)$
+    & Agent pays $c_{\text{arm},j}\%$ of $R_i$ (removed from economy); target $j$'s combat bonus $B_j$ increases by $c_{\text{arm},j} \cdot m$.
+    & $c_{\text{arm},j}$
+    & 10\% \\[6pt]
+\texttt{attack}$(j)$
+    & Both pay $c_{\text{war}}\%$ of own resources. Combat strength $s_i = R_i + B_i$. If multiple agents attack the same target, their strengths combine. Win probability $p = \sum s_{\text{atk}} / (\sum s_{\text{atk}} + s_{\text{def}})$. Winner takes $\alpha\%$ of loser's resources; coalition spoils split proportionally by strength.
+    & $c_{\text{war}}$ / $\alpha$
+    & 5\% / 40\% \\[6pt]
+\texttt{do\_nothing}
+    & No cost, no effect.
+    & ---
+    & --- \\[6pt]
+\hline
+\textbf{Simulation} & \textbf{Description} & \textbf{Parameter} & \textbf{Default} \\
+\hline
+    & Number of agents & $n$ & 30 \\
+    & Initial resources per agent & $R_i(0)$ & 100 \\
+    & Hard cap (with early stopping) & \texttt{max\_rounds} & 50 \\
+    & LLM sampling temperature & $T$ & 0.7 \\
+\hline
+\end{tabular}
+
+\vspace{4pt}
+{\footnotesize \textsuperscript{a} Disabled by default. Even a net $+2\%$ gain makes \texttt{invest\_self} trivially dominant at L1, collapsing all agents to self-investment. Tested separately in OAT screening (Section~\ref{sec:oat}).}
+\end{table}
+
+\subsection{Interaction Topology}
+\label{sec:topology}
+%   DECIDED (Mar 2, pending Debraj confirmation Mar 14):
+%   Dynamic social network with payoff-based rewiring.
 %
-% TODO: Justify design choices
-%   - Why not PD/Stag Hunt? Too constrained for emergent structure — only 2
-%     actions, no spatial dynamics, no resource accumulation, no coalitions.
-%     Our game has 4 action types × N targets = rich action space.
-%   - Why spatial? Enables local interaction, coalition formation along
-%     geographic lines, phase transitions at radius boundaries
-%     (Perc & Szolnoki, 2010; Wang et al., 2012)
-%   - Why 10 agents? Large enough for network structure (communities, hierarchy),
-%     small enough for LLM inference (10 concurrent API calls per round)
-%   - Why simultaneous? Removes first-mover advantage, closer to Nash setup
-%   - Why %-based? Scale-invariant — poor and rich agents face same dilemma
-%     structure. Prevents dominant strategies at extreme resource levels.
-%   - Connect to Axelrod (1984): positive-sum cooperation possible
-%   - Connect to Epstein & Axtell (1996): Sugarscape-inspired resource dynamics
+%   TODO Koen — schrijf deze subsection. Kernpunten:
 %
-% TODO: Spatial structure — OPEN DESIGN DECISION
-%   Current: fixed toroidal grid with interaction_radius
-%   Under consideration: network rewiring (dynamic social network instead of grid)
-%   - Agents periodically drop low-utility neighbours, add new ones
-%   - Solves "random movement not representable" (Debraj feedback, Jan 30)
-%   - See ideas.txt, discuss with Debraj Mar 14
-%   - If rewiring: cite Santos et al. (2006), Perc et al. (2017)
-%   - If grid: cite Schelling (1971), Epstein & Axtell (1996)
+%   1. MOTIVATION (2-3 zinnen):
+%      LLM agents have no physical embodiment — grid movement (Park et al.
+%      2023) requires spatial decisions that aren't natural for language models.
+%      Social ties are the natural topology: who you interact with, not where
+%      you stand. Dynamic rewiring lets the network co-evolve with agent
+%      strategies (Santos, Pacheco & Lenaerts, 2006).
+%
+%   2. NETWORK STRUCTURE (formeel):
+%      - G(t) = (V, E(t)): undirected, unweighted social network
+%      - V = N (all agents), E(t) evolves over time
+%      - Initial network: Erdős-Rényi G(n, p) with expected degree ⟨k⟩ ≈ 4-6
+%        Connected component guaranteed at initialization
+%      - Agents can only interact with direct neighbours: N_i(t) = {j : (i,j) ∈ E(t)}
+%
+%   3. REWIRING MECHANISM (formeel, dit is de kern):
+%      Each round, with probability w per agent, the ENGINE (not the LLM):
+%        (a) Identifies the neighbour j* with lowest cumulative payoff
+%            over the last n rounds (net resource change from interactions)
+%        (b) Severs edge (i, j*)
+%        (c) Adds edge (i, k) where k is drawn uniformly from non-neighbours
+%      Constraints: break-one-make-one (edge conservation), min degree ≥ 1
+%
+%      Payoff-based rule follows Zimmermann et al. (2004, Phys. Rev. E 69:065102).
+%      Chosen over strategy-dependent rewiring (Santos et al., 2006) because
+%      the 6-action game cannot be cleanly classified as cooperate/defect.
+%      Payoff evaluation naturally handles the continuous hostility spectrum.
+%
+%   4. REWIRING PROBABILITY w AS IV (link to §3.3.2):
+%      w ∈ {0, 0.05, 0.3, 1.0} maps to the static → viscous → fluid → fully
+%      dynamic spectrum identified by Rand, Arbesman & Christakis (2011, PNAS).
+%      This is the Information Structure IV (§3.3.2).
+%
+%   5. LITERATURE POSITIONING (kort, 3-4 zinnen):
+%      Co-evolutionary game theory: Santos et al. (2006), Zimmermann & Eguíluz
+%      (2004), Pacheco, Traulsen & Nowak (2006). Key result: dynamic topology
+%      promotes cooperation through positive assortment — cooperators cluster,
+%      defectors become isolated. Hierarchy emerges endogenously (Eguíluz et al.,
+%      2005). Experimental validation with human subjects: Rand et al. (2011).
+%
+%   6. NOVELTY CLAIM (1-2 zinnen):
+%      No existing work combines LLM agents with co-evolutionary network
+%      dynamics. No paper places K-level reasoning on adaptive networks.
+%      This design fills both gaps simultaneously.
+%
+%   Key references:
+%   - Santos, Pacheco & Lenaerts (2006, PLoS Comp Bio) — founding result
+%   - Zimmermann & Eguíluz (2004, PRE) — payoff-based rewiring, emergent hierarchy
+%   - Rand, Arbesman & Christakis (2011, PNAS) — experimental validation
+%   - Pacheco, Traulsen & Nowak (2006, PRL) — analytical timescale framework
+%   - Gross & Blasius (2008, J. R. Soc. Interface) — adaptive networks review
+%   - Ohtsuki, Hauert, Lieberman & Nowak (2006, Nature) — b/c > k rule
+%   - Akçay (2018, Nature Comms) — cautionary: cooperation can collapse networks
+%   - Su, McAvoy & Plotkin (2023, Nature Comput. Sci.) — temporal variation itself
+%     is a cooperation mechanism
 
 % -----------------------------------------------------------------------------
 % SECTION 3.2: Agent Architecture and Model Selection
@@ -79,6 +264,7 @@
 % Model selection rationale merged from former Chapter 4.
 % -----------------------------------------------------------------------------
 \section{Agent Architecture and Model Selection}
+\label{sec:agent_architecture}
 
 % TODO: 3.2.1 — Model Selection (merged from former Ch 4.1)
 \subsection{Model Selection}
@@ -111,24 +297,31 @@
 % TODO: 3.2.2 — Prompt structure
 \subsection{Prompt Structure}
 %   Each round, each agent receives a prompt containing:
-%   1. System instructions (game rules, action descriptions, objective)
-%   2. Reasoning level instruction (L0-L3, see §3.3.1)
-%   3. Current state (own resources, visible neighbours and their resources)
-%   4. Memory (if enabled): accumulated local observations from past rounds
-%   5. Response format: JSON with action choice + reasoning field
+%   1. Identity + objective (maximize resources)
+%   2. Temporal reasoning instruction (constant across all K-levels):
+%      "This is a repeated game... investments build reciprocity,
+%       attacks invite retaliation. Consider long-term consequences."
+%      Added Mar 2: separates temporal awareness (base) from social
+%      modeling depth (K-level). See §3.3.1 for rationale.
+%   3. Framing instruction (if applicable, see §3.3 for framing conditions)
+%   4. Current state (own resources, connected neighbours and their resources)
+%   5. Memory (if enabled): accumulated local observations from past rounds
+%   6. Reasoning level instruction (L0-L3, see §3.3.1)
+%   7. Response format: JSON with action + target (no reasoning field —
+%      reasoning is captured via <think> tokens, not self-report)
 %
 %   Prompt is deterministic given state — same state = same prompt.
 %   Full prompt text in Appendix.
 %
 % TODO: 3.2.3 — Memory architecture
 \subsection{Agent Memory}
+\label{sec:memory}
 %   Local observation memory (decision Mar 1):
 %   - Agents accumulate observations from their own perspective only
-%   - No god-view: agents don't know what happened outside their radius
+%   - No god-view: agents only see actions involving their network neighbours
 %   - Memory window: sliding window of last 10 rounds (configurable)
 %   - Per-neighbour: tracks last observed action, resources, round
-%   - Stale entries: neighbours that moved out of range show "last seen round X"
-%   - Memory OFF = no history, only current state (no reciprocity possible)
+%   - Stale entries: neighbours lost through rewiring show "last seen round X"
 %   - Memory ON = default. Without memory, do_nothing is Nash equilibrium
 %     (invest_other costs you 10%, returns go to target, not you)
 %
@@ -170,11 +363,22 @@
 %          best action."
 %     → Recursive reasoning, two levels of recursion (K-level 3)
 %
+%   Temporal vs social separation (design decision Mar 2):
+%   - ALL levels receive the same temporal reasoning instruction in the base
+%     prompt: "This is a repeated game... consider long-term consequences."
+%   - K-level prompts manipulate ONLY social modeling depth (who models whom)
+%   - Rationale: Camerer's CH is inherently static (one-shot games). Our game
+%     is repeated → temporal awareness is orthogonal to social reasoning depth.
+%     Without this separation, L0 agents would lack temporal reasoning entirely,
+%     confounding reasoning depth with time-horizon awareness.
+%   - This means IV1 is purely: how deeply do agents model other agents?
+%
 %   Theoretical grounding:
 %   - Cognitive hierarchy theory: Camerer, Ho & Chong (2004, QJE)
 %   - K-Level Reasoning in LLMs: Zhang et al. (2024, NAACL)
 %   - Kuusela & Roy (2024, AAMAS): level-0/1/2 in 2-agent RL → Hobbesian Trap
-%   - Prompt as computational depth manipulation: Pfau et al. (2024)
+%   - Prompt as computational depth manipulation: Pfau et al. (2024),
+%     Goyal et al. (2024, "Think Before You Speak")
 %
 %   Why prompt manipulation, not different models?
 %   - Single model eliminates architecture confounds
@@ -183,48 +387,156 @@
 %
 %   Faithfulness caveat (MUST include):
 %   - Reasoning traces are behavioral data, not mechanistic explanations
-%   - Cite: Turpin (2023), Lanham (2023), Chen (2025)
+%   - Cite: Turpin et al. (2024), Lanham et al. (2023), Chen et al. (2025)
 %   - We manipulate prompt-elicited deliberation, not "true" reasoning depth
 %   - Thinking token distributions: L1 mean ~4800, L3 mean ~5600 (only 17% diff)
 %     → model thinks deeply regardless of prompt level
 
 % TODO: 3.3.2 — IV2: Information Structure
 \subsection{Information Structure}
-%   Two sub-manipulations (MD type space):
-%   (a) Visibility: interaction_radius controls observation range
-%       Radius 1 (local, ~4 neighbours) → radius 2 (~12) → global (all visible)
-%   (b) Memory: persistent local observations vs stateless
-%       See §3.2.3 for memory architecture details
+%   The information IV maps to mechanism design's type space (Hurwicz, 1960)
+%   and narratively to Hobbes's "diffidence" (uncertainty about others).
+%
+%   DESIGN DECISION (Mar 2): Information structure = network topology.
+%   The network determines WHO you can interact with AND what you can observe.
+%   This is the single cleanest manipulation of the type space.
+%
+%   The IV is the REWIRING PROBABILITY w (Santos et al., 2006; Rand et al., 2011):
+%     w = 0:    static network — stuck with your neighbours, no exit option
+%     w = 0.05: viscous — slow adaptation, mostly stable relationships
+%     w = 0.3:  fluid — active restructuring, agents "vote with their feet"
+%     w = 1.0:  fully dynamic — complete relational freedom every round
+%
+%   Rewiring mechanism (engine-level, NOT an LLM decision):
+%   Each round, with probability w per agent, the engine:
+%   1. Drops the connection to the neighbour with lowest cumulative payoff
+%      (net resource change from interactions over last n rounds)
+%   2. Adds one connection to a random non-neighbour
+%   Break-one-make-one conserves total edges. Min degree ≥ 1 prevents isolation.
+%   Payoff-based rewiring follows Zimmermann et al. (2004, Phys. Rev. E)
+%   — appropriate for 6-action games where cooperate/defect classification
+%   doesn't apply (Santos et al. 2006 strategy-dependent rule requires binary).
+%
+%   Initial network: Erdős-Rényi G(n, p) with expected degree ⟨k⟩ ≈ 4-6.
+%   Connected component guaranteed. See §3.1.1 for full topology details.
+%
+%   BASE GAME DEFAULTS (not IVs, held constant):
+%   - Hidden resources: agents see only their OWN resource count.
+%     Neighbours' resources show as "???" — agents must learn who is
+%     strong/weak through interaction and memory. Creates genuine type
+%     uncertainty (Harsanyi, 1967-68). Tested in OAT pilots to confirm
+%     it doesn't break L0/L1 reasoning.
+%   - Memory: ALWAYS ON (sliding window, 10 rounds). Without memory,
+%     do_nothing is trivially dominant (invest_other benefits the target,
+%     not you — reciprocity requires remembering who invested in you).
+%     Memory is not an IV because it is a prerequisite for social dynamics.
+%   - Observation scope: direct connections only (1-hop). Agents observe
+%     actions and outcomes involving their neighbours. Third-party actions
+%     visible only when both actors are in the agent's neighbourhood.
 %
 %   Theoretical grounding:
 %   - Harsanyi (1967-68): incomplete information games, type uncertainty
-%   - Hobbes's "diffidence" (narrative frame, with caveat — see chapter header)
-%   - Information asymmetry creates strategic uncertainty → defensive behaviour
+%   - Santos, Pacheco & Lenaerts (2006, PLoS Comp Bio): cooperation on
+%     adaptive networks — rewiring probability as key parameter
+%   - Rand, Arbesman & Christakis (2011, PNAS): experimental validation
+%     — static/viscous/fluid spectrum, cooperation only in fluid networks
+%   - Zimmermann & Eguíluz (2004, Phys. Rev. E): payoff-based rewiring
+%   - Hobbes's "diffidence" — TWO-LAYERED mapping (see §2.2.3):
+%     Layer 1: Hidden resources (base default) = DIRECT diffidence.
+%       Agents always face type uncertainty about neighbour strength.
+%       This is the permanent backdrop — present in ALL conditions.
+%     Layer 2: Network rewiring w (the IV) = structural RESPONSE to diffidence.
+%       w=0: trapped with neighbours, can't escape threats → maximally constraining
+%       w=1: can flee, seek better partners → EXIT OPTION from bad relationships
+%     Key nuance: higher w doesn't REMOVE uncertainty (resources still hidden).
+%     It gives agents agency over their social environment.
+%     This separates the SOURCE of uncertainty (hidden resources) from the
+%     STRUCTURAL CONDITIONS under which uncertainty operates (network fluidity).
+%     The MD mapping is cleaner: w directly manipulates the type space.
 %
-%   NOTE: hide_resources (agents see only own resources) was considered but
-%   not implemented. Focus is on spatial visibility + temporal memory.
+%   Gap: No LLM multi-agent paper uses adaptive network topology.
+%   No paper combines K-level reasoning with co-evolutionary networks.
+%   This is a genuinely novel intersection (see §2.4.5 and §2.8 for literature gaps).
 
-% TODO: 3.3.3 — IV3: Communication and Enforcement
-\subsection{Communication and Enforcement}
-%   Three conditions (MD message space):
+% TODO: 3.3.3 — IV3: Communication Scope
+\subsection{Communication Scope}
+%   DESIGN DECISION (Mar 2): Communication IV = scope of cheap talk channel.
+%   No enforcement/contracts — that's a different mechanism entirely (future work).
+%   Instead, manipulate WHO can hear your message: nobody, one agent, or all neighbours.
+%
+%   Four levels on a single dimension — communication SCOPE:
 %   (1) No communication (baseline — Hobbesian state of nature)
-%       Agents choose actions based only on observation, no messaging
-%   (2) Cheap talk: pre-round messaging, not binding
-%       Agents can send messages to neighbors before choosing actions
-%       Messages have no enforcement — cheap talk (Crawford & Sobel, 1982)
-%   (3) Contracts with enforcement: binding agreements + punishment for defection
-%       Agents can propose/accept agreements; violation = automatic penalty
-%       Implements Hobbes's Leviathan: external enforcement enables cooperation
+%       Agents choose actions based only on observation and memory.
+%       Pure "state of nature" — no coordination channel exists.
+%   (2) Direct message only (private cheap talk)
+%       Pre-action phase: agent sends 1 message to 1 neighbour. PRIVATE —
+%       only the recipient sees it. Enables bilateral deals, secret coalitions,
+%       conspiracies. But no public coordination.
+%   (3) Broadcast only (public cheap talk)
+%       Pre-action phase: agent sends 1 message to ALL neighbours. PUBLIC —
+%       everyone in your neighbourhood sees it (including potential targets).
+%       Enables coordination, public commitments, norm enforcement, shaming.
+%       But no secrecy — your intentions are visible.
+%   (4) Choice (agent selects DM or broadcast each round)
+%       Agent decides whether to send private or public message.
+%       This is the "full capability" condition — tests not just the EFFECT
+%       of communication but also the PREFERENCE. Do agents choose conspiracy
+%       (DM) or coordination (broadcast)? Does this vary by reasoning level?
+%       L3 might strategically use DM for secret deals and broadcast for
+%       public threats or norm enforcement.
+%
+%   The key contrasts:
+%   - DM vs broadcast: HIDDEN coordination (conspiracies) vs PUBLIC coordination (norms)
+%   - Choice condition: reveals agent PREFERENCES for private vs public communication
+%     Channel choice itself becomes a dependent variable — proportion DM vs broadcast
+%     by reasoning level, round, network position.
+%   This is a clean manipulation of the message space without introducing
+%   a fundamentally different mechanism (enforcement).
+%
+%   All messages are cheap talk (Crawford & Sobel, 1982): non-binding,
+%   costless, potentially deceptive. The question is whether the SCOPE of
+%   the channel changes the informativeness of communication.
+%
+%   Implementation (pre-action messaging phase):
+%   - No-comm: skip messaging phase entirely
+%   - DM only: LLM outputs {"message": "...", "to": "Agent_X"} before action choice.
+%     Message appended to recipient's observation next round.
+%   - Broadcast only: LLM outputs {"message": "...", "to": "all"} before action choice.
+%     Message appended to ALL neighbours' observations next round.
+%   - Choice: LLM outputs {"message": "...", "to": "Agent_X" OR "all"}.
+%     Agent decides channel per round. Channel choice logged as DV.
+%   Messages stored in memory system alongside action observations.
+%
+%   Interaction with network rewiring (w):
+%   - Static network (w=0): broadcast audience is fixed — stable public sphere
+%   - Dynamic network (w=1): broadcast audience changes each round — fluid public
+%   - DM on dynamic networks: bilateral deals are fragile (partner may rewire away)
 %
 %   Theoretical grounding:
-%   - Crawford & Sobel (1982): strategic information transmission
+%   - Crawford & Sobel (1982): strategic information transmission (cheap talk)
+%   - Farrell & Rabin (1996): when is cheap talk credible?
+%   - Sally (1995): meta-analysis — communication boosts cooperation ~40% in
+%     social dilemma experiments. But mechanism unclear (commitment vs coordination)
 %   - Hurwicz (1960): message space as mechanism design input
 %   - Baliga & Sjöström (2004): arms races with/without communication
-%   - Schelling (1960): commitment as strategic tool
-%   - Dafoe et al. (2020): commitment as key to cooperative AI
+%   - Dafoe et al. (2020): communication as key to cooperative AI
 %
-%   STATUS: Not yet implemented (Phase 2d). Design finalized, implementation
-%   depends on Phase 2c results and compute budget.
+%   Hobbes mapping (strong): "lack of common power" — without communication,
+%   agents cannot coordinate to escape the Hobbesian trap. Cheap talk tests
+%   whether WORDS alone (without enforcement) can create order.
+%   DM vs broadcast tests whether order requires PUBLIC commitment or
+%   whether private bilateral deals suffice.
+%
+%   Future work: binding contracts with enforcement (Hobbes's Leviathan,
+%   Conitzer 2024 program equilibria) would test whether cheap talk's limits
+%   can be overcome by adding commitment devices. But this requires a
+%   fundamentally different engine mechanism — out of scope for this thesis.
+%
+%   Gap: No LLM multi-agent paper systematically varies communication SCOPE
+%   as IV. Existing work (WarAgent, negotiation studies) includes communication
+%   but doesn't manipulate the channel structure experimentally.
+%
+%   STATUS: Not yet implemented (Phase 2d). Design finalized.
 
 % -----------------------------------------------------------------------------
 % SECTION 3.4: Experimental Design
@@ -253,15 +565,20 @@
 % TODO: 3.4.2 — OAT Parameter Characterization
 \subsection{Parameter Characterization (OAT Screening)}
 %   One-at-a-time sweeps of game parameters on Qwen 3.5-27B:
-%   9 parameters × L1+L3 × 2 reps = ~116 runs
-%   Parameters: conflict_cost_pct, attack_take_pct, arm_cost_pct,
-%     invest_other_return_pct, invest_other_cost_pct, interaction_radius,
-%     invest_self toggle, memory toggle
+%   Game params: conflict_cost_pct, attack_take_pct, arm_cost_pct,
+%     invest_other_return_pct, invest_other_cost_pct, invest_self toggle
+%   Network params: initial_degree (⟨k⟩), rewiring_probability (w)
+%   Information: hidden_resources ON vs OFF (confirm hidden doesn't break L0/L1)
+%   × L1+L3 × 2+ reps per condition
 %   Purpose: identify sensitive parameters and reasoning depth × param interactions
 %   Follows Debraj's template: systematically vary ONE parameter at a time.
 %
 %   NOTE: invest_self is OFF by default in all sweeps. Even +2% net gain
 %   causes 100% invest_self in L1 runs (trivially dominant). Tested separately.
+%   NOTE: memory is ALWAYS ON — not tested as OAT variable (prerequisite for
+%   social dynamics, not an IV).
+%   NOTE: hidden resources is the DEFAULT. OAT pilot confirms it doesn't break
+%   agent reasoning at L0/L1. If it does → fall back to full info baseline.
 
 % TODO: 3.4.3 — Reasoning Depth Production
 \subsection{Reasoning Depth Experiments}
@@ -272,20 +589,60 @@
 %   - Key question: does Kuusela's Hobbesian Trap (2-agent RL) replicate
 %     in N-agent LLM systems?
 
-% TODO: 3.4.4 — Information Experiments
+% TODO: 3.4.4 — Information / Network Topology Experiments
 \subsection{Information Structure Experiments}
-%   Radius × memory manipulation at fixed reasoning level:
-%   - interaction_radius: [1, 2, 3, global] × memory [on, off] × reps
-%   - Purpose: test whether more information reduces or increases conflict
-%   - Key question: does Harsanyi's insight hold — does type uncertainty
-%     drive defensive behaviour?
+%   The Information IV IS the network topology, manipulated via rewiring
+%   probability w (see §3.3.2 and §3.1.1 for design rationale).
+%
+%   Design: w ∈ {0, 0.05, 0.3, 1.0} × reasoning levels × reps
+%   - w = 0: static network — no exit option, forced coexistence
+%   - w = 0.05: viscous — slow adaptation
+%   - w = 0.3: fluid — active restructuring
+%   - w = 1.0: fully dynamic — complete relational freedom
+%   (spectrum from Rand, Arbesman & Christakis, 2011, PNAS)
+%
+%   Base game held constant: hidden resources, memory ON, 1-hop observation.
+%   Reasoning level at L3 (or best-performing level from §3.4.3).
+%
+%   Key questions:
+%   - Does higher rewiring promote cooperation through positive assortment?
+%     (Santos et al. 2006 predicts yes)
+%   - Does the Hobbesian Trap (Kuusela & Roy 2024) persist on dynamic networks?
+%     (never tested — novel result regardless of direction)
+%   - Do communities stabilise differently at different w?
+%     (measured via NMI between consecutive window partitions)
+%   - Does hierarchy emerge differently? (Eguíluz et al. 2005 predicts
+%     endogenous leader/conformist/exploiter roles on adaptive networks)
 
-% TODO: 3.4.5 — Communication Experiments (Phase 2d)
-\subsection{Communication and Enforcement Experiments}
-%   Three communication conditions × reasoning levels × key params × reps
-%   Purpose: test whether enforcement shifts system from Hobbesian conflict
-%   to cooperative order (the "Leviathan hypothesis")
-%   STATUS: design only, depends on Phase 2c results and compute budget
+% TODO: 3.4.5 — Communication Scope Experiments (Phase 2d)
+\subsection{Communication Scope Experiments}
+%   Four communication scope conditions × reasoning levels × reps:
+%   (1) No communication (baseline)
+%   (2) Direct message only (private cheap talk — 1 message to 1 neighbour)
+%   (3) Broadcast only (public cheap talk — 1 message to all neighbours)
+%   (4) Choice (agent selects DM or broadcast each round)
+%
+%   Key questions:
+%   - Does cheap talk (DM or broadcast) reduce conflict vs no-comm?
+%     Sally (1995) predicts ~40% cooperation boost, but in human PD experiments.
+%   - Does SCOPE matter? Public > private → coordination mechanism.
+%     Private > public → bilateral commitment mechanism.
+%   - How does communication interact with reasoning depth?
+%     L0 agents can't strategically use messages. L3 agents may use
+%     messages deceptively (cheap talk equilibrium: messages uninformative
+%     when interests diverge, Crawford & Sobel 1982).
+%   - How does communication interact with network rewiring?
+%     DM + static network = stable bilateral relationships
+%     DM + fluid network = fragile deals (partner may leave)
+%     Broadcast + static = fixed public sphere
+%     Broadcast + fluid = changing audience each round
+%
+%   Full factorial is 4 comm × 4 reasoning × 4 network = 64 cells.
+%   May need to reduce: e.g., fix w at 2 levels (static, fluid) for comm
+%   experiments → 4 × 4 × 2 = 32 cells × 20 reps = 640 runs.
+%   Or: run choice condition only at L1+L3 (most informative contrast).
+%
+%   STATUS: design only, depends on Phase 2c results and compute budget.
 
 % TODO: 3.4.6 — Robustness
 \subsection{Robustness Checks}
@@ -316,14 +673,21 @@
 %      Standard measure (Atkinson, 1970). Range [0,1], 0 = equal, 1 = one agent
 %      has everything. Tracks hierarchy emergence.
 %
-%   3. E-I index: (external - internal) / (external + internal) interactions
-%      (Krackhardt & Stern, 1988). Measures coalition formation.
-%      Range [-1, +1], -1 = pure ingroup, +1 = pure outgroup interaction.
+%   3. Network modularity Q(t): Newman modularity of the evolving social
+%      network, with communities detected via Leiden algorithm.
+%      Range [0, 1], higher = stronger community structure.
+%      Tracks whether agents self-organize into distinct cooperative/
+%      competitive clusters through rewiring (Santos et al. 2006).
+%      Replaces E-I index from earlier outline — modularity is more
+%      informative with adaptive network topology.
 %
 %   Why these three:
-%   - Cover behaviour (cooperation), outcome (inequality), structure (coalitions)
+%   - Cover behaviour (cooperation ratio), outcome (inequality/Gini),
+%     structure (network modularity)
 %   - All computable per round → time series analysis
 %   - All have clear theoretical grounding
+%   - Network modularity is uniquely enabled by the adaptive topology
+%     design (§3.1.1) — a metric no LLM multi-agent paper has reported
 
 % TODO: 3.5.2 — Secondary metrics (reported but not primary focus)
 \subsection{Secondary Metrics}
@@ -332,8 +696,12 @@
 %   - Action stability: fraction of agents repeating previous action
 %   - First attack round: onset of conflict
 %   - Palma ratio: top 10% / bottom 40% (tail sensitivity)
-%   - Network metrics: community detection (Leiden), Elo ratings, hierarchy
-%     steepness — only if rewiring is implemented and network is dynamic
+%   - Network metrics (enabled by adaptive topology, see §3.1.1):
+%     * Degree distribution evolution (do cooperative clusters form?)
+%     * Community detection (Leiden algorithm) per round
+%     * Assortativity by strategy (do cooperators preferentially connect?)
+%     * Clustering coefficient and average path length (small-world?)
+%     * Elo ratings and hierarchy steepness (David's score)
 %   - Phase transition indicators: variance peak, rolling-window EWS
 %     (Scheffer et al., 2009)
 %   - Stabilisation round: post-hoc convergence detection for validation
@@ -362,8 +730,9 @@
 %   - SURF national supercomputer (Netherlands)
 %   - GPU partition: NVIDIA H100 80GB SXM5, shared nodes (up to 4 jobs/node)
 %   - Apptainer (Singularity) containers for reproducibility (pinned vLLM version)
-%   - Compute budget: initially 125K SBU, extended to 225K SBU
-%     (192 SBU per GPU-hour on H100)
+%   - Compute budget: initially 125K SBU (institute allocation), extended
+%     via NWO Small Compute application (up to 1M SBU).
+%     Rate: 192 SBU per GPU-hour on H100.
 %
 % TODO: 3.6.2 — vLLM serving configuration
 %   - vLLM 0.16.1rc1 (nightly for Qwen3.5 support)

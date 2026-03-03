@@ -187,11 +187,11 @@ def run_simulation(game_params: dict,
     engine = GameEngine(
         agent_ids=agent_ids,
         initial_resources=initial_resources,
-        invest_self_cost_pct=game_params.get('invest_self_cost_pct', 10),
-        invest_self_return_pct=game_params.get('invest_self_return_pct', 20),
+        invest_self_pct=game_params.get('invest_self_pct', 2),
         invest_other_cost_pct=game_params.get('invest_other_cost_pct', 10),
         invest_other_return_pct=game_params.get('invest_other_return_pct', 15),
         arm_cost_pct=game_params.get('arm_cost_pct', 10),
+        arm_multiplier=game_params.get('arm_multiplier', 2.0),
         arm_other_cost_pct=game_params.get('arm_other_cost_pct', None),
         arm_decay=game_params.get('arm_decay', 0.5),
         attack_take_pct=game_params.get('attack_take_pct', 40),
@@ -317,7 +317,7 @@ def run_simulation(game_params: dict,
                 thinking = last_trace.get('thinking', '') or ''
                 if thinking:
                     # Truncate for log display (full trace saved in traces JSON)
-                    reasoning = thinking[:300] + ('...' if len(thinking) > 300 else '')
+                    reasoning = thinking[:2000] + ('...' if len(thinking) > 2000 else '')
                 else:
                     # Fallback: try to extract reasoning from JSON response body
                     response_text = last_trace.get('response', '') or ''
@@ -360,8 +360,9 @@ def run_simulation(game_params: dict,
 
                 # Show immediate result for attacks
                 for combat in result.get("combat_results", []):
-                    winner_mark = "✓" if combat['winner'] == combat['attacker'] else "✗"
-                    print(f"    ⚔️ vs {combat['defender']}: {combat['winner']} won {winner_mark} ({combat['attacker_win_prob']:.1%})")
+                    attackers_str = ",".join(combat.get('attackers', []))
+                    winner_mark = "✓" if combat['winner'] == 'coalition' else "✗"
+                    print(f"    ⚔️ {attackers_str} vs {combat['defender']}: {combat['winner']} won {winner_mark} ({combat['attacker_win_prob']:.1%})")
 
             # Tick arms and advance round
             engine.tick_arms()
@@ -416,8 +417,9 @@ def run_simulation(game_params: dict,
             if round_result.get('combat_results'):
                 print("\n  ⚔️  Combat outcomes:")
                 for combat in round_result['combat_results']:
-                    winner_mark = "✓" if combat['winner'] == combat['attacker'] else "✗"
-                    print(f"    {combat['attacker']} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
+                    attackers_str = ",".join(combat.get('attackers', []))
+                    winner_mark = "✓" if combat['winner'] == 'coalition' else "✗"
+                    print(f"    {attackers_str} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
                     print(f"      (Win probability: {combat['attacker_win_prob']:.1%})")
 
         # Compute per-round metrics
@@ -474,8 +476,9 @@ def run_simulation(game_params: dict,
                 # Only attach combat_won to the attacker's action outcome
                 # (defenders had a different action; their defense is passive)
                 for combat in combat_results:
-                    if combat['attacker'] == aid:
-                        outcome['combat_won'] = (combat['winner'] == aid)
+                    if aid in combat.get('attackers', []):
+                        outcome['combat_won'] = (combat['winner'] == 'coalition')
+                        break
                 agent_outcomes[aid] = outcome
 
             for aid in agent_ids:
