@@ -22,15 +22,15 @@ api_key_env_var: "OPENROUTER_API_KEY"
 base_url: "https://openrouter.ai/api/v1"
 
 # Model Selection
-model: "google/gemini-2.5-flash-lite"
+model: "qwen/qwen3.5-27b"
 
 # Generation Parameters
 temperature: 0.7
 max_tokens: 500
-timeout: 30  # seconds
+timeout: 60  # seconds (longer for 27B reasoning model)
 
 # Rate Limiting
-requests_per_minute: 30
+requests_per_minute: 20  # conservative for 27B
 retry_attempts: 3
 retry_delay: 2  # seconds
 
@@ -43,3 +43,4 @@ prompt_config:
   show_effects: false                    # Show numerical costs/returns in actions
   social_cot: true                     # Enable social chain of thought prompting
   information_level: "full"             # Options: 'full' (show all info)
+  reasoning_level: "level3"            # L3: recursive — what do they think I'll do?

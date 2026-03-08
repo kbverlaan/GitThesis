@@ -7,6 +7,24 @@ Not commitments — things to consider for thesis or follow-up work.
 
 ## Directly Relevant to Current Design
 
+CORE HYPOTHESIS — CAMERER vs KUUSELA (Mar 2, from reading Camerer 2004):
+  Two competing predictions for what deeper K-level reasoning does:
+  - Camerer (2004): more K-levels → convergence toward Nash equilibrium.
+    The recursive structure "corrects" — higher levels compensate for
+    lower levels' errors. System converges.
+  - Kuusela & Roy (2024): more K-levels → AWAY from peaceful equilibrium.
+    Under incomplete info + preventive advantage, deeper reasoning
+    amplifies fear → pre-emptive attacks. The Hobbesian Trap.
+  KEY INSIGHT: which prediction holds DEPENDS ON GAME PARAMETERS.
+    High conflict_cost + low attack_take → Nash is cooperative → Camerer
+    Low conflict_cost + high attack_take → attack is profitable → Kuusela
+  This maps directly to our OAT sweep: the parameter space contains a
+  BOUNDARY between Camerer-regime and Kuusela-regime. Finding that
+  boundary is potentially the strongest result of the thesis.
+  Hypothesis: "Reasoning depth interacts with game structure to determine
+  whether the system converges toward cooperative equilibrium (Camerer)
+  or the Hobbesian Trap (Kuusela)."
+
 THINKING BUDGET AS CONTINUOUS VARIABLE:
   Qwen3.5 supports thinking_budget parameter natively. Could replace discrete
   L0-L3 with continuous reasoning depth (0 / 512 / 2048 / 8192 tokens).

@@ -86,7 +86,7 @@ Slide deck: `meeting27slidedeck.key` (archived in GitThesis root)
 | Richting A of B? | **Beide!** Reasoning depth + credible commitment als aparte chapters |
 | Is K-instructed verdedigbaar? | **Ja**, maar gebruik reasoning models met hun eigen traces |
 | Base params? | Maakt niet uit — kies wat de interessantste resultaten oplevert |
-| Één model? | **Ja, strikt.** Qwen 3.5-35B-A3B. Alles opnieuw draaien |
+| Één model? | **Ja, strikt.** Qwen 3.5-27B. Alles opnieuw draaien |
 | Scope? | Breed — beide richtingen + extensies als tijd het toelaat |
 | Collateral % als manipulatie? | Beslissing voor later, eerst experimenten draaien |
 

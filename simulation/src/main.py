@@ -24,8 +24,257 @@ sys.path.insert(0, str(Path(__file__).parent))
 from game.engine import GameEngine, GameState
 from game.spatial import NetworkTopology
 from agents.llm_agent import LLMAgent
+from agents.memory import AgentMemory
 from analysis.metrics import compute_round_metrics, check_early_stopping
-from analysis.network import analyze_run_networks
+from analysis.network import analyze_run_networks, detect_communities
+import display as d
+
+
+def save_checkpoint(path, engine, agents, network, pending_messages, bilateral_flows_history, all_round_metrics):
+    """Save full simulation state for resume."""
+    checkpoint = {
+        'round_number': engine.state.round_number,
+        'resources': dict(engine.state.resources),
+        'arm_bonuses': dict(engine.state.arm_bonuses),
+        'history': [],
+        'agent_memories': {},
+        'pending_messages': pending_messages,
+        'bilateral_flows_history': [],
+        'all_round_metrics': all_round_metrics,
+    }
+    # Serialize history (bilateral_flows has tuple keys)
+    for rd in engine.state.history:
+        rd_copy = dict(rd)
+        if 'bilateral_flows' in rd_copy:
+            rd_copy['bilateral_flows'] = {
+                f"{k[0]}→{k[1]}" if isinstance(k, tuple) else k: v
+                for k, v in rd_copy['bilateral_flows'].items()
+            }
+        checkpoint['history'].append(rd_copy)
+    # Serialize agent memories
+    for aid, agent in agents.items():
+        if agent.memory is not None:
+            checkpoint['agent_memories'][aid] = agent.memory.to_dict()
+    # Serialize network
+    if network:
+        checkpoint['network_edges'] = network.get_edge_list()
+    # Serialize bilateral_flows_history
+    for bf in bilateral_flows_history:
+        checkpoint['bilateral_flows_history'].append({
+            f"{k[0]}→{k[1]}" if isinstance(k, tuple) else k: v
+            for k, v in bf.items()
+        })
+    with open(path, 'w') as f:
+        json.dump(checkpoint, f, default=str)
+
+
+def load_checkpoint(path):
+    """Load checkpoint for resume."""
+    with open(path) as f:
+        return json.load(f)
+
+
+def reconstruct_from_jsonl(jsonl_path: str, game_params: dict) -> dict:
+    """Reconstruct full simulation state from JSONL reasoning log.
+
+    Replays all rounds to rebuild agent memories, resources, network, etc.
+    Returns a checkpoint-compatible dict.
+    """
+    from agents.memory import AgentMemory
+
+    rounds = []
+    with open(jsonl_path) as f:
+        for line in f:
+            rounds.append(json.loads(line))
+
+    if not rounds:
+        raise ValueError(f"Empty JSONL: {jsonl_path}")
+
+    # Skip crashed rounds (>80% do_nothing = likely API failure)
+    while len(rounds) > 1:
+        last = rounds[-1]
+        agents_data = last['agents']
+        do_nothing_count = sum(1 for a in agents_data.values() if a.get('action') in ('do_nothing', None, ''))
+        if do_nothing_count / len(agents_data) > 0.8:
+            print(f"  Skipping round {last['round']} (likely API failure: {do_nothing_count}/{len(agents_data)} do_nothing)")
+            rounds.pop()
+        else:
+            break
+
+    last_round = rounds[-1]
+    agent_ids = list(last_round['agents'].keys())
+
+    # Build memories by replaying rounds
+    memories = {aid: AgentMemory(aid, game_params.get('memory', {}).get('window_size', 10))
+                for aid in agent_ids}
+
+    all_round_metrics = []
+    pending_messages = {aid: [] for aid in agent_ids}
+    engine_history = []  # Minimal round logs for engine saturation counting
+
+    for rd in rounds:
+        rnd = rd['round']
+        agents_data = rd['agents']
+        network_edges = rd.get('network', {}).get('edges', [])
+
+        # Build visible_agents from network edges
+        visible = {aid: set() for aid in agent_ids}
+        for edge in network_edges:
+            a, b = edge[0], edge[1]
+            if a in visible and b in visible:
+                visible[a].add(b)
+                visible[b].add(a)
+
+        # Build round_actions list
+        round_actions = []
+        for aid, adata in agents_data.items():
+            act = adata.get('action', 'no_action')
+            if act and act != 'no_action':
+                round_actions.append({
+                    'agent': aid,
+                    'action': act,
+                    'target': adata.get('target'),
+                })
+            else:
+                round_actions.append({
+                    'agent': aid,
+                    'action': 'no_action',
+                })
+
+        # Build resources dict
+        all_resources = {aid: adata.get('resources', 0) for aid, adata in agents_data.items()}
+
+        # Compute resource changes (approximate — not critical for memory)
+        resource_changes = {aid: 0.0 for aid in agent_ids}
+
+        # Get combat results
+        combat_results = rd.get('combat', [])
+
+        # Update each agent's memory
+        for aid in agent_ids:
+            adata = agents_data.get(aid, {})
+            act = adata.get('action', 'no_action')
+            target = adata.get('target')
+
+            # Record own action
+            memories[aid].record_action(rnd, act, target, {})
+
+            # Update observations
+            vis_list = list(visible.get(aid, []))
+            memories[aid].update_observations(
+                rnd, vis_list, round_actions,
+                resource_changes, combat_results, all_resources
+            )
+
+            # Record note
+            note = adata.get('note_to_self')
+            if note:
+                memories[aid].record_note(note)
+
+        # Process messages
+        msgs = rd.get('messages', [])
+        next_messages = {aid: [] for aid in agent_ids}
+        for msg in msgs:
+            sender = msg.get('from') or msg.get('agent_id')
+            msg_to = msg.get('message_to')
+            text = msg.get('message', '')
+            if not text:
+                continue
+
+            # Record sent message
+            if sender in memories:
+                memories[sender].record_messages(
+                    {'message': text, 'message_to': msg_to},
+                    pending_messages.get(sender, []),
+                    rnd
+                )
+
+            # Route for next round
+            if msg_to and msg_to != 'all' and msg_to in agent_ids:
+                next_messages[msg_to].append({'from': sender, 'message': text, 'channel': 'dm'})
+            elif msg_to == 'all':
+                for target in agent_ids:
+                    if target != sender:
+                        next_messages[target].append({'from': sender, 'message': text, 'channel': 'broadcast'})
+
+        pending_messages = next_messages
+
+        # Store minimal round log for engine history (needed for saturation counting)
+        engine_history.append({'actions': round_actions, 'round': rnd})
+
+        # Store metrics if available
+        if 'primary' in rd:
+            metrics = dict(rd['primary'])
+            metrics['round'] = rnd
+            if 'secondary' in rd:
+                metrics.update(rd['secondary'])
+            all_round_metrics.append(metrics)
+
+    # Build checkpoint
+    checkpoint = {
+        'round_number': last_round['round'] + 1,  # Next round to play
+        'resources': {aid: agents_data[aid].get('resources', 0) for aid, agents_data in [(a, last_round['agents']) for a in agent_ids]},
+        'arm_bonuses': {aid: last_round['agents'][aid].get('arm_bonus', 0) for aid in agent_ids},
+        'history': engine_history,  # Minimal history for engine (needed for saturation counting)
+        'agent_memories': {aid: memories[aid].to_dict() for aid in agent_ids},
+        'network_edges': last_round.get('network', {}).get('edges', []),
+        'pending_messages': pending_messages,
+        'bilateral_flows_history': [],
+        'all_round_metrics': all_round_metrics,
+    }
+
+    # Fix resources dict (handle the list comp issue)
+    checkpoint['resources'] = {aid: last_round['agents'][aid].get('resources', 0) for aid in agent_ids}
+
+    print(f"Reconstructed state from {len(rounds)} rounds of {jsonl_path}")
+    print(f"  Agents: {agent_ids}")
+    print(f"  Resuming from round {checkpoint['round_number']}")
+
+    return checkpoint
+
+# Optional: per-round modularity via Leiden
+try:
+    import networkx as nx
+    _HAS_NX = True
+except ImportError:
+    _HAS_NX = False
+
+
+def _compute_round_modularity(history: list, window: int = 5) -> float:
+    """Compute network modularity Q(t) on recent cooperation+conflict interactions.
+
+    Uses a sliding window of the last `window` rounds. Uses networkx's built-in
+    greedy modularity (no leidenalg/igraph dependency). Returns 0.0 if not enough
+    history or no edges.
+    """
+    if not _HAS_NX or len(history) < 2:
+        return 0.0
+
+    recent = history[-window:]
+    G = nx.Graph()  # Undirected for modularity computation
+
+    for round_data in recent:
+        for action in round_data.get('actions', []):
+            agent = action.get('agent')
+            target = action.get('target')
+            action_type = action.get('action', '')
+            if not target or action_type in ('no_action', 'do_nothing', 'invest_self', 'arm_self'):
+                continue
+            if G.has_edge(agent, target):
+                G[agent][target]['weight'] += 1
+            else:
+                G.add_edge(agent, target, weight=1)
+
+    if G.number_of_edges() < 2 or G.number_of_nodes() < 3:
+        return 0.0
+
+    try:
+        communities = nx.community.greedy_modularity_communities(
+            G, weight='weight', resolution=1.0
+        )
+        return nx.community.modularity(G, communities, weight='weight')
+    except Exception:
+        return 0.0
 
 
 def load_config(config_path: str) -> dict:
@@ -43,14 +292,22 @@ def save_results(game_state: GameState,
     """Save simulation results to files."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save game history
+    # Save game history — convert tuple keys in bilateral_flows to strings
+    serializable_history = []
+    for rd in game_state.history:
+        rd_copy = dict(rd)
+        if 'bilateral_flows' in rd_copy:
+            rd_copy['bilateral_flows'] = {
+                f"{k[0]}→{k[1]}": v for k, v in rd_copy['bilateral_flows'].items()
+            }
+        serializable_history.append(rd_copy)
     history_file = output_dir / f"{run_id}_history.json"
     with open(history_file, 'w') as f:
         json.dump({
             "agents": game_state.agents,
             "final_resources": game_state.resources,
             "total_rounds": game_state.round_number,
-            "history": game_state.history
+            "history": serializable_history
         }, f, indent=2)
 
     # Save reasoning traces (with token usage, latency, errors)
@@ -121,9 +378,10 @@ def save_results(game_state: GameState,
         print(f"  - Metadata: {run_id}_meta.json")
 
 
-def run_simulation(game_params: dict, 
+def run_simulation(game_params: dict,
                    openrouter_config: dict,
-                   run_id: Optional[str] = None) -> tuple:
+                   run_id: Optional[str] = None,
+                   resume_path: Optional[str] = None) -> tuple:
     """
     Run a complete simulation.
     
@@ -160,8 +418,31 @@ def run_simulation(game_params: dict,
     if not api_key:
         api_key = "none"  # vLLM doesn't require an API key
     
-    # Create agent IDs
-    agent_ids = [f"agent_{i+1}" for i in range(game_params['num_agents'])]
+    # Create agent IDs — random color names to avoid positional/ordinal LLM bias
+    AGENT_NAMES = [
+        "Red", "Blue", "Green", "Gold", "Silver",
+        "Coral", "Jade", "Amber", "Ivory", "Slate",
+        "Crimson", "Teal", "Copper", "Violet", "Pearl",
+        "Bronze", "Scarlet", "Indigo", "Onyx", "Cobalt",
+        "Maroon", "Olive", "Cyan", "Rust", "Mauve",
+        "Sage", "Plum", "Dusk", "Ash", "Storm",
+    ]
+    n_agents = game_params['num_agents']
+
+    # If resuming, extract agent IDs from checkpoint before creating agents
+    _resume_ckpt = None
+    if resume_path:
+        if resume_path.endswith('.jsonl'):
+            _resume_ckpt = reconstruct_from_jsonl(resume_path, game_params)
+        else:
+            _resume_ckpt = load_checkpoint(resume_path)
+        names = list(_resume_ckpt['resources'].keys())
+        n_agents = len(names)
+    elif n_agents <= len(AGENT_NAMES):
+        names = random.sample(AGENT_NAMES, n_agents)
+    else:
+        names = [f"agent_{i+1}" for i in range(n_agents)]
+    agent_ids = names
 
     # Build initial resource distribution
     dist_type = game_params.get('initial_distribution', 'equal')
@@ -196,6 +477,9 @@ def run_simulation(game_params: dict,
         arm_decay=game_params.get('arm_decay', 0.5),
         attack_take_pct=game_params.get('attack_take_pct', 40),
         conflict_cost_pct=game_params.get('conflict_cost_pct', 5),
+        resource_decay_pct=game_params.get('resource_decay_pct', 0),
+        invest_saturation_decay=game_params.get('invest_saturation_decay', 1.0),
+        invest_saturation_window=game_params.get('invest_saturation_window', 5),
         max_rounds=game_params['max_rounds'],
     )
 
@@ -237,6 +521,50 @@ def run_simulation(game_params: dict,
     print(f"Model: {openrouter_config['model']}")
     print(f"Prompt config: {prompt_config}")
     print(f"Max rounds: {game_params['max_rounds']}\n")
+
+    # Resume from checkpoint or JSONL
+    resumed_metrics = []
+    resumed_bilateral = []
+    resumed_pending = {}
+    if resume_path and _resume_ckpt:
+        ckpt = _resume_ckpt
+        print(f"Resuming from round {ckpt['round_number']} (source: {resume_path})")
+        # Restore engine state
+        engine.state.round_number = ckpt['round_number']
+        engine.state.resources = {aid: float(v) for aid, v in ckpt['resources'].items()}
+        engine.state.arm_bonuses = {aid: float(v) for aid, v in ckpt.get('arm_bonuses', {}).items()}
+        # Restore history (bilateral_flows keys back to tuples)
+        engine.state.history = []
+        for rd in ckpt.get('history', []):
+            if 'bilateral_flows' in rd:
+                restored_bf = {}
+                for k, v in rd['bilateral_flows'].items():
+                    parts = k.split('→')
+                    if len(parts) == 2:
+                        restored_bf[(parts[0], parts[1])] = v
+                    else:
+                        restored_bf[k] = v
+                rd['bilateral_flows'] = restored_bf
+            engine.state.history.append(rd)
+        # Restore agent memories
+        for aid, mem_dict in ckpt.get('agent_memories', {}).items():
+            if aid in agents:
+                agents[aid].memory = AgentMemory.from_dict(mem_dict)
+        # Restore network
+        if network and 'network_edges' in ckpt:
+            network.restore_edges(ckpt['network_edges'])
+        # Restore run state
+        resumed_pending = ckpt.get('pending_messages', {})
+        resumed_metrics = ckpt.get('all_round_metrics', [])
+        for bf_str in ckpt.get('bilateral_flows_history', []):
+            restored = {}
+            for k, v in bf_str.items():
+                parts = k.split('→')
+                if len(parts) == 2:
+                    restored[(parts[0], parts[1])] = v
+                else:
+                    restored[k] = v
+            resumed_bilateral.append(restored)
     
     def can_afford_any_action(resources: float, game_params: Dict) -> bool:
         """Check if agent can afford any action (all costs are %-based)."""
@@ -262,32 +590,34 @@ def run_simulation(game_params: dict,
               f"entropy_thr={es_entropy_threshold})")
 
     start_time = time.time()
-    all_round_metrics = []
+    all_round_metrics = resumed_metrics if resumed_metrics else []
     previous_actions_map = None
-    resource_changes_history = []  # For network rewiring payoff window
+    bilateral_flows_history = resumed_bilateral if resumed_bilateral else []
     comm_scope = game_params.get('comm_scope', 'none')
-    pending_messages = {aid: [] for aid in agent_ids}  # Messages to deliver next round
+    pending_messages = resumed_pending if resumed_pending else {aid: [] for aid in agent_ids}
 
+    # Checkpoint + log directory
+    log_dir = Path(__file__).parent.parent / "data" / "runs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir = log_dir / "checkpoints"
+    checkpoint_dir.mkdir(exist_ok=True)
+    checkpoint_path = checkpoint_dir / f"{run_id}_checkpoint.json"
+
+    # Live reasoning log — appended after each round so you can `tail -f`
+    reasoning_log_path = None
+    if run_id:
+        reasoning_log_path = log_dir / f"{run_id}_reasoning_live.jsonl"
+        d.p(f"{d.C('Live reasoning log:', 'dim')} {reasoning_log_path}")
+
+    start_round = engine.get_state().round_number  # 1 for fresh, >1 for resumed
     while not engine.is_game_over(max_rounds):
         state = engine.get_state()
         round_num = state.round_number
         
-        print(f"\n{'='*70}")
-        print(f"ROUND {round_num}/{max_rounds}")
-        print(f"{'='*70}")
-
-        # Network rewiring happens at END of round (after resource updates)
-        # No movement step needed — network is static within a round
-
-        # Show current resources at start of round
-        print("\n📊 Current Resources:")
-        for agent_id in agent_ids:
-            bonus = state.arm_bonuses.get(agent_id, 0)
-            armed_marker = f" [ARM +{bonus:.1f}]" if bonus > 0 else ""
-            print(f"  {agent_id}: {state.resources[agent_id]:.1f}{armed_marker}")
-        
-        print(f"\n🤔 Agent Decisions:")
-        print("-" * 70)
+        d.print_round_header(round_num, max_rounds)
+        d.print_resource_bars(state.resources, state.arm_bonuses, agent_ids)
+        if network:
+            d.print_network(agent_ids, network.get_neighbors)
         
         # Get history length from config
         history_length = game_params.get('history_length', 10)
@@ -347,25 +677,20 @@ def run_simulation(game_params: dict,
             for agent_id in order:
                 current_state = engine.get_state()
                 if not can_afford_any_action(current_state.resources[agent_id], game_params):
-                    print(f"\n{agent_id}: [BROKE - NO ACTION]")
+                    d.p(f"\n{d._ca(agent_id)}: {d.C('BROKE - NO ACTION', 'red')}")
                     round_log["actions"].append({"agent": agent_id, "action": "no_action", "reason": "insufficient_resources"})
                     continue
 
                 agent_id, action, reasoning = get_agent_action(agent_id, current_state)
                 action_desc = action.action_type.value + (f" → {action.target_id}" if action.target_id else "")
-                print(f"\n{agent_id}: {action_desc}")
-                print(f"  Reasoning: {reasoning}")
+                d.p(f"\n{d._ca(agent_id)}: {action_desc}")
 
                 result = engine.resolve_single_action(action)
                 round_log["actions"].extend(result["actions"])
                 round_log["combat_results"].extend(result.get("combat_results", []))
                 all_actions_this_round.append(action)
 
-                # Show immediate result for attacks
-                for combat in result.get("combat_results", []):
-                    attackers_str = ",".join(combat.get('attackers', []))
-                    winner_mark = "✓" if combat['winner'] == 'coalition' else "✗"
-                    print(f"    ⚔️ {attackers_str} vs {combat['defender']}: {combat['winner']} won {winner_mark} ({combat['attacker_win_prob']:.1%})")
+                d.print_combat_results(result.get("combat_results", []))
 
             # Tick arms and advance round
             engine.tick_arms()
@@ -392,59 +717,49 @@ def run_simulation(game_params: dict,
 
             action_details.sort(key=lambda x: agent_ids.index(x['agent']))
 
+            # Build display map and show reasoning
+            display_action_map = {}
             for detail in action_details:
-                action_desc = detail['action'].action_type.value
-                if detail['action'].target_id:
-                    action_desc += f" → {detail['action'].target_id}"
-                print(f"\n{detail['agent']}:")
-                print(f"  Action: {action_desc}")
-                print(f"  Reasoning: {detail['reasoning']}")
-
-            for aid in broke_agents:
-                print(f"\n{aid}: [BROKE - NO ACTION]")
-
-            print(f"\n" + "-" * 70)
-
+                aid = detail['agent']
+                display_action_map[aid] = {
+                    'action': detail['action'].action_type.value,
+                    'target': detail['action'].target_id,
+                }
             round_result = engine.resolve_round(actions)
 
-            # Show round results
-            print(f"\n⚡ Round Results:")
-            if round_result['resource_changes']:
-                print("  Resource changes:")
-                for agent_id, change in round_result['resource_changes'].items():
-                    if abs(change) > 0.01:
-                        sign = "+" if change > 0 else ""
-                        new_total = state.resources[agent_id]
-                        print(f"    {agent_id}: {sign}{change:.1f} (now: {new_total:.1f})")
+            # Collect notes for smart display
+            round_notes = {}
+            for aid in agent_ids:
+                agent = agents[aid]
+                if hasattr(agent, '_last_note') and agent._last_note:
+                    round_notes[aid] = agent._last_note
+                elif agent.memory and agent.memory.note_to_self:
+                    round_notes[aid] = agent.memory.note_to_self
 
-            if round_result.get('combat_results'):
-                print("\n  ⚔️  Combat outcomes:")
-                for combat in round_result['combat_results']:
-                    attackers_str = ",".join(combat.get('attackers', []))
-                    winner_mark = "✓" if combat['winner'] == 'coalition' else "✗"
-                    print(f"    {attackers_str} vs {combat['defender']}: {combat['winner']} won {winner_mark}")
-                    print(f"      (Win probability: {combat['attacker_win_prob']:.1%})")
+            d.print_agent_round_summary(display_action_map, round_notes, agent_ids)
+            d.print_combat_results(round_result.get('combat_results', []))
 
         # Collect and route messages for next round
+        # Messages are global — any agent can message any other agent
         if comm_scope != 'none':
             next_messages = {aid: [] for aid in agent_ids}
             msg_count = 0
+            other_agents = {aid: [x for x in agent_ids if x != aid] for aid in agent_ids}
             for aid in agent_ids:
                 msg = agents[aid].get_last_message()
                 if msg and msg.get('message'):
                     msg_to = msg.get('message_to')
-                    neighbors = network.get_neighbors(aid) if network else agent_ids
                     if msg_to == 'all' or comm_scope == 'broadcast':
-                        # Broadcast to all connected agents
-                        for nbr in neighbors:
-                            next_messages[nbr].append({
+                        # Broadcast to all other agents
+                        for target in other_agents[aid]:
+                            next_messages[target].append({
                                 'from': aid,
                                 'message': msg['message'],
                                 'channel': 'broadcast',
                             })
                         msg_count += 1
-                    elif msg_to and msg_to in (neighbors if network else agent_ids):
-                        # DM to specific agent
+                    elif msg_to and msg_to in other_agents[aid]:
+                        # DM to specific agent (any agent, not just neighbors)
                         next_messages[msg_to].append({
                             'from': aid,
                             'message': msg['message'],
@@ -460,8 +775,8 @@ def run_simulation(game_params: dict,
                     round_messages.append(msg)
             if round_messages:
                 round_result['messages'] = round_messages
-            if msg_count > 0:
-                print(f"  💬 Messages: {msg_count} sent this round")
+            if round_messages:
+                d.print_messages(round_messages)
 
         # Compute per-round metrics
         updated_state = engine.get_state()
@@ -472,10 +787,16 @@ def run_simulation(game_params: dict,
         )
         metrics['round'] = round_num
         metrics['resources'] = dict(updated_state.resources)
+
+        # Primary metric: network modularity Q(t)
+        current_history = updated_state.history if updated_state.history else []
+        metrics['modularity'] = _compute_round_modularity(current_history, window=5)
+
         all_round_metrics.append(metrics)
 
-        stability_str = f"{metrics['action_stability']:.0%}" if metrics['action_stability'] is not None else "n/a"
-        print(f"\n  Metrics: Gini={metrics['gini']:.3f}  Palma={metrics['palma']:.2f}  Stability={stability_str}")
+        # Display metrics dashboard with trends
+        prev_metrics = all_round_metrics[-2] if len(all_round_metrics) >= 2 else None
+        d.print_metrics_dashboard(metrics, prev_metrics)
 
         # Early stopping check (Phase 2: after min_rounds, check convergence)
         if early_stop_enabled:
@@ -487,9 +808,9 @@ def run_simulation(game_params: dict,
                 entropy_threshold=es_entropy_threshold,
             )
             if should_stop:
-                print(f"\n{'='*70}")
-                print(f"EARLY STOPPING at round {round_num}: {stop_reason}")
-                print(f"{'='*70}")
+                d.p(f"\n{d.C('=' * 70, 'bold')}")
+                d.p(d.C(f"EARLY STOPPING at round {round_num}: {stop_reason}", 'yellow'))
+                d.p(d.C('=' * 70, 'bold'))
                 early_stopped = True
                 early_stop_reason = stop_reason
                 break
@@ -538,16 +859,103 @@ def run_simulation(game_params: dict,
                     received_messages=pending_messages.get(aid, []),
                 )
 
+        # Append reasoning to live log (JSONL — one JSON object per round)
+        if reasoning_log_path:
+            # Build per-agent trace: extract reasoning from thinking or response
+            agent_traces = {}
+            for aid in agent_ids:
+                traces = agents[aid].get_reasoning_traces()
+                if not traces:
+                    continue
+                last = traces[-1]
+                thinking = last.get('thinking', '') or ''
+                response = last.get('response', '') or ''
+
+                # Extract reasoning text: prefer <think> block, fall back to response
+                if thinking:
+                    reasoning_text = thinking
+                elif response:
+                    # Gemini-style: reasoning + JSON in response. Split at first {
+                    brace = response.find('{')
+                    reasoning_text = response[:brace].strip() if brace > 0 else ''
+                else:
+                    reasoning_text = ''
+
+                # Extract the parsed action from round_result (authoritative)
+                action_entry = next(
+                    (a for a in round_result.get('actions', []) if a.get('agent') == aid),
+                    {}
+                )
+
+                agent_traces[aid] = {
+                    'action': action_entry.get('action', ''),
+                    'target': action_entry.get('target'),
+                    'reasoning': reasoning_text,
+                    'thinking': thinking if thinking else None,
+                    'note_to_self': agents[aid]._last_note,
+                    'tokens': last.get('usage', {}).get('total_tokens', 0),
+                    'latency_s': last.get('latency_s') or last.get('latency', 0),
+                    'prompt': last.get('prompt', ''),
+                    'response': response,
+                }
+
+            log_entry = {
+                'round': round_num,
+                # Embed config in first round for viewer
+                **({'config': {
+                    'reasoning_level': prompt_config.get('reasoning_level', 'unknown'),
+                    'rewiring_prob': game_params.get('rewiring_prob', 0),
+                    'comm_scope': game_params.get('comm_scope', 'none'),
+                    'num_agents': len(agent_ids),
+                    'max_rounds': game_params.get('max_rounds'),
+                    'model': openrouter_config.get('model', 'unknown'),
+                }} if round_num == 1 or round_num == start_round else {}),
+                # §3.5.1 Primary metrics
+                'primary': {
+                    'cooperation_ratio': metrics['cooperation_ratio'],
+                    'gini': metrics['gini'],
+                    'modularity': metrics['modularity'],
+                },
+                # §3.5.2 Secondary metrics
+                'secondary': {
+                    'palma': metrics['palma'],
+                    'action_stability': metrics['action_stability'],
+                    'action_distribution': metrics.get('action_distribution', {}),
+                },
+                # Per-agent state
+                'agents': {
+                    aid: {
+                        'resources': updated_state.resources[aid],
+                        'arm_bonus': updated_state.arm_bonuses.get(aid, 0.0),
+                        'breakdown': round_result.get('resource_breakdown', {}).get(aid, {}),
+                        **agent_traces.get(aid, {}),
+                    }
+                    for aid in agent_ids
+                },
+                # Events
+                'combat': round_result.get('combat_results', []),
+                'messages': [
+                    {'from': m.get('from'), 'to': m.get('message_to'), 'text': m.get('message', '')}
+                    for m in round_result.get('messages', [])
+                ],
+                # Network topology for viewer
+                'network': {
+                    'edges': network.get_edge_list() if network else [],
+                },
+            }
+            with open(reasoning_log_path, 'a') as f:
+                f.write(json.dumps(log_entry, default=str) + '\n')
+
         # Network rewiring (end of round, after resource updates)
         if network:
-            rc = round_result.get('resource_changes', {})
-            resource_changes_history.append(rc)
-            rewire_stats = network.rewire(resource_changes_history)
-            if rewire_stats['agents_rewired'] > 0:
-                print(f"  🔗 Network rewired: {rewire_stats['agents_rewired']} agents, "
-                      f"{rewire_stats['edges_dropped']} edges swapped")
+            bf = dict(round_result.get('bilateral_flows', {}))
+            bilateral_flows_history.append(bf)
+            rewire_stats = network.rewire(bilateral_flows_history)
+            d.print_network_rewire(rewire_stats)
 
-        print()
+        # Save checkpoint after each round (for resume)
+        save_checkpoint(checkpoint_path, engine, agents, network,
+                       pending_messages, bilateral_flows_history, all_round_metrics)
 
     elapsed = time.time() - start_time
     
@@ -563,34 +971,24 @@ def run_simulation(game_params: dict,
     # Final summary
     state = engine.get_state()
     rounds_played = state.round_number - 1  # Round number is incremented after last round
-    print(f"\n{'='*70}")
-    print("🏁 SIMULATION COMPLETE")
-    print(f"{'='*70}")
-    print(f"Total rounds: {rounds_played}")
-    print(f"Time elapsed: {elapsed:.1f}s ({elapsed/rounds_played:.1f}s per round)")
-    print(f"\n📈 Final Resources (sorted):")
-    sorted_resources = sorted(state.resources.items(), key=lambda x: x[1], reverse=True)
-    for rank, (agent_id, resources) in enumerate(sorted_resources, 1):
-        print(f"  {rank}. {agent_id}: {resources:.1f}")
-    
-    # Calculate statistics
-    total_resources = sum(state.resources.values())
-    avg_resources = total_resources / len(state.resources)
-    print(f"\n📊 Statistics:")
-    print(f"  Total resources in system: {total_resources:.1f}")
-    print(f"  Average per agent: {avg_resources:.1f}")
-    
-    # Count action types
-    action_counts = {}
+
+    d.print_final_summary(state.resources, state.arm_bonuses, agent_ids, elapsed,
+                          all_round_metrics)
+    d.p(f"  Rounds: {rounds_played}  ({elapsed/max(rounds_played,1):.1f}s/round)")
+
+    # Build round_summaries from history for action distribution
+    round_summaries = []
     for round_data in state.history:
+        rs = {}
         for action in round_data['actions']:
-            action_type = action.get('action', 'unknown')
-            action_counts[action_type] = action_counts.get(action_type, 0) + 1
-    
-    print(f"\n🎯 Action Distribution:")
-    for action_type, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True):
-        pct = (count / sum(action_counts.values())) * 100
-        print(f"  {action_type}: {count} ({pct:.1f}%)")
+            rs[action['agent']] = {
+                'action': action.get('action', 'unknown'),
+                'target': action.get('target'),
+            }
+        round_summaries.append(rs)
+
+    d.print_action_distribution(round_summaries)
+    d.print_agent_profiles(round_summaries, agent_ids, state.resources)
     
     # Run metadata
     run_metadata = {
@@ -623,24 +1021,59 @@ def run_simulation(game_params: dict,
 
 
 def main():
-    """Main entry point."""
-    # Load environment variables
-    load_dotenv()
-    
-    # Get project root
-    project_root = Path(__file__).parent.parent
-    
-    # Load configurations
-    game_params = load_config(project_root / "config" / "game_params.yaml")
-    openrouter_config = load_config(project_root / "config" / "openrouter_config.yaml")
-    
-    # Run simulation
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    state, traces, round_metrics, run_metadata = run_simulation(game_params, openrouter_config, run_id)
+    """Unified entry point for single runs and parameter sweeps.
 
-    # Save results
-    output_dir = project_root / "data" / "runs"
-    save_results(state, traces, round_metrics, output_dir, run_id, run_metadata)
+    Usage:
+        # Single run with config YAMLs:
+        python src/main.py --game config/sweetspot_game.yaml --api config/sweetspot_openrouter.yaml
+
+        # Parameter sweep:
+        python src/main.py --sweep experiments/reasoning_depth_pilot.yaml
+
+        # Single run from sweep (for SLURM array jobs):
+        python src/main.py --sweep experiments/reasoning_depth_pilot.yaml --run-index 0
+
+        # Batch of runs from sweep:
+        python src/main.py --sweep experiments/reasoning_depth_pilot.yaml --run-index 0 --batch-size 5
+    """
+    import argparse
+    parser = argparse.ArgumentParser(description="Run simulation or parameter sweep")
+    parser.add_argument('--game', type=str, default=None, help='Game params YAML (default: config/game_params.yaml)')
+    parser.add_argument('--api', type=str, default=None, help='API config YAML (default: config/openrouter_config.yaml)')
+    parser.add_argument('--output', type=str, default=None, help='Output directory (default: data/runs)')
+    parser.add_argument('--sweep', type=str, default=None, help='Experiment YAML for parameter sweep')
+    parser.add_argument('--run-index', type=int, default=None, help='Run single (condition, rep) by index (for SLURM array jobs)')
+    parser.add_argument('--batch-size', type=int, default=1, help='Number of consecutive runs per job (default: 1)')
+    parser.add_argument('--resume', type=str, default=None, help='Resume from checkpoint JSON (saves after each round)')
+    args = parser.parse_args()
+
+    if args.sweep:
+        # Sweep mode — delegate to sweep module
+        from sweep import run_sweep, run_single, run_batch
+        if args.run_index is not None:
+            if args.batch_size > 1:
+                run_batch(args.sweep, args.run_index, args.batch_size)
+            else:
+                run_single(args.sweep, args.run_index)
+        else:
+            run_sweep(args.sweep)
+    else:
+        # Single run mode
+        load_dotenv()
+        project_root = Path(__file__).parent.parent
+
+        game_path = Path(args.game) if args.game else project_root / "config" / "game_params.yaml"
+        api_path = Path(args.api) if args.api else project_root / "config" / "openrouter_config.yaml"
+        game_params = load_config(game_path)
+        openrouter_config = load_config(api_path)
+
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        state, traces, round_metrics, run_metadata = run_simulation(
+            game_params, openrouter_config, run_id, resume_path=args.resume
+        )
+
+        output_dir = Path(args.output) if args.output else project_root / "data" / "runs"
+        save_results(state, traces, round_metrics, output_dir, run_id, run_metadata)
 
 
 if __name__ == "__main__":

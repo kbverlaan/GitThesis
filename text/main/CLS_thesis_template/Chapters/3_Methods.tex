@@ -31,6 +31,8 @@
 %   Nieuwe structuur: tuple definitie → per onderdeel uitwerken.
 %   Hieronder de voorgestelde opbouw met instructies per deel.
 
+Our game is designed to produce rich emergent dynamics by utilizing minimally sufficient components, following the \textit{Generative Sufficiency} precedent set by Epstein (2006). The step away from classical games researched thoroughly in game theory, such as the Prisoners Dilemma or Stag Hunt, is motivated by the absence of emergent behaviour possible using large-language model driven agent architectures. The six actions prove to be rich enough for dynamics such as coalition-forming, arms races, bandwagoning, mobbing, hierachies and signalling, where classical games simply wouldn't suffice without modifications. 
+
 Our coordination game is defined as a tuple $G = \langle \mathcal{N}, \mathcal{S}, \mathcal{A}, O, T, u \rangle$:
 
 \begin{itemize}
@@ -50,19 +52,28 @@ Additionally, a single H100 is able to process 32 concurrent sequences in vLLM. 
 
 % ---------------------------------------------------------------------------
 % TODO: Koen — STATE S (kort, 3-5 zinnen)
-%   - Resources R_i(t): non-negative reals, initial R_i(0) = 100 for all i
-%   - Arm bonuses B_i(t): combat bonus, decays by δ each round
+%   - Resources R_i(t): non-negative reals, initial R_i(0) = 25 for all i
+%     (was 100 in earlier design; lowered to make 5% decay meaningful and
+%     create genuine scarcity pressure within ~20 rounds)
+%   - Arm bonuses B_i(t): combat bonus, decays by δ=0.5 each round
 %   - Network G(t) = (V, E(t)): verwijs naar §3.1.1 (Interaction Topology)
 %     voor initialisatie (ER graph) en rewiring mechanism
 %   - %-based economy: scale invariance, both rich and poor face same dilemmas
 %     → \cite{EpsteinAxtell1996}
+%   - Resource decay: r_decay=5% per round. Prevents indefinite accumulation,
+%     creates pressure to invest (hoarding loses value). Without decay,
+%     do_nothing becomes dominant for rich agents.
 % ---------------------------------------------------------------------------
 
 %STATE S
 The state $S$ is defined by two vectors and a network. 
 Resources $R_i(t)$ is a vector of non-negative reals and is initialized for all agents at $R_i = 100$. 
 Arm bonuses $B_i(t)$ are also tracked through a vector and represent an agent's strenght during combat when summed with their resources. Every round, all arm bonuses decay with $\delta$.
+
 The network 
+For a detailed explanation of the network topology, see \ref{sec:topology}.
+
+All costs and returns are a percentage of the actor's resources $R_i(t)$. This design choice rests on assuring scale invariance, meaning both rich and poor agents face similar dilemmas disregarding their wealth and aligns with canonical ABM practice. %add cite epstein&axtell
 
 
 % ---------------------------------------------------------------------------
@@ -70,17 +81,39 @@ The network
 %   Dit is het langste deel — de acties zijn het hart van het model.
 %   Behoud de bestaande tekst hieronder, maar frame het expliciet als
 %   "Action Set" met de cooperative/military/passive driedeling.
+%
+% TODO: Koen — INVEST SATURATION (diminishing returns)
+%   Geïmplementeerd: invest_saturation_decay=0.8, invest_saturation_window=5.
+%   Herhaalde investeringen naar dezelfde target geven afnemend rendement.
+%   return_multiplier = saturation_decay^(count_in_window). Na 5 rondes
+%   investeren in dezelfde agent: 0.8^5 = 0.33× van originele return.
+%   Motivatie: voorkomt dat 2 agents een permanent invest_other loop vormen
+%   (A→B→A→B...). Forceert diversificatie van investment partners.
+%   Emergent gevolg in exploratory runs: "DR-pauses" — agents pauzeren
+%   investeringen om saturation window te resetten. Beschrijf in Results.
+%
+% TODO: Koen — INVEST_SELF OFF by default
+%   invest_self is uitgeschakeld (allow_invest_self: false).
+%   Zelfs +0.5% netto is triviaal dominant vs invest_other's -10% cost.
+%   Met invest_self AAN kiest L1 altijd invest_self → geen sociaal dilemma.
+%   Motivatie: verwijderen maakt invest_other vs militair vs passief de
+%   echte keuze. Mention as design decision, not afterthought.
 % ---------------------------------------------------------------------------
 
-Our game is designed to produce rich emergent dynamics by utilizing minimally sufficient components, following the \textit{Generative Sufficiency} precedent set by Epstein \cite{?}. The step away from classical games researched thoroughly in game theory, such as the Prisoners Dilemma or Stag Hunt, is motivated by the absence of emergent behaviour possible using large-language model driven agent architectures. The six actions prove to be rich enough for dynamics such as coalition-forming, arms races, bandwagoning, mobbing, hierachies and signalling, where classical games simply wouldn't suffice without modifications. Our game can be seen as an extension to the classical stag hunt, though staying minimal to causually analyse the outcomes.
-
-All costs and returns are a percentage of the actor's resources $R_i(t)$. This design choice rests on assuring scale invariance, meaning both rich and poor agents face similar dilemmas disregarding their wealth and aligns with canonical ABM practice \cite{EpsteinAxtell1996}.
 There are two \textbf{cooperative} actions, \texttt{invest\_other} and \texttt{invest\_self}, which grow the total economy. However, investing in another agent costs the actor $c_{\text{inv}}\%$ of their resources, making the action only valuable for their own wealth if they expect reciprocity in the following rounds. Investing in oneself removes that uncertainty, but the net percentage gain ($g_{\text{self}}$) is smaller and the actor is limited by their own wealth. Both actions simultaneously exhibit a signalling function: investing in others can be seen as goodwill, trust and an invitation for cooperation, while investing in oneself can be seen as asocial, though practical. Additionally, the cost of investing in another agent ($c_{\text{inv}}$) is smaller than the return for the target ($r_{\text{inv}}$), creating a social dilemma: individually investing is costly, but collectively the action is net-positive.
 
 Three \textbf{military} actions introduce additional dynamics: \texttt{arm\_self} creates extra combat power ($B_i$) for a limited time and can be used both offensively and defensively. Seeing a neighbor arm themselves poses a threat either way, as their intentions are not known to the agent. Actors can also decide to \texttt{arm\_other}, increasing the combat power of a neighbor. Arming other agents can signal extreme trust and enables stronger agents to substantially strengthen a weaker neighbor for a limited time. The combat bonuses are subject to a decay ($\delta$) to prevent permanent escalation. Keeping high combat bonuses requires repeated arming. %baliga 2004 cite, maar nog niet gelezen!
 
 % TODO: Koen — attack sterker schrijven: dit is de actie die alles drijft!
-The \texttt{attack} action is a direct way to transfer wealth between agents. Both the actor and target pay conflict cost ($c_{\text{war}}$) after which their chances of winning the conflict is decided by the ratio of their resources + combat bonus. The winner takes $\alpha\%$ of the losers resources, disregarding who was the initiator of the attack.
+The driving force in the game is the \texttt{attack} action. Both the actor and target pay conflict cost ($c_{\text{war}}$) after which their chances of winning the conflict is decided by the ratio of their resources $R_i$ + arm bonus $B_i$. Conflicts are probalistically resolved, meaning the stronger agent is more probable to win than the weaker one. The winner takes $\alpha\%$ of the losers resources, irrespective to who was the initiator of the attack.
+When multiple agents attack a single target in same round, either through cooperation or chance, their combat strength combines into a single coalition attack. If the defender loses the conflict, $\alpha\%$ will be split proportionally by strenght contribution. Defenders always stand alone in our game. Arming other becomes the effective mechanism for strengthening coalition partners defensively.
+
+Because all actions happen simulatenously, an agent involved in multiple conflicts wil use their snapshotted strength in combat. An agent can lose at most 
+% what if an agents loses in multiple combats in one round? Can they lose more than alpha? if losses stack, an agent can potentially have negative resources. hmm this is an important design question. No wait, you can only be in 2 conflicts per round (if you attack) and you get attacked. If multiple agents attack you, they form a coalition. Okay, then as long as alpha is not more than 45%, its fine. agents can risk severe losses, when fighting 2 conflicts, but it makes sense!
+% where do we drop that its not entirely simultaneous but non-conflict actions come before millitarry.
+
+
+
 % TODO: Koen — combat is probabilistisch (Lanchester-type), niet deterministisch.
 %   Sterkere agent wint WAARSCHIJNLIJKER, niet altijd. 1 zin toevoegen.
 % TODO: Koen — coalition attacks toevoegen:
@@ -95,7 +128,7 @@ The \texttt{attack} action is a direct way to transfer wealth between agents. Bo
 %   Interesting interaction with communication scope IV: DM enables secret
 %   coordination of attacks, broadcast enables public calls-to-arms.
 
-Lastly, agents are allowed to do nothing in any given round with the \texttt{do\_nothing} action. Although the action itself costs nothing and gains nothing in terms of resources, the loss of opportunity is to be considered.
+Lastly, a single \textbf{passive} action allows agents to do nothing in any given round. Although the action itself costs nothing and gains nothing in terms of resources, the loss of opportunity is to be considered.
 
 % ---------------------------------------------------------------------------
 % TODO: Koen — OBSERVATION O (kort, 4-5 zinnen)
@@ -107,6 +140,20 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   - Dit is NIET de IV — hidden resources en memory zijn base defaults.
 %     De IV is network rewiring w (§3.3.2), die bepaalt WIE je buren zijn.
 % ---------------------------------------------------------------------------
+
+% TODO: Koen — OBSERVATION update: hide_resources is nu CONFIGURABLE
+%   In de exploratory/case study: hide_resources=false (agents zien
+%   elkaars resources). Motivatie: met hidden resources kunnen agents
+%   geen EV berekeningen maken → defaulten naar coöperatie uit
+%   onzekerheid ipv uit strategisch denken. Dit confoundt reasoning
+%   depth effecten. Met visible resources is reasoning depth het
+%   verschil in HOE ze over dezelfde informatie redeneren.
+%   In het full factorial kan hide_resources terug als aparte conditie.
+%   NB: dit wijkt af van de eerdere design decision in §3.3.2 waar
+%   hidden resources als "base default" stond. Heroverweeg framing.
+Agents are able to fully observe their own resources $R_i$ and arm bonus $B_i$. On default, the resources of their neighbours are hidden, creating type uncertainty. %cite harsanyi, perhaps change it to visible again. agents cant compute evs and default to cooperation. confound could be moralistic prompting.
+Actions and combat outcome involving direct neighbours are visible and accumulate in memory (see \ref{sec:memory})
+
 
 % ---------------------------------------------------------------------------
 % TODO: Koen — TRANSITION FUNCTION T (dit is nu NERGENS expliciet!)
@@ -138,6 +185,22 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   - %-based: scale invariance
 %   - Snapshot combat: geen volgorde-afhankelijkheid bij meerdere gevechten
 %   - Non-attack before attack: arm bonuses tellen mee in combat dezelfde ronde
+%
+% TODO: Koen — RESOURCE DECAY toevoegen aan T
+%   Step 7: Resource decay: R_i(t+1) *= (1 - r_decay), r_decay=5%.
+%   Alle agents verliezen 5% resources per ronde. Motivatie:
+%   (1) Voorkomt indefinite accumulation — rijke agents kunnen niet passief
+%       blijven zitten. Maakt do_nothing actief kostbaar.
+%   (2) Creëert druk om te investeren (economy moet groeien om decay te compenseren)
+%   (3) Natuurlijke convergence pressure — ongelijkheid daalt over tijd
+%       tenzij actief onderhouden door investeringen of plundering.
+%   In exploratory runs: Gini daalde van 0.445→0.317 mede door decay.
+%
+% TODO: Koen — RESOURCE BREAKDOWN
+%   Engine tracked per-agent per-round breakdown: invest_self, invest_received,
+%   invest_cost, arm_cost, conflict_cost, combat_transfer, decay.
+%   Logged in JSONL voor post-hoc analyse. Noem in Methods als
+%   "accounting transparency" — elke resource verandering is traceerbaar.
 % ---------------------------------------------------------------------------
 
 % ---------------------------------------------------------------------------
@@ -149,6 +212,7 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   - Dit is ook de basis voor network rewiring: "lowest cumulative payoff"
 %     neighbour wordt ge-dropped (§3.1.1)
 % ---------------------------------------------------------------------------
+
 
 \begin{table}[ht]
 \centering
@@ -162,38 +226,52 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
     & Agent pays $c_{\text{inv}}\%$ of $R_i$; target $j$ receives $r_{\text{inv}}\%$ of $R_i$. Grows the total economy.
     & $c_{\text{inv}}$ / $r_{\text{inv}}$
     & 10\% / 15\% \\[6pt]
-\texttt{invest\_self}\textsuperscript{a}
+\texttt{invest\_self}
     & Agent gains $g_{\text{self}}\%$ of $R_i$ (no cost).
     & $g_{\text{self}}$
     & 2\% \\[6pt]
+% TODO: Koen — arm_multiplier bijgewerkt naar 3.0 (was 2.0). Motivatie:
+%   Bij m=2.0 was arming te zwak om attack af te schrikken (EV van attack
+%   bleef positief). Bij m=3.0 creëert 1 ronde arming genoeg afschrikking
+%   dat attack EV-negatief wordt tegen bewapende agents.
 \texttt{arm\_self}
     & Agent pays $c_{\text{arm}}\%$ of $R_i$ (removed from economy); combat bonus $B_i$ increases by $c_{\text{arm}} \cdot m$. Bonus decays by $\delta$ each round.
     & $c_{\text{arm}}$ / $m$ / $\delta$
-    & 10\% / 2.0 / 0.5 \\[6pt]
+    & 10\% / 3.0 / 0.5 \\[6pt]
 \texttt{arm\_other}$(j)$
     & Agent pays $c_{\text{arm},j}\%$ of $R_i$ (removed from economy); target $j$'s combat bonus $B_j$ increases by $c_{\text{arm},j} \cdot m$.
     & $c_{\text{arm},j}$
     & 10\% \\[6pt]
 \texttt{attack}$(j)$
     & Both pay $c_{\text{war}}\%$ of own resources. Combat strength $s_i = R_i + B_i$. If multiple agents attack the same target, their strengths combine. Win probability $p = \sum s_{\text{atk}} / (\sum s_{\text{atk}} + s_{\text{def}})$. Winner takes $\alpha\%$ of loser's resources; coalition spoils split proportionally by strength.
+% TODO: Koen — attack_take_pct bijgewerkt: α=50% in case study (was 40% in tabel,
+%   25% in eerdere sweetspot). Bij α=25% was attack te zwak en werd invest_other
+%   triviaal dominant. Bij α=50% is attack een echte bedreiging die
+%   strategisch denken vereist. conflict_cost_pct=1% (was 5%) zodat combat
+%   goedkoop is om te initiëren maar de stakes (α=50%) hoog zijn.
     & $c_{\text{war}}$ / $\alpha$
-    & 5\% / 40\% \\[6pt]
+    & 1\% / 50\% \\[6pt]
 \texttt{do\_nothing}
     & No cost, no effect.
     & ---
     & --- \\[6pt]
 \hline
+% TODO: Koen — resource_decay_pct en invest_saturation toevoegen aan tabel
+\textbf{Economy} & \textbf{Description} & \textbf{Parameter} & \textbf{Default} \\
+\hline
+    & Resource decay per round & $r_{\text{decay}}$ & 5\% \\
+    & Invest saturation decay factor & $\gamma_{\text{sat}}$ & 0.8 \\
+    & Invest saturation window & $w_{\text{sat}}$ & 5 rounds \\
+    & Allow invest\_self action & --- & off \\
+\hline
 \textbf{Simulation} & \textbf{Description} & \textbf{Parameter} & \textbf{Default} \\
 \hline
     & Number of agents & $n$ & 30 \\
-    & Initial resources per agent & $R_i(0)$ & 100 \\
-    & Hard cap (with early stopping) & \texttt{max\_rounds} & 50 \\
+    & Initial resources per agent & $R_i(0)$ & 25 \\
+    & Hard cap (with early stopping) & \texttt{max\_rounds} & 60 \\
     & LLM sampling temperature & $T$ & 0.7 \\
 \hline
 \end{tabular}
-
-\vspace{4pt}
-{\footnotesize \textsuperscript{a} Disabled by default. Even a net $+2\%$ gain makes \texttt{invest\_self} trivially dominant at L1, collapsing all agents to self-investment. Tested separately in OAT screening (Section~\ref{sec:oat}).}
 \end{table}
 
 \subsection{Interaction Topology}
@@ -213,7 +291,9 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   2. NETWORK STRUCTURE (formeel):
 %      - G(t) = (V, E(t)): undirected, unweighted social network
 %      - V = N (all agents), E(t) evolves over time
-%      - Initial network: Erdős-Rényi G(n, p) with expected degree ⟨k⟩ ≈ 4-6
+%      - Initial network: Erdős-Rényi G(n, p) with expected degree ⟨k⟩ ≈ 5
+%        (was 3.0 bij 10 agents, opgehoogd naar 5.0 bij 30 agents zodat
+%        agents genoeg interactiepartners hebben voor emergent structuur)
 %        Connected component guaranteed at initialization
 %      - Agents can only interact with direct neighbours: N_i(t) = {j : (i,j) ∈ E(t)}
 %
@@ -257,6 +337,8 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   - Akçay (2018, Nature Comms) — cautionary: cooperation can collapse networks
 %   - Su, McAvoy & Plotkin (2023, Nature Comput. Sci.) — temporal variation itself
 %     is a cooperation mechanism
+
+As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfair that agents potentially only drop 1 connection and gain one? That means agents can never create more connections than theyre initialized with? Should the reconnecting also be smart? Or is connecting to a random non-neighbor automatically beneficial to lesser connected agents?
 
 % -----------------------------------------------------------------------------
 % SECTION 3.2: Agent Architecture and Model Selection
@@ -312,6 +394,32 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %
 %   Prompt is deterministic given state — same state = same prompt.
 %   Full prompt text in Appendix.
+%
+% TODO: Koen — NOTE-TO-SELF toevoegen
+%   Elke agent schrijft een private strategische notitie (max 500 chars)
+%   als onderdeel van hun JSON response. Deze note_to_self wordt ALLEEN
+%   aan diezelfde agent getoond in de volgende ronde. Andere agents zien
+%   het niet. Motivatie:
+%   (1) Simuleert private strategic planning — agents kunnen allianties
+%       tracken, EV berekeningen opslaan, defectie onthouden.
+%   (2) Wordt meegenomen als behavioral data: de inhoud van notes
+%       onthult strategisch denken (b.v. "ATTACK agent_2. Isolated. EV positive.")
+%   (3) Zonder note-to-self geen multi-round planning mogelijk — agent
+%       ziet alleen memory window, geen eigen intenties van vorige ronde.
+%   In exploratory runs: agents gebruiken notes voor EV berekeningen,
+%   alliance tracking, defection detection, en target prioritering.
+%
+% TODO: Koen — MESSAGING + TIMING toevoegen
+%   Pre-action messaging phase (comm_scope=dm):
+%   - Agent stuurt optioneel 1 bericht naar 1 neighbor (of null).
+%   - Berichten worden pas VOLGENDE ronde bezorgd. Geen same-round
+%     coördinatie mogelijk — dit is expliciet in de prompt vermeld.
+%   - Motivatie timing: voorkomt dat agents berichten als binding
+%     commitment gebruiken ("ik investeer als jij investeert" → check).
+%     Nu is communicatie cheap talk met vertraging → echte onzekerheid.
+%   - Inbox (ontvangen berichten) getoond in prompt + opgeslagen in memory.
+%   - Outbox (verzonden berichten) ook in memory zodat agent eigen
+%     beloftes kan tracken via note-to-self.
 %
 % TODO: 3.2.3 — Memory architecture
 \subsection{Agent Memory}
@@ -644,6 +752,19 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %
 %   STATUS: design only, depends on Phase 2c results and compute budget.
 
+% TODO: Koen — 3.4.X — CASE STUDY (30 agents, 60 rounds)
+%   Eén deep exploratory run vóór full factorial.
+%   Doel: kwalitatieve observatie van emergent structuur bij schaal.
+%   Config: 30 agents, R_i(0)=25, ⟨k⟩=5, w=0.1, comm_scope=dm,
+%   reasoning_level=L2, max_rounds=60, alle andere params = sweetspot.
+%   Geen statistische analyse — 1 run, geen reps. Beschrijf als
+%   "illustrative case study" in Results, niet als bewijs.
+%   Motivatie: 10-agent exploratory toonde pact-vorming, parasitisme,
+%   en DR-pauses. Vraag: schalen deze patronen? Ontstaan er
+%   macro-structuren (handelsblokken, hiërarchieën) bij 30 agents
+%   die fundamenteel anders zijn dan bij 10?
+%   Infrastructuur: 1× H100, vLLM Qwen3.5-27B, ~3h runtime.
+
 % TODO: 3.4.6 — Robustness
 \subsection{Robustness Checks}
 %   - All runs: unique seed, full config, model version, hardware, vLLM
@@ -756,6 +877,29 @@ Lastly, agents are allowed to do nothing in any given round with the \texttt{do\
 %   - ThreadPoolExecutor: N_agents concurrent requests per round
 %   - All configs, traces, and results saved as JSON
 %   - Infra metadata logged: SLURM job ID, node, GPU info, timestamps
+%
+% TODO: Koen — CHECKPOINTING toevoegen
+%   Na elke ronde: full checkpoint JSON (engine state, agent memories,
+%   pending messages, network edges, all metrics). Enables:
+%   (1) Resume na timeout/crash — essentieel bij 3h SLURM limiet
+%       voor 60-round runs. Resumed runs krijgen nieuw run ID maar
+%       continuëren exact dezelfde simulatie.
+%   (2) Post-hoc analyse op elk punt in de run
+%   (3) Backwards compatibility: checkpoint format includes round_number,
+%       resources, arm_bonuses, history, agent_memories, network_edges.
+%
+% TODO: Koen — LIVE JSONL LOG toevoegen
+%   Primaire data output: JSONL file (1 JSON object per ronde).
+%   Per ronde bevat:
+%   - Round number, config (round 1 only)
+%   - Metrics: f_C, Gini, Q, Palma, stability, action distribution
+%   - Per agent: resources, action, target, reasoning trace (thinking),
+%     note_to_self, token count, latency, resource breakdown
+%   - Combat results: attacker(s), defender, win probability, transfer
+%   - Messages: sender, recipient, content
+%   - Network edges (voor viewer graph)
+%   JSONL format: append-only, crash-safe, streambaar.
+%   Viewer (viewer.html) kan JSONL laden voor interactieve analyse.
 %
 % TODO: 3.6.4 — Quantization decision
 %   - FP8 quantization benchmarked (Mar 2): 238s/round vs 188s/round bf16

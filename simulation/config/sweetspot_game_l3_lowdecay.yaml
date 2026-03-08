@@ -1,0 +1,48 @@
+# L3 test run — low decay, 10 agents, 15 rounds
+# Purpose: test neutral L3 prompt (ToM second-order) + timing clarification
+# Budget: ~$1.50 on OpenRouter
+# Key changes vs sweetspot_game.yaml:
+#   - 10 agents (more interaction), 15 rounds
+#   - resource_decay_pct: 2% (not 5% — reduces poverty trap dominance)
+#   - invest_other_return_pct: 12% (not 15% — surplus +2% ≈ decay, cooperation alone barely sustains)
+#   - attack_take_pct: 50% (higher stakes — conflict needed to grow, not just survive)
+#   - conflict_cost_pct: 1% (lower barrier to attack)
+#   - invest_self OFF (forces interaction)
+#   - invest_saturation (diminishing returns on repeated same-pair investment)
+
+num_agents: 10
+initial_resources: 100.0
+
+invest_self_pct: 0.5
+invest_other_cost_pct: 10
+invest_other_return_pct: 12
+invest_saturation_decay: 0.8
+invest_saturation_window: 5
+allow_invest_self: false
+
+arm_cost_pct: 10
+arm_multiplier: 5.0
+arm_decay: 0.5
+
+attack_take_pct: 50
+combat_max_loss_pct: 75
+conflict_cost_pct: 1
+resource_decay_pct: 2
+
+max_rounds: 25
+history_length: 10
+
+action_order: "simultaneous"
+
+network_enabled: true
+mean_degree: 4.0
+rewiring_prob: 0.1
+payoff_window: 3
+
+comm_scope: "dm"
+
+memory:
+  enabled: true
+  window_size: 10
+
+note_to_self: true

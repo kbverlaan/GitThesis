@@ -1,234 +1,258 @@
-# Thesis Quality Checklist: Publishable Standard
+# Publication Checklist: AAMAS-Targeted
 
-## Context
-MSc Computational Science thesis on reasoning depth × game structure → emergent social structure in LLM multi-agent systems. This checklist ensures every experiment, analysis, and writing decision meets publishable quality standards.
+## Target Venue
+**AAMAS 2027** (Main Track). 8 pages + unlimited references. Double-blind.
+Submission ~Oct 2026, notification ~Dec 2026, conference May 2027.
+Thesis deadline July 15, 2026 — thesis is primary, paper is extracted from it.
+
+## Template: Kuusela & Roy (AAMAS 2024)
+Debraj's paper structure: ~0.75p intro, ~1p background, ~2.5p methods, ~3.5p results, ~0.75p discussion.
+**Results dominate** (39%). Methods are formal but readable. Discussion is tight — under one page.
+Declarative result section titles ("Cost Uncertainty Promotes Pre-Emptive Attacks").
+Heavy appendix usage: sensitivity, algorithm details, proofs all deferred.
 
 ---
 
-## 1. Experimental Design
+## 1. The Story (Writing Science — OCAR)
 
-### Reproducibility (non-negotiable)
-- [ ] Every run has a unique, logged random seed
-- [ ] Model version, API endpoint, and exact date logged per run
-- [ ] Temperature fixed and documented (justify choice)
-- [ ] Full prompt text versioned in repo — any change = new version number
-- [ ] Hardware specs logged (GPU type, vLLM version, batch size)
-- [ ] Complete config file saved per run (all parameters, not just swept ones)
-- [ ] Code committed to git before each batch of runs — tag with experiment ID
+A paper is an argument, not a data dump. Every section serves the narrative arc.
+
+### Opening: Why should the reader care?
+- [ ] Open with Hobbes's question: how does order emerge from anarchy?
+  - Kuusela & Roy: "There is at least one civilisation in the universe. What if there are more?"
+  - Ours: "Hobbes identified three conditions that prevent social order: rational self-interest, uncertainty, and the absence of enforcement. We test all three — independently — in a society of LLM agents."
+- [ ] Frame connects to real-world stakes: AI agent deployment, multi-agent coordination, institutional design for AI systems
+- [ ] First paragraph is readable by any CS researcher, not just MAS specialists
+
+### Challenge: What's hard / unknown / counterintuitive?
+- [ ] State the naive expectation explicitly so you can break it
+  - "One might expect that smarter agents cooperate more, that more information reduces conflict, and that communication enables peace..."
+  - "Kuusela & Roy showed higher reasoning reinforces conflict in 2-agent RL. Does this hold across all three Hobbesian conditions in N-agent LLM systems?"
+- [ ] Identify the gap precisely: mechanism design has three inputs (solution concept, type space, message space) — nobody has varied all three in multi-agent LLMs
+- [ ] The gap is between existing work, not just "nobody did X"
+- [ ] Note: Hobbes mapping is narrative (with caveats on info→diffidence); mechanism design mapping is the formal backbone
+
+### Action: What did we do? (Methods + Experiments)
+- [ ] Game formally specified (states, actions, transitions, rewards) — AAMAS expects this
+- [ ] Three IVs operationalized as mechanism design inputs (solution concept, type space, message space)
+- [ ] Experiments build logically: each IV gets its own experiment block
+  - Exp 1: System characterisation (parameter screening)
+  - Exp 2: Reasoning depth (solution concept) — L0-L3 × game structure
+  - Exp 3: Information (type space) — visibility/memory manipulation
+  - Exp 4: Communication & enforcement (message space) — no-comm → cheap talk → contracts
+- [ ] Number and enumerate experiments at the start of Results section (Kuusela does this)
+
+### Resolution: What did we find? So what?
+- [ ] The counterintuitive finding IS the resolution — state it cleanly
+- [ ] Connect back to the opening stakes
+- [ ] Limitations are honest, not defensive (Kuusela lists 3 key assumptions and calls one "clearly not valid")
+- [ ] Future work is concrete and brief (2-3 sentences max)
+
+---
+
+## 2. The Counterintuitive Finding
+
+**This is what makes the paper publishable.** Debraj's pattern: set up an expectation, then break it with data.
+
+### Candidates from our work (must validate on Qwen 3.5)
+- [ ] "More reasoning → more conflict" (Kuusela replication in LLM domain) — but is it that simple?
+- [ ] Non-monotonic pattern: L0 cooperative, L1 strategic, L2 defensive, L3 exploitative — reasoning doesn't monotonically help OR hurt
+- [ ] "Deeper reasoning amplifies structural incentives" — L0 is blind to game params, L2/L3 respond explosively
+- [ ] The cooperate-then-strike strategy: L3 cooperates MORE than L2 (47% vs 34%) but attacks 4× more (8% vs 2%)
+- [ ] "No reasoning level escapes the Hobbesian trap" — but credible commitment does?
+
+### Requirements for the finding
+- [ ] Must survive replication on Qwen 3.5 (all Gemma 2 results are exploratory)
+- [ ] Must be robust to base parameter choice (that's what the sweeps test)
+- [ ] Must be statistically significant with proper CIs
+- [ ] Must be explainable — WHY does this happen? (reasoning traces as evidence, not proof)
+
+---
+
+## 3. Experimental Design
+
+### Formal Game Specification (AAMAS requirement)
+- [ ] Full formal model: states, action space, observation function, transition dynamics, reward function
+- [ ] %-based economy formally defined (not just described in code comments)
+- [ ] Spatial structure formally defined (grid, radius, visibility)
+- [ ] Reasoning levels operationalized with exact prompt text (appendix)
+
+### Experiment Progression (Kuusela's pattern)
+- [ ] **Exp 1: System characterisation** — baseline behaviour under parameter variation (the OAT sweeps)
+- [ ] **Exp 2: Reasoning depth main effect** — L0/L1/L2/L3 at fixed game params
+- [ ] **Exp 3: The interaction** — reasoning depth × game structure (the key finding)
+- [ ] **Exp 4: Credible commitment** — can contracts break what no reasoning level escapes? (separate chapter/paper?)
+- [ ] Each experiment has a declarative title that states its conclusion
 
 ### Statistical Power
-- [ ] Minimum 20 runs per condition (more for noisy conditions)
-- [ ] Power analysis conducted: pilot 5-10 runs → estimate ICC and effect sizes → simulate power (simr in R) targeting 80% power at d ≥ 0.5
-- [ ] If underpowered, acknowledge explicitly and report effect sizes + confidence intervals anyway
-- [ ] Document finite-size effects: at N=30, fluctuations scale as O(1/√30) ≈ 18%
+- [ ] Minimum 20 runs per condition for production experiments
+- [ ] Power analysis from pilot data (ICC, effect sizes → simr)
+- [ ] If underpowered: acknowledge, report effect sizes + CIs anyway
 
-### Controls
-- [ ] Every manipulation has a well-defined control condition
-- [ ] Reasoning levels (L0-L3) operationalized with exact prompt text, not just descriptions
-- [ ] Order effects controlled: randomize option presentation in prompts
-- [ ] No authority cues or sycophancy-inducing language in prompts (Sharma et al., 2023)
-- [ ] Base parameters create genuine dilemmas (arm_cost > 0, verified via sweep)
+### Controls & Reproducibility
+- [ ] Every run: unique seed, full config, model version, hardware, vLLM version logged
+- [ ] Temperature fixed and documented
+- [ ] Code tagged in git per experiment batch
+- [ ] Prompt text versioned — any change = new version number
 
 ---
 
-## 2. Statistical Analysis
+## 4. Analysis
 
-### Model Specification
-- [ ] Mixed-effects models with proper nesting: `Outcome ~ Condition * GameParam + Round + Round² + (1|RunID)`
-- [ ] Justify random effects structure (RunID as clustering variable — the simulation run is the unit of analysis, not the individual agent decision)
-- [ ] Report ICC to quantify within-run clustering
-- [ ] Use Satterthwaite approximation for degrees of freedom (lmerTest)
-- [ ] Check and report model assumptions: residual normality, homoscedasticity, random effects distribution
+### Primary Metrics (pick 3, not 15)
+- [ ] **Cooperation ratio** f_C(t) — primary outcome (maps to Kuusela's attack frequency)
+- [ ] **Gini coefficient** — inequality / hierarchy emergence
+- [ ] **E-I index** — coalition formation / ingroup-outgroup dynamics
+- [ ] All three reported as time series, not just end-values (Debraj: "no rationale for end-values if not stabilised")
 
-### Effect Sizes and Uncertainty (non-negotiable)
-- [ ] Report Cohen's d for all pairwise comparisons
-- [ ] Report partial η² for omnibus tests
-- [ ] Report 95% confidence intervals for all key estimates
-- [ ] Report Bayes factors (Jeffreys-Zellner-Siow prior) for key comparisons — following Akata et al. (2025, Nature Human Behaviour)
-- [ ] Never report only p-values. Effect size + CI is the minimum
-
-### Multiple Comparisons
-- [ ] Correct for multiple comparisons (Bonferroni or FDR as appropriate)
-- [ ] Pre-register primary outcome variable (cooperation rate f_C) to distinguish confirmatory from exploratory
-- [ ] Clearly label exploratory analyses as such
+### Statistical Models
+- [ ] Mixed-effects: `Outcome ~ ReasoningLevel * GameParam + Round + (1|RunID)`
+- [ ] Effect sizes: Cohen's d (pairwise) + partial eta-squared (omnibus) + 95% CIs
+- [ ] Bayes factors for key comparisons (Akata et al., 2025)
+- [ ] Multiple comparison correction (FDR)
+- [ ] Report ICC for within-run clustering
 
 ### Robustness
-- [ ] Sensitivity analysis: do conclusions change with different model specifications?
-- [ ] Report results with and without outlier runs (define outlier criterion a priori)
-- [ ] If using prompt variants: report FormatSpread (Sclar et al., 2024) or PromptSensiScore (Zhuo et al., 2024)
+- [ ] Sensitivity to base parameters (that's what Stage 1 sweeps establish)
+- [ ] Prompt sensitivity: FormatSpread (Sclar et al., 2024) on semantically equivalent reformulations
+- [ ] Results with/without outlier runs
 
 ---
 
-## 3. Reasoning Trace Analysis
+## 5. Reasoning Traces
 
-### Faithfulness (non-negotiable caveat)
-- [ ] State explicitly in methods: "Reasoning traces are treated as behavioral data, not as mechanistic explanations of model computation"
-- [ ] Cite the faithfulness literature: Turpin et al. (2023), Lanham et al. (2023), Chen et al. (2025)
-- [ ] Cite the counter-evidence: Baker et al./METR (2025) — CoT-as-computation in tasks requiring step-by-step reasoning shows higher faithfulness
-- [ ] Implement at least one faithfulness validation on a subset:
-  - Option A (lightweight): Lanham et al.'s early-answering test — truncate CoT, check if decisions change
-  - Option B (stronger): Thought Anchors resampling (Bogdan et al., 2025) — resample CoT 10-20× from opponent-modeling sentence onward, measure action distribution shift
-- [ ] Frame the prompt as manipulating computational depth, not just semantic content (supported by Pfau et al., 2024 — filler tokens improve performance through additional forward passes)
-
-### Coding
-- [ ] Use LACA framework (Chew et al., 2023): codebook → prompt calibration → LLM coding with justifications → reliability
-- [ ] Report inter-rater reliability with Gwet's AC1 (not just Cohen's kappa — AC1 is more robust to prevalence effects)
-- [ ] Human-verify 10-20% of coded traces
-- [ ] Triangulate: cross-reference stated reasoning with actual choices. Report concordance rate
-
-### Trace Metrics
-- [ ] Theory-of-mind depth coded per trace (L0-L3 following Jia et al., 2025)
-- [ ] Track whether prompted reasoning level matches observed reasoning level (they may diverge)
-- [ ] Quantify: % agents mentioning future payoffs, opponent intentions, coalition dynamics pre- vs. post-transition
-- [ ] Use BERTopic or embedding similarity for emergent themes (not just predefined codes)
-
----
-
-## 4. Phase Transition Detection (if pursuing Origins angle)
-
-### Primary Detection
-- [ ] Rolling-window EWS: variance, lag-1 autocorrelation, skewness over ~10-round windows
-- [ ] Trend significance: Kendall's τ > 0.4, p < 0.05
-- [ ] Gaussian kernel smoothing for detrending
-- [ ] Report EWS for each individual run, not just aggregated
+### Framing (non-negotiable)
+- [ ] "Reasoning traces are behavioral data, not mechanistic explanations"
+- [ ] Cite faithfulness literature: Turpin (2023), Lanham (2023), Chen (2025)
+- [ ] Frame prompts as "computational depth manipulation" (Pfau et al., 2024)
 
 ### Validation
-- [ ] Variance peak across parameter sweep (susceptibility analogue)
-- [ ] If multiple agent counts: Binder cumulant crossing
-- [ ] TIPMOC for parametric detection of power-law divergence (arXiv:2602.10817)
+- [ ] At least one faithfulness test: early-answering (Lanham) or Thought Anchors (Bogdan)
+- [ ] Concordance rate: stated reasoning vs actual action choice
 
-### What Counts as Evidence
-- [ ] Sharp transition = strong claim. Define threshold: coefficient of variation of critical point < X across replications
-- [ ] Smooth crossover = weaker but valid claim. Report crossover region width
-- [ ] No transition = also a finding. Report it honestly
-
----
-
-## 5. Metrics (computed consistently across all experiments)
-
-### Per-run, per-round
-- [ ] Cooperation rate f_C(t) — primary outcome
-- [ ] Gini coefficient — resource inequality
-- [ ] Pre-emptive attack frequency — Hobbesian metric (attacks not preceded by attack from target)
-- [ ] First-attack timing
-
-### Per-run, per-window (5-round sliding windows)
-- [ ] Coalition structure via Leiden algorithm (sweep γ ∈ {0.5, 0.8, 1.0, 1.5, 2.0})
-- [ ] Coalition stability: NMI between consecutive partitions
-- [ ] Network reciprocity, density, clustering coefficient
-
-### Per-run, aggregate
-- [ ] Elo steepness (hierarchy metric)
-- [ ] Theil T index (decomposable inequality)
-- [ ] Final cooperation rate (last 10 rounds, to capture equilibrium)
-
-### Reporting
-- [ ] All metrics defined precisely in methods section with formulas
-- [ ] Each metric justified with citation
-- [ ] Report distributions, not just means — boxplots or violin plots per condition
+### As Evidence (not decoration)
+- [ ] Traces explain the counterintuitive finding — WHY does L3 cooperate-then-strike?
+- [ ] Embedding trajectories (Debraj suggestion): UMAP/PCA showing distinct reasoning regimes
+- [ ] Example traces per level in paper (1-2 sentences each), full traces in appendix
 
 ---
 
-## 6. Figures and Visualizations
+## 6. Figures
 
-### Standards
-- [ ] Every figure interpretable without reading the caption in detail
-- [ ] Colorblind-safe palette (viridis or similar)
-- [ ] Error bars or shaded confidence bands on all time series
-- [ ] Individual run trajectories visible (transparent lines) behind condition means
-- [ ] Font size ≥ 8pt in all figures (including axis labels)
-- [ ] Vector format (PDF/SVG) for all plots, not rasterized
+AAMAS = 8 pages. Every figure must earn its space. Kuusela uses 5 figures (1 method, 4 results).
 
-### Key Figures to Include
-- [ ] Cooperation rate over rounds, per condition (the "hero figure")
-- [ ] Parameter sweep with variance peak (if doing phase transition)
-- [ ] Radar chart or heatmap: metric profiles per reasoning level
-- [ ] Interaction plot: reasoning level × game parameter (showing the non-monotonic pattern)
-- [ ] Example reasoning traces (one per level) — anonymized/shortened
-- [ ] Network snapshots at key timepoints showing coalition structure
+### Essential Figures (thesis + paper)
+- [ ] **Hero figure**: Cooperation ratio over rounds, per reasoning level (mean + CI bands + individual trajectories)
+- [ ] **Interaction plot**: Reasoning level × game parameter → Gini or cooperation (the non-monotonic pattern)
+- [ ] **Parameter sweep**: Variance/sensitivity across theta values (susceptibility analogue)
+- [ ] **Reasoning trace evidence**: Embedding UMAP or representative trace excerpts
+
+### Figure Standards
+- [ ] Colorblind-safe (viridis)
+- [ ] Consistent axes across related figures (Kuusela reuses heatmap format across Exp 2-4)
+- [ ] Error bars / CI bands on everything
+- [ ] Font size >= 8pt, vector format (PDF)
+- [ ] Each figure interpretable without reading full caption
+
+### For Paper (not thesis): Choose 4-5 Max
+- [ ] Method figure: game schematic or agent architecture (1 figure)
+- [ ] Results figures: 3-4 max, each tied to one experiment/finding
 
 ---
 
-## 7. Writing
+## 7. Writing Discipline
 
-### Structure
-- [ ] Introduction: Hobbesian Trap framing → gap (nobody studies reasoning depth × emergent structure) → contribution
-- [ ] Related work: Position clearly against K-Level Reasoning (Zhang et al., 2024), GTBench (Duan et al., 2024), Lorè & Heydari (2024), and Kuusela & Roy (2024)
-- [ ] Methods: Sufficient detail for replication. Include full prompt texts in appendix
-- [ ] Results: Separate confirmatory (pre-registered) from exploratory findings
-- [ ] Discussion: Explicitly state limitations. Don't oversell
+### AAMAS 8-Page Constraint
+- [ ] Introduction: 0.75 pages max — hook, gap, contribution, outline
+- [ ] Background/Related Work: 1 page max — position against 4-6 key papers, not a literature survey
+- [ ] Methods: 2-2.5 pages — formal game + reasoning levels + experimental design
+- [ ] Results: 3-3.5 pages — THIS IS THE PAPER. Build from baseline → surprise.
+- [ ] Discussion: 0.75 pages max — synthesis, limitations, future work
+- [ ] Everything else → appendix (prompt texts, full param tables, sensitivity analysis, algorithm details)
+
+### Declarative Section Titles (Kuusela's style)
+- Bad: "4.1 Experiment 1: Parameter Sensitivity"
+- Good: "4.1 Cheap Arming Creates Arms Races Only When Agents Reason Deeply"
 
 ### Claims Calibration
-- [ ] Match claim strength to evidence strength:
-  - Strong evidence (effect size + statistical significance + robustness) → "We find that..."
-  - Moderate evidence (significant but not robust, or robust but small effect) → "Our results suggest..."
-  - Weak evidence (trends, exploratory) → "We observe preliminary evidence that..."
-- [ ] Never claim causality from prompt → behavior without the faithfulness caveat
-- [ ] Frame reasoning depth manipulation as: "prompts that elicit different levels of deliberation" not "we made agents think deeper"
+- [ ] Strong: "We find that..." — for statistically significant + robust + meaningful effect size
+- [ ] Moderate: "Our results suggest..." — significant but not fully robust, or small effect
+- [ ] Weak: "We observe preliminary evidence..." — trends, exploratory
+- [ ] Honest uncertainty: "While the exact frequencies are uncertain, the result is qualitatively different" (Kuusela's exact phrasing for their noisiest result)
+- [ ] Never: "We made agents think deeper" → Always: "Prompts that elicit different levels of deliberation"
 
-### Novelty Claims (be precise)
-- [ ] Existing: CoT/K-level reasoning affects individual game performance (GTBench, K-R, TMGBench, Jia et al.)
-- [ ] Existing: LLMs show different strategic behavior under different framings (Lorè & Heydari, 2024)
-- [ ] Existing: Higher-order reasoning reinforces Hobbesian Trap in 2-agent RL (Kuusela & Roy, 2024)
-- [ ] **Novel: Reasoning depth produces qualitatively different emergent social structures (not just performance differences) in multi-agent systems**
-- [ ] **Novel: The effect is non-monotonic and conditional on game structure (interaction effect)**
-- [ ] **Novel: Extension of Hobbesian Trap framework from 2-agent RL to 30-agent LLM systems**
+### Novelty Claims (precise positioning)
+- [ ] **Existing**: CoT affects individual strategic performance (GTBench, K-Level, TMGBench)
+- [ ] **Existing**: LLM behavior varies with framing (Lore & Heydari, 2024)
+- [ ] **Existing**: Higher reasoning reinforces Hobbesian Trap in 2-agent RL (Kuusela & Roy, 2024)
+- [ ] **Existing**: Cheap talk theory (Crawford & Sobel, 1982), mechanism design (Hurwicz/Maskin/Myerson)
+- [ ] **Novel**: First systematic manipulation of all three mechanism design inputs in multi-agent LLM systems
+- [ ] **Novel**: Reasoning depth produces qualitatively different emergent social STRUCTURES (not just individual performance) in N-agent systems
+- [ ] **Novel**: The effect is non-monotonic and conditional on game structure (interaction)
+- [ ] **Novel**: Cheap talk effectiveness in LLMs (if confirmed) — behavioral commitment absent in rational agent models
+- [ ] **Novel**: Extension from 2-agent RL to 30-agent LLM — same trap, different mechanism
 
-### Limitations Section (include all of these)
-- [ ] CoT faithfulness — traces are behavioral data, not ground truth on model cognition
-- [ ] Single model (Gemma 2 27B) — generalization to other architectures is future work
+### Theoretical Grounding (dual framework)
+- [ ] **Mechanism design** (formal, exact): three IVs = solution concept, type space, message space (Hurwicz 1960)
+- [ ] **Hobbes** (narrative, with caveats): three IVs ≈ competition, diffidence, lack of common power (*Leviathan* 1651)
+- [ ] **Caveat on info→diffidence**: less information → more uncertainty → more defensive action is a causal chain, not a direct mapping. Harsanyi (1967) formalizes incomplete info; Hobbes's diffidence is broader (includes wantrouwen with full info)
+- [ ] **Supporting**: Baliga & Sjöström (2004) formalize Hobbesian trap with cheap talk; Habermas on communicative action; Camerer et al. (2004) cognitive hierarchy
+
+### Limitations (honest, not defensive)
+- [ ] CoT faithfulness caveat
+- [ ] Single model (Qwen 3.5-27B) — generalization is future work
 - [ ] Finite-size effects at N=30
-- [ ] Prompt sensitivity — results may vary with semantically equivalent reformulations
-- [ ] LLM stochasticity from hardware (up to 9%, arXiv:2506.09501)
-- [ ] Complete information assumption — real social systems have partial observability
+- [ ] Prompt sensitivity
+- [ ] K-instructed vs natural reasoning depth — our prompts manipulate, nature selects
+- [ ] Hobbes mapping is narrative, not formal — mechanism design is the exact framework
 
 ---
 
-## 8. Code and Data Management
+## 8. What Debraj Values (from his papers)
 
-### Repository
-- [ ] Clean, documented codebase with README
-- [ ] Requirements file with pinned versions
+Patterns to follow:
+
+1. **The question already matters.** Don't open with a technical gap. Open with a question that has real-world stakes.
+2. **Counterintuitive result IS the paper.** The title, abstract, and structure all build toward breaking an expectation.
+3. **Formal rigor serves the story.** Full game specification, but embedded in readable narrative.
+4. **Experiments build logically.** Each answers a question the previous left open. Numbered and enumerated upfront.
+5. **Dual contribution.** Method + finding. The paper is publishable on either alone. (Ours: local agent memory + reasoning depth findings?)
+6. **Assumption honesty.** List the strongest assumptions and flag their fragility. "Clearly not a valid assumption" — this increases credibility.
+7. **Real-world resonance in the conclusion.** Always connect back to something outside the model.
+8. **Appendices carry heavy load.** Main paper is self-contained for reading; details are external.
+
+---
+
+## 9. Key Literature
+
+### Must-Cite (positioning)
+- Kuusela & Roy (AAMAS 2024) — direct predecessor, same supervisor
+- Zhang et al. (NAACL 2025) — K-Level Reasoning framework
+- Akata et al. (Nature Human Behaviour, 2025) — LLMs in repeated games
+- Lore & Heydari (Scientific Reports, 2024) — framing effects
+- Jia et al. (arXiv:2502.20432) — CoT not universally effective
+
+### Must-Cite (faithfulness)
+- Turpin et al. (NeurIPS 2023) — unfaithful CoT
+- Lanham et al. (Anthropic, 2023) — measuring faithfulness
+- Chen et al. (Anthropic, 2025) — reasoning models unfaithfulness
+- Pfau et al. (2024) — computational depth independent of content
+
+### Must-Cite (methods)
+- Perc et al. (Physics Reports, 2017) — cooperation phase transitions
+- Traag et al. (2019) — Leiden algorithm (if using coalitions)
+- Sclar et al. (ICLR, 2024) — FormatSpread
+
+### Should-Cite (Debraj's group)
+- Mengesha & Roy (Nature Comms, 2025) — phase transitions in ABMs
+- Mengesha & Roy (ICCS, 2025) — game selection → inequality
+- Bazyleva, Garibay & Roy (Sci Rep, 2024) — GSA in multiscale models
+
+---
+
+## 10. Code & Data
+
+- [ ] Clean repo with README and requirements (pinned versions)
 - [ ] Scripts to reproduce every figure from raw data
-- [ ] Raw data preserved (all run logs, traces, configs)
-
-### Logging (per run)
-- [ ] Full action history (agent × round matrix)
-- [ ] Resource trajectories (agent × round)
-- [ ] Reasoning traces (JSON: reasoning, beliefs, strategy, cooperation_intention, action)
-- [ ] Run metadata (seed, config, model version, timestamp, duration)
-- [ ] Any errors or API failures
-
----
-
-## 9. Key Literature to Cite
-
-### Reasoning Depth in Strategic Settings
-- Zhang et al. (2024/2025), K-Level Reasoning — NAACL 2025
-- Jia et al. (2025), arXiv:2502.20432 — CoT not universally effective for strategic reasoning
-- Duan et al. (2024), GTBench — NeurIPS 2024
-- Pfau et al. (2024), "Let's Think Dot by Dot" — computational depth matters independent of content
-
-### CoT Faithfulness & Interpretation
-- Turpin et al. (2023), NeurIPS — unfaithful explanations
-- Lanham et al. (2023), Anthropic — measuring faithfulness
-- Chen et al. (2025), Anthropic — reasoning models unfaithfulness
-- Baker et al./METR (2025) — CoT-as-computation vs rationalization
-- Bogdan et al. (2025), "Thought Anchors", arXiv:2506.19143 — sentence-level causal analysis
-- Bogdan et al. (2025), "Thought Branches", arXiv:2510.27484 — resampling for causal claims
-
-### LLM Game Theory
-- Akata et al. (2025), Nature Human Behaviour — LLMs in repeated games, SCoT
-- Lorè & Heydari (2024), Scientific Reports — framing > game structure
-- TMGBench (2025), Neurocomputing — 2nd-order ToM minimal gain
-
-### Hobbesian Trap
-- Kuusela & Roy (2024), AAMAS — higher-order reasoning reinforces trap
-- Mengesha & Roy (2025), Nature Comms — phase transitions in ABMs
-
-### Methods
-- Perc et al. (2017), Physics Reports — cooperation phase transitions
-- Scheffer et al. (2009), Nature — early warning signals
-- Traag et al. (2019) — Leiden algorithm
-- Sclar et al. (2024), ICLR — FormatSpread
-- Chew et al. (2023) — LACA framework for trace coding
+- [ ] Per-run logging: actions, resources, traces, configs, metadata, errors
+- [ ] Appendix materials on Zenodo (Kuusela's approach) — prompt texts, full param tables, raw data

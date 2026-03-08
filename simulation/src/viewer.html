@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Origins of Order — Simulation Viewer</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root {
+  --bg: #0f0f17;
+  --bg2: #161622;
+  --bg3: #1e1e30;
+  --bg4: #262640;
+  --text: #d8d8e8;
+  --text2: #9898b0;
+  --dim: #585870;
+  --border: #2a2a40;
+  --border-light: #3a3a55;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --coop: #34d399;
+  --coop-dim: rgba(52,211,153,0.15);
+  --attack: #f87171;
+  --attack-dim: rgba(248,113,113,0.15);
+  --arm: #fbbf24;
+  --arm-dim: rgba(251,191,36,0.15);
+  --neutral: #64748b;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden; height: 100vh;
+}
+code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; }
+
+/* ═══ TOP BAR ═══ */
+#topbar {
+  height: 56px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 16px; z-index: 100;
+  flex-shrink: 0;
+}
+#topbar .logo {
+  font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+#topbar .logo span { color: var(--accent2); }
+
+/* Metric pills */
+.metrics-row { display: flex; gap: 6px; }
+.metric-pill {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px; display: flex; align-items: center; gap: 8px;
+  cursor: default; transition: border-color 0.2s;
+}
+.metric-pill:hover { border-color: var(--border-light); }
+.metric-pill .label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.metric-pill .value { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric-pill .trend { font-size: 11px; margin-left: -4px; }
+.metric-pill canvas { height: 18px; width: 60px; display: block; }
+
+/* Round controls */
+#controls {
+  display: flex; align-items: center; gap: 8px; margin-left: auto;
+}
+#controls button {
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  width: 32px; height: 32px; cursor: pointer; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: all 0.15s;
+}
+#controls button:hover { background: var(--bg4); border-color: var(--border-light); }
+#round-slider {
+  width: 140px; accent-color: var(--accent);
+}
+#round-label {
+  font-size: 13px; font-weight: 600; min-width: 60px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.toggle-label {
+  font-size: 11px; color: var(--text2); cursor: pointer; display: flex; align-items: center; gap: 4px;
+  user-select: none;
+}
+.toggle-label input { accent-color: var(--accent); }
+#load-btn {
+  background: var(--accent); color: white; border: none;
+  padding: 7px 14px; cursor: pointer; border-radius: var(--radius);
+  font-size: 12px; font-weight: 500; transition: opacity 0.15s;
+}
+#load-btn:hover { opacity: 0.85; }
+#file-input { display: none; }
+#run-name { font-size: 11px; color: var(--dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ═══ TOOLBAR ═══ */
+#toolbar {
+  height: 36px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 16px; gap: 8px;
+  flex-shrink: 0;
+}
+.toolbar-group { display: flex; align-items: center; gap: 8px; }
+.toolbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.toolbar-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+#toolbar select {
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 3px 8px; font-size: 11px; cursor: pointer;
+}
+#toolbar input[type="range"] { width: 80px; accent-color: var(--accent); }
+#toolbar button {
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  width: 28px; height: 28px; cursor: pointer; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: all 0.15s;
+}
+#toolbar button:hover { background: var(--bg4); border-color: var(--border-light); }
+
+/* ═══ MAIN LAYOUT ═══ */
+#layout {
+  display: flex; height: calc(100vh - 92px); /* 56 topbar + 36 toolbar */
+}
+
+/* ═══ LEFT SIDEBAR ═══ */
+#sidebar {
+  width: 260px; min-width: 260px; background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto;
+  flex-shrink: 0;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Config panel */
+#config-panel {
+  padding: 16px; border-bottom: 1px solid var(--border);
+}
+#config-panel .section-title {
+  font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.config-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.config-item {
+  background: var(--bg3); border-radius: 6px; padding: 8px 10px;
+}
+.config-item.full { grid-column: 1 / -1; }
+.config-item .config-label { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.config-item .config-value { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.config-item .config-value.reasoning { color: var(--accent2); }
+.config-item .config-value.network { color: var(--coop); }
+.config-item .config-value.comm { color: var(--arm); }
+
+/* Action distribution */
+#action-dist {
+  padding: 16px; border-bottom: 1px solid var(--border);
+}
+#action-dist .section-title {
+  font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.action-bar-container { display: flex; flex-direction: column; gap: 4px; }
+.action-bar-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.action-bar-label {
+  font-size: 10px; color: var(--text2); width: 70px; text-align: right; flex-shrink: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.action-bar-track {
+  flex: 1; height: 16px; background: var(--bg); border-radius: 3px;
+  position: relative; overflow: hidden;
+}
+.action-bar-fill {
+  height: 100%; border-radius: 3px; transition: width 0.3s ease;
+  min-width: 0;
+}
+.action-bar-count {
+  font-size: 10px; color: var(--dim); width: 20px; font-variant-numeric: tabular-nums;
+}
+
+/* Standings */
+#standings-panel {
+  padding: 16px; flex: 1;
+}
+#standings-panel .section-title {
+  font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.standings-list { display: flex; flex-direction: column; gap: 1px; }
+.standing-entry {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  border-radius: 4px; cursor: pointer; transition: background 0.15s;
+}
+.standing-entry:hover { background: rgba(255,255,255,0.04); }
+.standing-entry.selected { background: rgba(99,102,241,0.15); }
+.standing-rank { font-size: 9px; color: var(--dim); width: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.standing-agent { font-size: 11px; font-weight: 600; width: 24px; }
+.standing-icon { font-size: 11px; width: 16px; text-align: center; }
+.standing-bar-track {
+  flex: 1; height: 12px; background: rgba(255,255,255,0.03);
+  border-radius: 2px; position: relative; overflow: hidden;
+}
+.standing-bar-fill {
+  height: 100%; border-radius: 2px; transition: width 0.3s ease;
+  min-width: 1px;
+}
+.standing-value {
+  font-size: 10px; color: var(--text2); width: 32px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.standing-arm {
+  font-size: 9px; color: var(--arm); width: 24px; text-align: right;
+}
+
+/* ═══ GRAPH AREA ═══ */
+#graph-area {
+  flex: 1; position: relative; overflow: hidden; background: var(--bg);
+}
+#graph-area svg { width: 100%; height: 100%; display: block; }
+
+/* Empty state */
+#empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--dim); z-index: 5;
+}
+#empty-state h2 { font-size: 24px; color: var(--text2); margin-bottom: 8px; font-weight: 300; }
+#empty-state p { font-size: 14px; }
+#empty-state .drop-zone {
+  margin-top: 24px; border: 2px dashed var(--border);
+  border-radius: var(--radius-lg); padding: 40px 60px;
+  text-align: center; transition: border-color 0.2s;
+}
+#empty-state .drop-zone.dragover { border-color: var(--accent); }
+
+/* Legend */
+#legend {
+  position: absolute; bottom: 12px; left: 12px; z-index: 10;
+  background: rgba(22,22,34,0.9); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 14px; font-size: 11px; color: var(--text2);
+  display: none; gap: 12px;
+}
+#legend span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* Combat panel (sidebar) */
+#combat-panel {
+  padding: 16px; border-bottom: 1px solid var(--border);
+}
+#combat-panel .section-title {
+  font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.combat-entry {
+  padding: 4px 0; font-size: 11px; line-height: 1.5;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.combat-entry:last-child { border-bottom: none; }
+.combat-outcome {
+  font-size: 10px; color: var(--text2); margin-top: 2px;
+  padding-left: 16px;
+}
+
+/* ═══ AGENT CARD (slide-over) ═══ */
+#agent-card {
+  position: absolute; top: 0; right: -380px; width: 380px; height: 100%;
+  background: var(--bg2); border-left: 1px solid var(--border);
+  z-index: 50; overflow-y: auto; transition: right 0.25s ease;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+}
+#agent-card.open { right: 0; }
+#agent-card::-webkit-scrollbar { width: 4px; }
+#agent-card::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+#card-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg2); z-index: 5;
+}
+#card-header-top { display: flex; align-items: center; justify-content: space-between; }
+.card-agent-name { font-size: 18px; font-weight: 700; }
+#card-close {
+  cursor: pointer; font-size: 20px; color: var(--dim); width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius); transition: all 0.15s;
+}
+#card-close:hover { color: var(--text); background: var(--bg3); }
+.card-action-row { margin-top: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.card-resources { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+/* Resource breakdown */
+.card-breakdown {
+  display: none; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-size: 10px;
+}
+.bd-item {
+  padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+}
+.bd-item b { margin-left: 2px; }
+.bd-coop { background: var(--coop-dim); color: var(--coop); }
+.bd-attack { background: var(--attack-dim); color: var(--attack); }
+.bd-arm { background: var(--arm-dim); color: var(--arm); }
+.bd-dim { background: rgba(100,116,139,0.15); color: var(--text2); }
+.bd-net { background: var(--bg4); color: var(--text); font-weight: 600; }
+
+/* Card stats strip */
+.card-stats {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+}
+.card-stat {
+  flex: 1; padding: 10px 16px; text-align: center; border-right: 1px solid var(--border);
+}
+.card-stat:last-child { border-right: none; }
+.card-stat .stat-label { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.card-stat .stat-value { font-size: 16px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* Card sections */
+.card-section { border-bottom: 1px solid var(--border); }
+.card-section summary {
+  padding: 10px 20px; cursor: pointer; font-size: 12px; color: var(--text2);
+  list-style: none; display: flex; align-items: center; gap: 8px;
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+.card-section summary:hover { color: var(--text); }
+.card-section summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 0.2s; flex-shrink: 0; }
+.card-section[open] summary::before { transform: rotate(45deg); }
+.card-section .content { padding: 0 20px 14px; }
+.card-section pre {
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 60vh; overflow-y: auto;
+  background: var(--bg); padding: 12px; border-radius: var(--radius);
+  font-size: 11.5px; line-height: 1.6; color: var(--text2);
+}
+.card-section pre::-webkit-scrollbar { width: 4px; }
+.card-section pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.note-box {
+  background: var(--arm-dim); border-left: 3px solid var(--arm);
+  padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 12px; line-height: 1.5;
+}
+.msg-item { padding: 4px 0; font-size: 12px; line-height: 1.4; }
+.msg-item .sender { font-weight: 600; }
+.msg-item .msg-text { color: var(--text2); }
+
+.history-grid { display: flex; flex-direction: column; gap: 2px; }
+.history-item {
+  display: flex; align-items: center; gap: 8px; padding: 3px 6px;
+  font-size: 11px; border-radius: 3px;
+}
+.history-item.current { background: rgba(99,102,241,0.1); }
+.history-item .round-num { color: var(--dim); width: 24px; font-variant-numeric: tabular-nums; }
+.history-item .hist-action { width: 90px; }
+.history-item .hist-target { color: var(--text2); width: 50px; }
+.history-item .hist-res { color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* Action colors */
+.action-invest_other { color: var(--coop); }
+.action-invest_self { color: var(--text2); }
+.action-arm_self, .action-arm_other { color: var(--arm); }
+.action-attack { color: var(--attack); }
+.action-do_nothing { color: var(--dim); }
+
+/* Cluster hulls */
+.cluster-hull {
+  fill-opacity: 0.06; stroke-width: 1; stroke-opacity: 0.2;
+  stroke-dasharray: 6,3;
+}
+
+/* Edge styles */
+.edge-new { stroke: var(--coop) !important; stroke-opacity: 0.6; stroke-dasharray: 4,2; }
+.edge-removed { stroke: var(--attack) !important; stroke-opacity: 0.3; stroke-dasharray: 2,4; }
+
+/* Tooltip */
+.tooltip {
+  position: fixed; background: var(--bg3); border: 1px solid var(--border-light);
+  padding: 8px 12px; border-radius: var(--radius); font-size: 12px;
+  pointer-events: none; z-index: 200; display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.5;
+  backdrop-filter: blur(8px);
+}
+
+/* Message lines on graph */
+.msg-line {
+  stroke-dasharray: 3,4; stroke-opacity: 0.5; stroke-width: 1.5;
+}
+
+/* Trend indicators */
+.trend-up { color: var(--coop); }
+.trend-down { color: var(--attack); }
+.trend-flat { color: var(--dim); }
+
+/* Scrollbar global */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP BAR ═══ -->
+<div id="topbar">
+  <div class="logo"><span>Origins</span> of Order</div>
+
+  <div class="metrics-row">
+    <div class="metric-pill" title="Cooperation fraction: invest_other / meaningful actions">
+      <div>
+        <div class="label">f_C</div>
+        <div class="value" id="m-fc">--</div>
+      </div>
+      <canvas id="spark-fc"></canvas>
+    </div>
+    <div class="metric-pill" title="Gini coefficient (0 = equal, 1 = max inequality)">
+      <div>
+        <div class="label">Gini</div>
+        <div class="value" id="m-gini">--</div>
+      </div>
+      <canvas id="spark-gini"></canvas>
+    </div>
+    <div class="metric-pill" title="Network modularity (Leiden algorithm)">
+      <div>
+        <div class="label">Q</div>
+        <div class="value" id="m-mod">--</div>
+      </div>
+      <canvas id="spark-mod"></canvas>
+    </div>
+    <div class="metric-pill" title="Action stability: fraction repeating last action">
+      <div>
+        <div class="label">Stability</div>
+        <div class="value" id="m-stab">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <span id="run-name"></span>
+    <label id="load-btn">Load JSONL<input type="file" id="file-input" accept=".jsonl"></label>
+    <button id="prev-btn" title="Previous round (←)">&#9664;</button>
+    <span id="round-label">--</span>
+    <input type="range" id="round-slider" min="0" max="0" value="0">
+    <button id="next-btn" title="Next round (→)">&#9654;</button>
+    <label class="toggle-label"><input type="checkbox" id="auto-advance"> Auto</label>
+    <label class="toggle-label" id="live-label" style="display:none"><input type="checkbox" id="live-watch"> <span style="color:#f87171">&#9679;</span> Live</label>
+  </div>
+</div>
+
+<!-- ═══ TOOLBAR (under topbar) ═══ -->
+<div id="toolbar">
+  <div class="toolbar-group">
+    <label class="toggle-label"><input type="checkbox" id="show-actions" checked> Actions</label>
+    <label class="toggle-label"><input type="checkbox" id="show-messages" checked> Msgs</label>
+    <label class="toggle-label"><input type="checkbox" id="show-edge-diff"> Edge diff</label>
+  </div>
+  <div class="toolbar-sep"></div>
+  <div class="toolbar-group">
+    <select id="cluster-mode" title="Cluster mode">
+      <option value="network">Clusters: Network</option>
+      <option value="actions">Actions: This Round</option>
+      <option value="actions-all">Actions: Overall</option>
+    </select>
+  </div>
+  <div class="toolbar-sep"></div>
+  <div class="toolbar-group">
+    <span class="toolbar-label">Spacing</span>
+    <input type="range" id="spacing-slider" min="30" max="250" value="80" title="Node spacing">
+    <button id="reshuffle-btn" title="Reshuffle layout (R)">&#8634;</button>
+  </div>
+</div>
+
+<!-- ═══ MAIN LAYOUT ═══ -->
+<div id="layout">
+  <!-- Left sidebar -->
+  <div id="sidebar" style="display:none">
+    <!-- Experiment config -->
+    <div id="config-panel">
+      <div class="section-title">Experiment Config</div>
+      <div class="config-grid">
+        <div class="config-item">
+          <div class="config-label">Reasoning</div>
+          <div class="config-value reasoning" id="cfg-reasoning">--</div>
+        </div>
+        <div class="config-item">
+          <div class="config-label">Rewiring (w)</div>
+          <div class="config-value network" id="cfg-rewiring">--</div>
+        </div>
+        <div class="config-item">
+          <div class="config-label">Comm Scope</div>
+          <div class="config-value comm" id="cfg-comm">--</div>
+        </div>
+        <div class="config-item">
+          <div class="config-label">Agents</div>
+          <div class="config-value" id="cfg-agents">--</div>
+        </div>
+        <div class="config-item full">
+          <div class="config-label">Palma Ratio</div>
+          <div class="config-value" id="cfg-palma">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action distribution -->
+    <div id="action-dist">
+      <div class="section-title">Actions</div>
+      <div class="action-bar-container" id="action-bars"></div>
+    </div>
+
+    <!-- Combat -->
+    <div id="combat-panel">
+      <div class="section-title">Combat</div>
+      <div id="combat-entries"><span style="color:var(--dim);font-size:11px">No combat</span></div>
+    </div>
+
+    <!-- Standings -->
+    <div id="standings-panel">
+      <div class="section-title">Standings</div>
+      <div class="standings-list" id="standings-list"></div>
+    </div>
+  </div>
+
+  <!-- Graph -->
+  <div id="graph-area">
+    <div id="empty-state">
+      <h2>Origins of Order</h2>
+      <p>Simulation replay viewer</p>
+      <div class="drop-zone" id="drop-zone">
+        Drop a <code>_reasoning_live.jsonl</code> here<br>
+        <span style="font-size:12px;color:var(--dim)">or use Load JSONL above</span>
+      </div>
+    </div>
+    <div id="legend">
+      <span style="color:var(--coop)">&#9679; invest</span>
+      <span style="color:var(--attack)">&#9679; attack</span>
+      <span style="color:var(--arm)">&#9679; arm</span>
+      <span style="color:var(--dim)">&#9679; do nothing</span>
+      <span id="legend-diff" style="display:none">
+        | <span style="color:var(--coop)">--- new edge</span>
+        <span style="color:var(--attack);opacity:0.5">--- removed</span>
+      </span>
+      <span id="legend-msg" style="display:none">
+        | <span style="color:var(--accent2)">... message</span>
+      </span>
+    </div>
+
+    <svg id="network-svg" style="display:none"></svg>
+
+    <!-- Agent card slide-over -->
+    <div id="agent-card">
+      <div id="card-header">
+        <div id="card-header-top">
+          <span class="card-agent-name" id="card-name"></span>
+          <span id="card-close">&times;</span>
+        </div>
+        <div class="card-action-row" id="card-action"></div>
+        <div class="card-resources" id="card-res"></div>
+        <div class="card-breakdown" id="card-breakdown"></div>
+      </div>
+      <div class="card-stats" id="card-stats"></div>
+      <div id="card-body"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ═══ CONSTANTS ═══
+const AGENT_COLORS = [
+  '#818cf8','#f472b6','#34d399','#fbbf24','#60a5fa','#f87171',
+  '#fb923c','#c084fc','#22d3ee','#a3e635','#a78bfa','#fb7185',
+  '#2dd4bf','#facc15','#6366f1','#e879f9','#38bdf8','#f59e0b',
+  '#ec4899','#4ade80','#3b82f6','#eab308','#8b5cf6','#14b8a6',
+  '#a8a29e','#cbd5e1','#94a3b8','#d8b4fe','#86efac','#93c5fd'
+];
+const ACTION_ICONS = {invest_other:'&#10230;',invest_self:'&#9651;',arm_self:'&#9670;',arm_other:'&#9670;',attack:'&#9876;',do_nothing:'&#183;'};
+const ACTION_LABELS = {invest_other:'invest other',invest_self:'invest self',arm_self:'arm self',arm_other:'arm other',attack:'attack',do_nothing:'do nothing'};
+const ACTION_COLORS_MAP = {invest_other:'#34d399',invest_self:'#94a3b8',arm_self:'#fbbf24',arm_other:'#fbbf24',attack:'#f87171',do_nothing:'#64748b'};
+const ACTION_ORDER = ['invest_other','invest_self','arm_self','arm_other','attack','do_nothing'];
+const ACTION_CSS = a => `action-${a}`;
+
+let rounds = [];
+let currentRound = 0;
+let autoTimer = null;
+let simulation = null;
+let selectedAgent = null;
+
+// Stable color assignment: first round's agent order determines colors
+let agentColorMap = {};
+function agentColor(aid) {
+  if (agentColorMap[aid] !== undefined) return AGENT_COLORS[agentColorMap[aid] % AGENT_COLORS.length];
+  // Fallback: hash
+  let h = 0;
+  for (let i = 0; i < aid.length; i++) h = ((h << 5) - h + aid.charCodeAt(i)) | 0;
+  return AGENT_COLORS[Math.abs(h) % AGENT_COLORS.length];
+}
+function agentShort(aid) {
+  // agent_1 → A1, random names → first 3 chars
+  if (aid.startsWith('agent_')) return 'A' + aid.slice(6);
+  return aid.length <= 5 ? aid : aid.slice(0, 4);
+}
+
+// ═══ PARSE & LOAD ═══
+function loadData(text) {
+  rounds = text.trim().split('\n').filter(l=>l).map(l => JSON.parse(l));
+  if (!rounds.length) return;
+  // Assign stable colors from first round's agent order
+  agentColorMap = {};
+  Object.keys(rounds[0].agents).forEach((aid, i) => { agentColorMap[aid] = i; });
+  currentRound = 0;
+  document.getElementById('round-slider').max = rounds.length - 1;
+  document.getElementById('round-slider').value = 0;
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('network-svg').style.display = 'block';
+  document.getElementById('sidebar').style.display = 'flex';
+  document.getElementById('legend').style.display = 'flex';
+
+  // Try to infer config from data
+  inferConfig();
+  initGraph();
+  renderRound();
+}
+
+function inferConfig() {
+  const r = rounds[0];
+  const n = Object.keys(r.agents).length;
+  document.getElementById('cfg-agents').textContent = n;
+
+  // Pretty reasoning level labels
+  const REASONING_LABELS = {
+    'level0': 'L0 (instinct)', 'level1': 'L1 (best response)',
+    'level2': 'L2 (opponent model)', 'level3': 'L3 (recursive)',
+    'default': 'default',
+  };
+
+  // Try to detect from config embedded in JSONL (check all rounds, not just first)
+  const configRound = rounds.find(rd => rd.config);
+  if (configRound) {
+    const cfg = configRound.config;
+    const rl = cfg.reasoning_level || '--';
+    document.getElementById('cfg-reasoning').textContent = REASONING_LABELS[rl] || rl;
+    document.getElementById('cfg-rewiring').textContent = cfg.rewiring_prob ?? '--';
+    document.getElementById('cfg-comm').textContent = cfg.comm_scope || '--';
+    if (cfg.model) {
+      const runName = document.getElementById('run-name');
+      if (runName && !runName.textContent) runName.textContent = cfg.model;
+    }
+    return; // Config is authoritative, skip inference
+  }
+
+  // Fallback: infer from data
+  // Comm scope from messages
+  const hasMessages = rounds.some(rd => rd.messages && rd.messages.length > 0);
+  if (!hasMessages) document.getElementById('cfg-comm').textContent = 'none';
+  else {
+    const hasBroadcast = rounds.some(rd => rd.messages?.some(m => !m.to));
+    const hasDM = rounds.some(rd => rd.messages?.some(m => m.to));
+    if (hasBroadcast && hasDM) document.getElementById('cfg-comm').textContent = 'choice';
+    else if (hasBroadcast) document.getElementById('cfg-comm').textContent = 'broadcast';
+    else document.getElementById('cfg-comm').textContent = 'dm';
+  }
+
+  // Rewiring from edge changes (check all consecutive round pairs)
+  let totalChanges = 0;
+  for (let i = 1; i < rounds.length; i++) {
+    const prev = rounds[i-1].network?.edges || [];
+    const curr = rounds[i].network?.edges || [];
+    if (prev.length === 0 && curr.length === 0) continue;
+    const prevSet = new Set(prev.map(e => e.slice().sort().join('-')));
+    const currSet = new Set(curr.map(e => e.slice().sort().join('-')));
+    curr.forEach(e => { if (!prevSet.has(e.slice().sort().join('-'))) totalChanges++; });
+    prev.forEach(e => { if (!currSet.has(e.slice().sort().join('-'))) totalChanges++; });
+  }
+  if (rounds.length < 2) document.getElementById('cfg-rewiring').textContent = '? (1 round)';
+  else if (totalChanges === 0) document.getElementById('cfg-rewiring').textContent = '0 (static)';
+  else document.getElementById('cfg-rewiring').textContent = 'dynamic';
+
+  // Reasoning level: try to infer from thinking length
+  // L0 has no thinking, L1-L3 have progressively longer reasoning
+  const avgThinkLen = rounds.slice(0, 3).flatMap(rd =>
+    Object.values(rd.agents).map(a => (a.thinking || a.reasoning || '').length)
+  ).reduce((s,v,i,a) => s + v / a.length, 0);
+  if (avgThinkLen < 50) document.getElementById('cfg-reasoning').textContent = 'L0 (inferred)';
+  else document.getElementById('cfg-reasoning').textContent = '? (no config)';
+}
+
+// ═══ FILE LOADING + LIVE WATCH ═══
+let fileHandle = null;  // File System Access API handle (for live re-read)
+let liveTimer = null;
+
+// Standard file input (fallback)
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('run-name').textContent = f.name.replace('_reasoning_live.jsonl','');
+  f.text().then(loadData);
+});
+
+// "Load JSONL" button: prefer File System Access API for live support
+document.getElementById('load-btn').addEventListener('click', async e => {
+  // Try modern File System Access API (Chrome/Edge) for live re-reading
+  if (window.showOpenFilePicker) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'JSONL', accept: {'application/jsonl': ['.jsonl']} }],
+      });
+      fileHandle = handle;
+      const file = await handle.getFile();
+      document.getElementById('run-name').textContent = file.name.replace('_reasoning_live.jsonl','');
+      document.getElementById('live-label').style.display = 'inline-flex';
+      const text = await file.text();
+      loadData(text);
+    } catch (err) {
+      if (err.name !== 'AbortError') console.warn('File picker error:', err);
+    }
+  }
+  // Else: falls through to normal <input type=file> click
+});
+
+// Live watch: uses File System Access API handle to re-read from disk
+document.getElementById('live-watch').onchange = e => {
+  if (e.target.checked && fileHandle) {
+    liveTimer = setInterval(async () => {
+      if (!fileHandle) return;
+      try {
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        const lines = text.trim().split('\n').filter(l => l);
+        if (lines.length > rounds.length) {
+          const newRounds = lines.slice(rounds.length).map(l => JSON.parse(l));
+          rounds.push(...newRounds);
+          document.getElementById('round-slider').max = rounds.length - 1;
+          // Jump to latest
+          currentRound = rounds.length - 1;
+          syncSlider();
+          renderRound();
+          // Update config if first round just arrived
+          if (rounds.length === newRounds.length) inferConfig();
+        }
+      } catch (err) {
+        console.warn('Live watch error:', err);
+      }
+    }, 3000);
+  } else {
+    clearInterval(liveTimer);
+    liveTimer = null;
+  }
+};
+
+// Drag & drop: also try to get a file handle for live support
+const dropZone = document.getElementById('drop-zone');
+document.body.addEventListener('dragover', e => {
+  e.preventDefault();
+  if (dropZone) dropZone.classList.add('dragover');
+});
+document.body.addEventListener('dragleave', () => {
+  if (dropZone) dropZone.classList.remove('dragover');
+});
+document.body.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (dropZone) dropZone.classList.remove('dragover');
+
+  // Try to get file handle from DataTransferItem (Chrome 86+)
+  const item = e.dataTransfer.items?.[0];
+  if (item?.getAsFileSystemHandle) {
+    try {
+      const handle = await item.getAsFileSystemHandle();
+      if (handle.kind === 'file') {
+        fileHandle = handle;
+        const file = await handle.getFile();
+        document.getElementById('run-name').textContent = file.name.replace('_reasoning_live.jsonl','');
+        document.getElementById('live-label').style.display = 'inline-flex';
+        const text = await file.text();
+        loadData(text);
+        return;
+      }
+    } catch (err) { /* fallback below */ }
+  }
+
+  // Fallback: regular File object (no live support)
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    document.getElementById('run-name').textContent = f.name.replace('_reasoning_live.jsonl','');
+    f.text().then(loadData);
+  }
+});
+
+// ═══ ROUND CONTROLS ═══
+document.getElementById('prev-btn').onclick = () => { if (currentRound > 0) { currentRound--; syncSlider(); renderRound(); }};
+document.getElementById('next-btn').onclick = () => { if (currentRound < rounds.length-1) { currentRound++; syncSlider(); renderRound(); }};
+document.getElementById('round-slider').oninput = e => { currentRound = parseInt(e.target.value); renderRound(); };
+document.getElementById('auto-advance').onchange = e => {
+  if (e.target.checked) {
+    autoTimer = setInterval(() => {
+      if (currentRound < rounds.length-1) { currentRound++; syncSlider(); renderRound(); }
+      else { e.target.checked = false; clearInterval(autoTimer); }
+    }, 2000);
+  } else { clearInterval(autoTimer); }
+};
+function syncSlider() { document.getElementById('round-slider').value = currentRound; }
+document.getElementById('show-edge-diff').onchange = () => {
+  document.getElementById('legend-diff').style.display = document.getElementById('show-edge-diff').checked ? 'inline' : 'none';
+  if (rounds.length) renderRound();
+};
+document.getElementById('show-actions').onchange = () => {
+  if (rounds.length) renderRound();
+};
+document.getElementById('show-messages').onchange = () => {
+  document.getElementById('legend-msg').style.display = document.getElementById('show-messages').checked ? 'inline' : 'none';
+  if (rounds.length) renderRound();
+};
+
+// Spacing slider
+let currentSpacing = 80;
+document.getElementById('spacing-slider').oninput = e => {
+  currentSpacing = parseInt(e.target.value);
+  if (simulation) {
+    simulation.force('link').distance(currentSpacing);
+    simulation.force('charge').strength(-currentSpacing * 2.5);
+    simulation.force('collision').radius(currentSpacing * 0.3);
+    simulation.alpha(0.4).restart();
+  }
+};
+
+// Reshuffle
+document.getElementById('reshuffle-btn').onclick = () => {
+  if (!simulation) return;
+  const container = document.getElementById('graph-area');
+  const w = container.clientWidth, h = container.clientHeight;
+  simulation.nodes().forEach(n => {
+    n.x = w * 0.2 + Math.random() * w * 0.6;
+    n.y = h * 0.2 + Math.random() * h * 0.6;
+    n.vx = 0; n.vy = 0; n.fx = null; n.fy = null;
+  });
+  simulation.alpha(1).restart();
+};
+
+// Cluster mode
+document.getElementById('cluster-mode').onchange = () => {
+  if (rounds.length) { renderRound(); document.getElementById('reshuffle-btn').click(); }
+};
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft') document.getElementById('prev-btn').click();
+  if (e.key === 'ArrowRight') document.getElementById('next-btn').click();
+  if (e.key === 'Escape') closeCard();
+  if (e.key === 'r' || e.key === 'R') document.getElementById('reshuffle-btn').click();
+});
+
+// ═══ AGENT CARD ═══
+document.getElementById('card-close').onclick = closeCard;
+function closeCard() {
+  document.getElementById('agent-card').classList.remove('open');
+  selectedAgent = null;
+  if (gNodes) d3.selectAll('.node-ring').attr('opacity', 0);
+  document.querySelectorAll('.standing-entry').forEach(e => e.classList.remove('selected'));
+}
+
+// ═══ D3 GRAPH ═══
+let svg, gZoom, gHulls, gLinks, gActions, gMessages, gNodes, gLabels, nodeMap = {};
+let zoomBehavior = null;
+
+function detectCommunities(edges, agents, roundIdx) {
+  const agentIds = Object.keys(agents);
+  const adj = {};
+  agentIds.forEach(a => adj[a] = new Set());
+  edges.forEach(([a, b]) => { adj[a]?.add(b); adj[b]?.add(a); });
+
+  const visited = new Set();
+  const components = [];
+  agentIds.forEach(aid => {
+    if (visited.has(aid)) return;
+    const comp = [];
+    const queue = [aid];
+    while (queue.length) {
+      const n = queue.shift();
+      if (visited.has(n)) continue;
+      visited.add(n); comp.push(n);
+      (adj[n] || []).forEach(nb => { if (!visited.has(nb)) queue.push(nb); });
+    }
+    components.push(comp);
+  });
+
+  const refined = [];
+  components.forEach(comp => {
+    if (comp.length <= 2) { refined.push(comp); return; }
+    const coopWeight = {};
+    const window = Math.min(roundIdx + 1, 5);
+    for (let i = Math.max(0, roundIdx - window + 1); i <= roundIdx; i++) {
+      const rd = rounds[i]; if (!rd) continue;
+      Object.entries(rd.agents).forEach(([aid, info]) => {
+        if (info.action === 'invest_other' && info.target && comp.includes(aid) && comp.includes(info.target)) {
+          const key = [aid, info.target].sort().join('-');
+          coopWeight[key] = (coopWeight[key] || 0) + 1;
+        }
+      });
+    }
+    const label = {};
+    comp.forEach((a, i) => label[a] = i);
+    for (let iter = 0; iter < 5; iter++) {
+      let changed = false;
+      comp.forEach(a => {
+        const neighborLabels = {};
+        (adj[a] || []).forEach(nb => {
+          if (!comp.includes(nb)) return;
+          const key = [a, nb].sort().join('-');
+          const w = (coopWeight[key] || 0) + 0.1;
+          neighborLabels[label[nb]] = (neighborLabels[label[nb]] || 0) + w;
+        });
+        const best = Object.entries(neighborLabels).sort((a,b) => b[1]-a[1])[0];
+        if (best && best[0] != label[a]) { label[a] = parseInt(best[0]); changed = true; }
+      });
+      if (!changed) break;
+    }
+    const groups = {};
+    comp.forEach(a => { const l = label[a]; (groups[l] = groups[l] || []).push(a); });
+    Object.values(groups).forEach(g => refined.push(g));
+  });
+  return refined.filter(c => c.length > 0);
+}
+
+// Action-based community detection: clusters by cooperation, attack, and messaging patterns
+function detectActionCommunities(agents, roundIdx, windowSize) {
+  const agentIds = Object.keys(agents);
+
+  // Build weighted adjacency from action history
+  // windowSize: 1 = this round only, null = all rounds up to now
+  const coopWeight = {};
+  const hostWeight = {};
+  const msgWeight = {};
+  const window = windowSize || (roundIdx + 1);
+
+  for (let i = Math.max(0, roundIdx - window + 1); i <= roundIdx; i++) {
+    const rd = rounds[i]; if (!rd) continue;
+    // Recency weight: more recent rounds count more
+    const recency = 1 + (i - Math.max(0, roundIdx - window + 1)) / window;
+
+    Object.entries(rd.agents).forEach(([aid, info]) => {
+      if (!info.target) return;
+      const key = [aid, info.target].sort().join('-');
+      if (info.action === 'invest_other') {
+        coopWeight[key] = (coopWeight[key] || 0) + recency;
+      } else if (info.action === 'attack') {
+        hostWeight[key] = (hostWeight[key] || 0) + recency;
+      } else if (info.action === 'arm_other') {
+        coopWeight[key] = (coopWeight[key] || 0) + recency * 0.5;
+      }
+    });
+
+    // Messages as cooperation signal
+    if (rd.messages) {
+      rd.messages.forEach(m => {
+        if (m.from && m.to) {
+          const key = [m.from, m.to].sort().join('-');
+          msgWeight[key] = (msgWeight[key] || 0) + recency * 0.3;
+        }
+      });
+    }
+  }
+
+  // Build affinity graph: only positive signals (coop + msg), attacks ignored for clustering
+  const adj = {};
+  agentIds.forEach(a => adj[a] = {});
+  const allKeys = new Set([...Object.keys(coopWeight), ...Object.keys(msgWeight)]);
+  allKeys.forEach(key => {
+    const [a, b] = key.split('-');
+    if (!agentIds.includes(a) || !agentIds.includes(b)) return;
+    const affinity = (coopWeight[key] || 0) + (msgWeight[key] || 0);
+    if (affinity > 0) {
+      adj[a][b] = affinity;
+      adj[b][a] = affinity;
+    }
+  });
+
+  // Label propagation on affinity graph
+  const label = {};
+  agentIds.forEach((a, i) => label[a] = i);
+
+  for (let iter = 0; iter < 10; iter++) {
+    let changed = false;
+    // Shuffle order for better convergence
+    const shuffled = [...agentIds].sort(() => Math.random() - 0.5);
+    shuffled.forEach(a => {
+      const neighborLabels = {};
+      Object.entries(adj[a]).forEach(([nb, w]) => {
+        neighborLabels[label[nb]] = (neighborLabels[label[nb]] || 0) + w;
+      });
+      const best = Object.entries(neighborLabels).sort((a,b) => b[1]-a[1])[0];
+      if (best && best[1] > 0.5 && best[0] != label[a]) {
+        label[a] = parseInt(best[0]);
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+
+  // Group by label
+  const groups = {};
+  agentIds.forEach(a => { const l = label[a]; (groups[l] = groups[l] || []).push(a); });
+  return Object.values(groups).filter(c => c.length > 0);
+}
+
+function hullPoints(members, padding = 30) {
+  if (members.length === 0) return null;
+  const points = [];
+  members.forEach(aid => {
+    const n = nodeMap[aid]; if (!n) return;
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+      points.push([n.x + Math.cos(angle) * padding, n.y + Math.sin(angle) * padding]);
+    }
+  });
+  if (points.length < 3) return null;
+  return d3.polygonHull(points);
+}
+
+function edgeChanges(currentEdges, prevEdges) {
+  const toKey = e => e.slice().sort().join('-');
+  const curr = new Set(currentEdges.map(toKey));
+  const prev = new Set(prevEdges.map(toKey));
+  return {
+    stable: currentEdges.filter(e => prev.has(toKey(e))),
+    added: currentEdges.filter(e => !prev.has(toKey(e))),
+    removed: prevEdges.filter(e => !curr.has(toKey(e))),
+  };
+}
+
+function initGraph() {
+  const container = document.getElementById('graph-area');
+  const w = container.clientWidth, h = container.clientHeight;
+  svg = d3.select('#network-svg').attr('viewBox', `0 0 ${w} ${h}`);
+  svg.selectAll('*').remove();
+
+  const defs = svg.append('defs');
+  [['coop','#34d399'],['attack','#f87171'],['arm','#fbbf24']].forEach(([type, color]) => {
+    defs.append('marker').attr('id', `arrow-${type}`)
+      .attr('viewBox','0 0 10 6').attr('refX',10).attr('refY',3)
+      .attr('markerWidth',8).attr('markerHeight',6).attr('orient','auto')
+      .append('path').attr('d','M0,0 L10,3 L0,6').attr('fill', color);
+  });
+
+  zoomBehavior = d3.zoom().scaleExtent([0.3, 5]).on('zoom', e => gZoom.attr('transform', e.transform));
+  svg.call(zoomBehavior);
+
+  gZoom = svg.append('g').attr('class', 'zoom-layer');
+  gHulls = gZoom.append('g').attr('class', 'hulls-layer');
+  gLinks = gZoom.append('g');
+  gMessages = gZoom.append('g');
+  gActions = gZoom.append('g');
+  gNodes = gZoom.append('g');
+  gLabels = gZoom.append('g');
+
+  const r = rounds[0];
+  const agents = Object.keys(r.agents);
+  const nodes = agents.map(aid => ({id: aid, r: r.agents[aid].resources}));
+  const edges = (r.network?.edges || []).map(e => ({source: e[0], target: e[1]}));
+
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(d=>d.id).distance(currentSpacing))
+    .force('charge', d3.forceManyBody().strength(-currentSpacing * 2.5))
+    .force('center', d3.forceCenter(w/2, h/2))
+    .force('collision', d3.forceCollide().radius(currentSpacing * 0.3))
+    .on('tick', ticked);
+
+  const nodeG = gNodes.selectAll('g').data(nodes, d=>d.id).join('g').attr('class','node-g')
+    .call(d3.drag().on('start',dragStart).on('drag',dragged).on('end',dragEnd))
+    .on('click', (e,d) => selectAgent(d.id))
+    .on('mouseenter', (e,d) => showTooltip(e, d))
+    .on('mouseleave', () => hideTooltip());
+
+  nodeG.append('circle').attr('class','node-ring').attr('r', 20).attr('fill','none')
+    .attr('stroke','white').attr('stroke-width',2).attr('opacity',0);
+  nodeG.append('circle').attr('class','node-circle').attr('r', 12)
+    .attr('fill', d=>agentColor(d.id)).attr('opacity', 0.9);
+
+  gLabels.selectAll('text').data(nodes, d=>d.id).join('text')
+    .attr('text-anchor','middle').attr('dy', 28).attr('font-size', 10)
+    .attr('fill','rgba(255,255,255,0.4)').attr('class','node-label')
+    .text(d => agentShort(d.id));
+
+  nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+}
+
+function nodePos(id) {
+  const n = typeof id === 'object' ? id : nodeMap[id];
+  return n ? {x: n.x, y: n.y} : {x: 0, y: 0};
+}
+
+function ticked() {
+  gLinks.selectAll('line')
+    .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
+    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+  gActions.selectAll('line')
+    .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
+    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+  gMessages.selectAll('line')
+    .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
+    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+  gNodes.selectAll('g').attr('transform', d=>`translate(${d.x},${d.y})`);
+  gLabels.selectAll('text').attr('x', d=>d.x).attr('y', d=>d.y);
+
+  // Update hulls on tick
+  gHulls.selectAll('.cluster-hull').attr('d', function(d) {
+    const pts = hullPoints(d.members);
+    return pts ? 'M' + pts.join('L') + 'Z' : '';
+  });
+}
+
+function dragStart(e,d) { if(!e.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; }
+function dragged(e,d) { d.fx=e.x; d.fy=e.y; }
+function dragEnd(e,d) { if(!e.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }
+
+// Tooltip
+function showTooltip(e, d) {
+  const r = rounds[currentRound];
+  const info = r.agents[d.id];
+  const tip = document.getElementById('tooltip');
+  const arm = info?.arm_bonus > 0.1 ? `<br>Arm: +${info.arm_bonus.toFixed(1)}` : '';
+  const tgt = info?.target ? ` &rarr; ${agentShort(info.target)}` : '';
+  let bdTip = '';
+  const bd = info?.breakdown;
+  if (bd) {
+    const parts = [];
+    if (bd.invest_self > 0.01) parts.push(`self +${bd.invest_self.toFixed(1)}`);
+    if (bd.invest_received > 0.01) parts.push(`recv +${bd.invest_received.toFixed(1)}`);
+    if (bd.invest_cost > 0.01) parts.push(`cost -${bd.invest_cost.toFixed(1)}`);
+    if (bd.arm_cost > 0.01) parts.push(`arm -${bd.arm_cost.toFixed(1)}`);
+    if (Math.abs(bd.combat_transfer||0) > 0.01) parts.push(`combat ${bd.combat_transfer>=0?'+':''}${bd.combat_transfer.toFixed(1)}`);
+    if (bd.decay > 0.01) parts.push(`decay -${bd.decay.toFixed(1)}`);
+    if (parts.length) bdTip = `<br><span style="color:var(--text2);font-size:10px">${parts.join(' · ')}</span>`;
+  }
+  tip.innerHTML = `<b style="color:${agentColor(d.id)}">${agentShort(d.id)}</b> &mdash; ${info?.resources?.toFixed(1) || '?'}${arm}<br><span class="${ACTION_CSS(info?.action)}">${info?.action || '?'}</span>${tgt}${bdTip}`;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY - 10) + 'px';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+// ═══ RENDER ROUND ═══
+function renderRound() {
+  const r = rounds[currentRound];
+  const prev = currentRound > 0 ? rounds[currentRound-1] : null;
+  const agents = r.agents;
+  const agentIds = Object.keys(agents).sort();
+
+  // Round label
+  document.getElementById('round-label').textContent = `R${r.round} / ${rounds[rounds.length-1].round}`;
+
+  // ── Metrics ──
+  const fc = r.primary.cooperation_ratio;
+  const gini = r.primary.gini;
+  const mod = r.primary.modularity;
+  const stab = r.secondary.action_stability;
+  const palma = r.secondary.palma;
+
+  function setMetric(id, val, fmt, prevVal) {
+    const el = document.getElementById(id);
+    let trend = '';
+    if (prevVal !== undefined && prevVal !== null) {
+      const diff = val - prevVal;
+      if (Math.abs(diff) < 0.005) trend = ' <span class="trend-flat">&#8212;</span>';
+      else if (diff > 0) trend = ' <span class="trend-up">&#9650;</span>';
+      else trend = ' <span class="trend-down">&#9660;</span>';
+    }
+    el.innerHTML = fmt(val) + trend;
+  }
+
+  setMetric('m-fc', fc, v=>v.toFixed(2), prev?.primary.cooperation_ratio);
+  document.getElementById('m-fc').style.color = fc >= 0.4 ? '#34d399' : fc >= 0.15 ? '#fbbf24' : '#f87171';
+
+  setMetric('m-gini', gini, v=>v.toFixed(3), prev?.primary.gini);
+  document.getElementById('m-gini').style.color = gini < 0.15 ? '#34d399' : gini < 0.35 ? '#fbbf24' : '#f87171';
+
+  setMetric('m-mod', mod, v=>v.toFixed(2), prev?.primary.modularity);
+  document.getElementById('m-mod').style.color = mod > 0.3 ? '#818cf8' : mod > 0.1 ? '#60a5fa' : '#64748b';
+
+  document.getElementById('m-stab').textContent = stab != null ? (stab*100).toFixed(0)+'%' : '--';
+  document.getElementById('m-stab').style.color = stab != null && stab >= 0.7 ? 'var(--text)' : 'var(--text2)';
+
+  // Palma
+  document.getElementById('cfg-palma').textContent = palma != null ? (palma === Infinity ? '∞' : palma.toFixed(2)) : '--';
+
+  // Sparklines
+  drawSparkline('spark-fc', rounds.map(r=>r.primary.cooperation_ratio), currentRound, '#34d399');
+  drawSparkline('spark-gini', rounds.map(r=>r.primary.gini), currentRound, '#fbbf24');
+  drawSparkline('spark-mod', rounds.map(r=>r.primary.modularity), currentRound, '#818cf8');
+
+  // ── Action distribution ──
+  const dist = r.secondary.action_distribution || {};
+  const totalActions = Math.max(ACTION_ORDER.reduce((s,a) => s + (dist[a]||0), 0), 1);
+  const barsEl = document.getElementById('action-bars');
+  barsEl.innerHTML = '';
+  ACTION_ORDER.forEach(action => {
+    const count = dist[action] || 0;
+    const pct = (count / totalActions * 100);
+    const row = document.createElement('div');
+    row.className = 'action-bar-row';
+    row.innerHTML = `<span class="action-bar-label ${ACTION_CSS(action)}">${ACTION_LABELS[action]}</span><div class="action-bar-track"><div class="action-bar-fill" style="width:${pct}%;background:${ACTION_COLORS_MAP[action]};opacity:0.7"></div></div><span class="action-bar-count">${count}</span>`;
+    barsEl.appendChild(row);
+  });
+
+  // ── Standings ──
+  const sorted = [...agentIds].sort((a,b) => agents[b].resources - agents[a].resources);
+  const maxRes = Math.max(...sorted.map(a => agents[a].resources), 1);
+  const listEl = document.getElementById('standings-list');
+  listEl.innerHTML = '';
+  sorted.forEach((aid, i) => {
+    const info = agents[aid];
+    const pct = (info.resources / maxRes * 100).toFixed(1);
+    const color = agentColor(aid);
+    const entry = document.createElement('div');
+    entry.className = 'standing-entry' + (aid === selectedAgent ? ' selected' : '');
+    const armStr = info.arm_bonus > 0.1 ? `+${info.arm_bonus.toFixed(0)}` : '';
+    entry.innerHTML = `<span class="standing-rank">${i+1}</span><span class="standing-agent" style="color:${color}">${agentShort(aid)}</span><span class="standing-icon ${ACTION_CSS(info.action)}">${ACTION_ICONS[info.action]||''}</span><div class="standing-bar-track"><div class="standing-bar-fill" style="width:${pct}%;background:${color};opacity:0.6"></div></div><span class="standing-value">${info.resources.toFixed(0)}</span><span class="standing-arm">${armStr}</span>`;
+    entry.onclick = () => selectAgent(aid);
+    listEl.appendChild(entry);
+  });
+
+  // ── Graph ──
+  updateGraph(r);
+
+  // ── Combat (sidebar) ──
+  const entriesEl = document.getElementById('combat-entries');
+  if (r.combat && r.combat.length > 0) {
+    entriesEl.innerHTML = r.combat.map(c => {
+      const atkIds = (c.attackers || [c.attacker]).filter(Boolean);
+      const atks = atkIds.map(a =>
+        `<span style="color:${agentColor(a)}">${agentShort(a)}</span>`
+      ).join(', ');
+      const defId = c.defender || '?';
+      const def = `<span style="color:${agentColor(defId)}">${agentShort(defId)}</span>`;
+      const won = c.winner === 'coalition';
+      const icon = won ? '<span style="color:var(--attack)">&#9876;</span>' : '<span style="color:var(--coop)">&#9670;</span>';
+      const prob = c.attacker_win_prob != null ? ` <span style="color:var(--dim)">(${(c.attacker_win_prob*100).toFixed(0)}%)</span>` : '';
+      const winLabel = won ? 'attackers win' : 'defender wins';
+
+      // Resource outcome: use actual combat transfer if available, else estimate from breakdown
+      let outcome = '';
+      const transfer = c.total_transfer;
+      if (transfer != null) {
+        // Show actual combat-only transfer
+        const loser = won ? defId : atkIds[0];
+        const winners = won ? atkIds : [defId];
+        outcome += `<span style="color:${agentColor(loser)}">${agentShort(loser)}</span> -${transfer.toFixed(1)}`;
+        winners.forEach(a => {
+          const share = won
+            ? (c.attacker_powers?.[a] || 1) / (c.coalition_power || 1) * transfer
+            : transfer;
+          outcome += ` &nbsp;<span style="color:${agentColor(a)}">${agentShort(a)}</span> +${share.toFixed(1)}`;
+        });
+      } else if (prev) {
+        // Fallback: use breakdown if available
+        const defBd = agents[defId]?.breakdown;
+        const defCombat = defBd?.combat_transfer;
+        if (defCombat != null) {
+          outcome += `<span style="color:${agentColor(defId)}">${agentShort(defId)}</span> ${defCombat >= 0 ? '+' : ''}${defCombat.toFixed(1)}`;
+          atkIds.forEach(a => {
+            const bd = agents[a]?.breakdown;
+            const ct = bd?.combat_transfer || 0;
+            outcome += ` &nbsp;<span style="color:${agentColor(a)}">${agentShort(a)}</span> ${ct >= 0 ? '+' : ''}${ct.toFixed(1)}`;
+          });
+        }
+      }
+
+      return `<div class="combat-entry">${icon} [${atks}] vs ${def}${prob}<br><span style="font-size:10px;color:var(--dim)">${winLabel}</span>${outcome ? `<div class="combat-outcome">${outcome}</div>` : ''}</div>`;
+    }).join('');
+  } else {
+    entriesEl.innerHTML = '<span style="color:var(--dim);font-size:11px">No combat this round</span>';
+  }
+
+  // Update card if open
+  if (selectedAgent && agents[selectedAgent]) renderCard(selectedAgent);
+}
+
+const CLUSTER_COLORS = ['#818cf8','#f472b6','#34d399','#fbbf24','#60a5fa','#f87171','#fb923c','#c084fc','#22d3ee','#a3e635'];
+
+function updateGraph(r) {
+  const agents = r.agents;
+  const agentIds = Object.keys(agents);
+  const rawEdges = r.network?.edges || [];
+  const edges = rawEdges.map(e => ({source: e[0], target: e[1]}));
+
+  // Communities — mode determines algorithm
+  const clusterMode = document.getElementById('cluster-mode')?.value || 'network';
+  const isActionMode = clusterMode.startsWith('actions');
+  const actionWindow = clusterMode === 'actions' ? 1 : null; // null = all rounds
+  let communities;
+  if (isActionMode) {
+    communities = detectActionCommunities(agents, currentRound, actionWindow);
+  } else {
+    communities = detectCommunities(rawEdges, agents, currentRound);
+  }
+  const nodeCluster = {};
+  communities.forEach((members, ci) => members.forEach(aid => { nodeCluster[aid] = ci; }));
+
+  // Hulls
+  gHulls.selectAll('.cluster-hull')
+    .data(communities.filter(c => c.length >= 3), (d,i) => i)
+    .join('path')
+    .attr('class', 'cluster-hull')
+    .attr('fill', (d,i) => CLUSTER_COLORS[i % CLUSTER_COLORS.length])
+    .attr('stroke', (d,i) => CLUSTER_COLORS[i % CLUSTER_COLORS.length])
+    .each(function(d) { d.members = d; });
+
+  // ── Edge rendering depends on mode ──
+  const showDiff = document.getElementById('show-edge-diff')?.checked;
+  const showMsgs = document.getElementById('show-messages')?.checked;
+  const toKey = e => e.slice().sort().join('-');
+
+  if (isActionMode) {
+    // In action mode: show cooperation history as green edges, attacks as red
+    const edgeWindow = actionWindow || (currentRound + 1); // 1 = this round, null = all
+    const coopEdges = {};
+    const attackEdges = {};
+    for (let i = Math.max(0, currentRound - edgeWindow + 1); i <= currentRound; i++) {
+      const rd = rounds[i]; if (!rd) continue;
+      Object.entries(rd.agents).forEach(([aid, info]) => {
+        if (!info.target) return;
+        const key = [aid, info.target].sort().join('-');
+        if (info.action === 'invest_other' || info.action === 'arm_other') {
+          coopEdges[key] = (coopEdges[key] || 0) + 1;
+        } else if (info.action === 'attack') {
+          attackEdges[key] = (attackEdges[key] || 0) + 1;
+        }
+      });
+    }
+
+    const actionLinks = [];
+    Object.entries(coopEdges).forEach(([key, w]) => {
+      const [a, b] = key.split('-');
+      actionLinks.push({source: a, target: b, status: 'coop', weight: w});
+    });
+    Object.entries(attackEdges).forEach(([key, w]) => {
+      const [a, b] = key.split('-');
+      actionLinks.push({source: a, target: b, status: 'hostile', weight: w});
+    });
+
+    gLinks.selectAll('line').data(actionLinks, d=>`${d.source}-${d.target}-${d.status}`)
+      .join('line')
+      .attr('stroke', d => d.status === 'coop' ? '#34d399' : '#f87171')
+      .attr('stroke-width', d => Math.min(1 + d.weight * 0.8, 4))
+      .attr('stroke-dasharray', d => d.status === 'hostile' ? '4,3' : 'none')
+      .attr('stroke-opacity', d => Math.min(0.3 + d.weight * 0.15, 0.8));
+  } else {
+    // Network mode: show structural edges
+    const prevEdges = currentRound > 0 ? (rounds[currentRound - 1].network?.edges || []) : [];
+    const changes = edgeChanges(rawEdges, prevEdges);
+    const addedSet = new Set(changes.added.map(toKey));
+
+    let allEdges;
+    if (showDiff) {
+      allEdges = [
+        ...rawEdges.map(e => ({source: e[0], target: e[1], status: addedSet.has(toKey(e)) ? 'added' : 'stable'})),
+        ...changes.removed.map(e => ({source: e[0], target: e[1], status: 'removed'})),
+      ];
+    } else {
+      allEdges = rawEdges.map(e => ({source: e[0], target: e[1], status: 'stable'}));
+    }
+
+    gLinks.selectAll('line').data(allEdges, d=>`${d.source}-${d.target}-${d.status}`)
+      .join('line')
+      .attr('stroke', d => d.status === 'added' ? '#34d399' : d.status === 'removed' ? '#f87171' : 'rgba(255,255,255,0.12)')
+      .attr('stroke-width', d => d.status === 'stable' ? 1 : 1.5)
+      .attr('stroke-dasharray', d => d.status === 'removed' ? '3,5' : d.status === 'added' ? '5,3' : 'none')
+      .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 1);
+  }
+
+  // Message lines (shown in both modes)
+  const msgEdges = [];
+  if (showMsgs && r.messages) {
+    r.messages.forEach(m => {
+      if (m.to && nodeMap[m.from] && nodeMap[m.to]) {
+        msgEdges.push({source: m.from, target: m.to});
+      }
+    });
+  }
+  gMessages.selectAll('line').data(msgEdges, d=>`msg-${d.source}-${d.target}`)
+    .join('line')
+    .attr('class', 'msg-line')
+    .attr('stroke', '#818cf8')
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '3,4')
+    .attr('stroke-opacity', 0.4);
+
+  // Node sizes
+  const maxR = Math.max(...agentIds.map(a => agents[a].resources), 1);
+  gNodes.selectAll('.node-circle').data(agentIds.map(a=>nodeMap[a]).filter(Boolean), d=>d.id)
+    .attr('r', d => 7 + 13 * Math.sqrt((agents[d.id]?.resources||1) / maxR))
+    .attr('stroke', d => {
+      const bonus = agents[d.id]?.arm_bonus || 0;
+      return bonus > 0.1 ? '#fbbf24' : 'none';
+    })
+    .attr('stroke-width', d => {
+      const bonus = agents[d.id]?.arm_bonus || 0;
+      return bonus > 0.1 ? Math.min(1.5 + bonus / 4, 5) : 0;
+    });
+
+  // Action arrows (togglable)
+  const showActions = document.getElementById('show-actions')?.checked;
+  const actionEdges = [];
+  if (showActions) {
+    agentIds.forEach(aid => {
+      const info = agents[aid];
+      if (info.target && info.action) {
+        let type = null;
+        if (info.action === 'invest_other') type = 'coop';
+        else if (info.action === 'attack') type = 'attack';
+        else if (info.action === 'arm_other') type = 'arm';
+        if (type) actionEdges.push({source: aid, target: info.target, type});
+      }
+    });
+  }
+
+  gActions.selectAll('line').data(actionEdges, d=>`${d.source}-${d.target}-${d.type}`)
+    .join('line')
+    .attr('stroke', d => d.type==='coop' ? '#34d399' : d.type==='attack' ? '#f87171' : '#fbbf24')
+    .attr('stroke-width', 2.5)
+    .attr('stroke-dasharray', d => d.type==='attack' ? '6,3' : 'none')
+    .attr('marker-end', d => `url(#arrow-${d.type})`)
+    .attr('opacity', 0.7);
+
+  // Update forces — in action mode use cooperation links for layout
+  let simEdges;
+  if (isActionMode) {
+    // Build cooperation edges for layout from history
+    const coopPairs = new Set();
+    const simWindow = actionWindow || (currentRound + 1);
+    for (let i = Math.max(0, currentRound - simWindow + 1); i <= currentRound; i++) {
+      const rd = rounds[i]; if (!rd) continue;
+      Object.entries(rd.agents).forEach(([aid, info]) => {
+        if (info.target && (info.action === 'invest_other' || info.action === 'arm_other')) {
+          coopPairs.add([aid, info.target].sort().join('-'));
+        }
+      });
+      // Messages also pull together
+      if (rd.messages) rd.messages.forEach(m => {
+        if (m.from && m.to) coopPairs.add([m.from, m.to].sort().join('-'));
+      });
+    }
+    simEdges = [...coopPairs].map(key => {
+      const [a, b] = key.split('-');
+      return {source: nodeMap[a] || a, target: nodeMap[b] || b};
+    });
+  } else {
+    simEdges = edges.map(e => ({
+      source: nodeMap[e.source] || e.source,
+      target: nodeMap[e.target] || e.target,
+    }));
+  }
+  simulation.force('link').links(simEdges);
+
+  const container = document.getElementById('graph-area');
+  const w = container.clientWidth, h = container.clientHeight;
+  const nClusters = communities.length;
+  // Spread clusters further apart: radius scales with viewport and cluster count
+  const spreadRadius = Math.min(w, h) * Math.min(0.25 + nClusters * 0.03, 0.4);
+  const clusterCenters = {};
+  communities.forEach((members, ci) => {
+    const angle = (ci / Math.max(nClusters, 1)) * Math.PI * 2 - Math.PI / 2;
+    clusterCenters[ci] = {
+      x: w/2 + Math.cos(angle) * spreadRadius,
+      y: h/2 + Math.sin(angle) * spreadRadius
+    };
+  });
+
+  // Stronger cluster pull to separate hulls
+  const clusterStrength = Math.min(0.12 + nClusters * 0.02, 0.25);
+  simulation.force('clusterX', d3.forceX(d => {
+    const ci = nodeCluster[d.id];
+    return ci !== undefined && clusterCenters[ci] ? clusterCenters[ci].x : w/2;
+  }).strength(clusterStrength));
+  simulation.force('clusterY', d3.forceY(d => {
+    const ci = nodeCluster[d.id];
+    return ci !== undefined && clusterCenters[ci] ? clusterCenters[ci].y : h/2;
+  }).strength(clusterStrength));
+
+  simulation.alpha(0.3).restart();
+}
+
+// ═══ AGENT CARD ═══
+function selectAgent(aid) {
+  selectedAgent = aid;
+  document.getElementById('agent-card').classList.add('open');
+  gNodes.selectAll('.node-ring').attr('opacity', d => d.id === aid ? 1 : 0);
+  document.querySelectorAll('.standing-entry').forEach((e,i) => {
+    e.classList.toggle('selected', e.querySelector('.standing-agent')?.textContent === agentShort(aid));
+  });
+  renderCard(aid);
+}
+
+function renderCard(aid) {
+  const r = rounds[currentRound];
+  const info = r.agents[aid];
+  if (!info) return;
+
+  const color = agentColor(aid);
+  document.getElementById('card-name').innerHTML = `<span style="color:${color}">${aid}</span>`;
+
+  const tgtHtml = info.target ? ` &rarr; <span style="color:${agentColor(info.target)}">${agentShort(info.target)}</span>` : '';
+  document.getElementById('card-action').innerHTML = `<span class="${ACTION_CSS(info.action)}">${info.action}</span>${tgtHtml}`;
+
+  const armStr = info.arm_bonus > 0.1 ? ` + ${info.arm_bonus.toFixed(1)} arm = ${(info.resources + info.arm_bonus).toFixed(1)} strength` : '';
+  document.getElementById('card-res').textContent = `${info.resources.toFixed(1)} resources${armStr}`;
+
+  // Resource breakdown (if available)
+  const bdEl = document.getElementById('card-breakdown');
+  const bd = info.breakdown;
+  if (bd && bdEl) {
+    const items = [];
+    if (bd.invest_self > 0.01) items.push({label: 'invest self', val: bd.invest_self, cls: 'coop'});
+    if (bd.invest_received > 0.01) items.push({label: 'invest received', val: bd.invest_received, cls: 'coop'});
+    if (bd.invest_cost > 0.01) items.push({label: 'invest cost', val: -bd.invest_cost, cls: 'dim'});
+    if (bd.arm_cost > 0.01) items.push({label: 'arm cost', val: -bd.arm_cost, cls: 'arm'});
+    if (bd.conflict_cost > 0.01) items.push({label: 'conflict cost', val: -bd.conflict_cost, cls: 'attack'});
+    if (Math.abs(bd.combat_transfer || 0) > 0.01) items.push({label: 'combat', val: bd.combat_transfer, cls: bd.combat_transfer >= 0 ? 'coop' : 'attack'});
+    if (bd.decay > 0.01) items.push({label: 'decay', val: -bd.decay, cls: 'dim'});
+    if (items.length > 0) {
+      const net = items.reduce((s, i) => s + i.val, 0);
+      bdEl.innerHTML = items.map(i =>
+        `<span class="bd-item bd-${i.cls}">${i.label} <b>${i.val >= 0 ? '+' : ''}${i.val.toFixed(1)}</b></span>`
+      ).join('') + `<span class="bd-item bd-net">net <b>${net >= 0 ? '+' : ''}${net.toFixed(1)}</b></span>`;
+      bdEl.style.display = 'flex';
+    } else {
+      bdEl.style.display = 'none';
+    }
+  } else if (bdEl) {
+    bdEl.style.display = 'none';
+  }
+
+  // Stats strip
+  const statsEl = document.getElementById('card-stats');
+  const latency = info.latency_s ? info.latency_s.toFixed(1) + 's' : '--';
+  const tokens = info.tokens || '--';
+  // Cooperation rate for this agent across rounds
+  let coopCount = 0, totalRounds = 0;
+  rounds.forEach(rd => {
+    const a = rd.agents[aid];
+    if (a) { totalRounds++; if (a.action === 'invest_other') coopCount++; }
+  });
+  const coopRate = totalRounds > 0 ? (coopCount/totalRounds*100).toFixed(0) + '%' : '--';
+  statsEl.innerHTML = `
+    <div class="card-stat"><div class="stat-label">Coop Rate</div><div class="stat-value" style="color:var(--coop)">${coopRate}</div></div>
+    <div class="card-stat"><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
+    <div class="card-stat"><div class="stat-label">Latency</div><div class="stat-value">${latency}</div></div>
+  `;
+
+  const body = document.getElementById('card-body');
+  let html = '';
+
+  // Note to self (first, collapsed by default)
+  if (info.note_to_self) {
+    html += `<details class="card-section" open><summary>Note to Self</summary><div class="content"><div class="note-box">${escHtml(info.note_to_self)}</div></div></details>`;
+  }
+
+  // Reasoning (collapsed by default)
+  const reasoning = info.reasoning || info.thinking || '';
+  if (reasoning) {
+    html += `<details class="card-section"><summary>Reasoning</summary><div class="content"><pre>${escHtml(reasoning)}</pre></div></details>`;
+  }
+
+  // Input prompt (collapsed by default)
+  if (info.prompt) {
+    html += `<details class="card-section"><summary>Input Prompt</summary><div class="content"><pre>${escHtml(info.prompt)}</pre></div></details>`;
+  }
+
+  // Raw LLM output (collapsed by default)
+  if (info.response) {
+    html += `<details class="card-section"><summary>Raw Output</summary><div class="content"><pre>${escHtml(info.response)}</pre></div></details>`;
+  }
+
+  // Inbox
+  const inbox = r.messages?.filter(m => m.to === aid) || [];
+  if (inbox.length > 0) {
+    html += `<details class="card-section"><summary>Inbox (${inbox.length})</summary><div class="content">`;
+    inbox.forEach(m => {
+      html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span> <span class="msg-text">${escHtml(m.text)}</span></div>`;
+    });
+    html += '</div></details>';
+  }
+
+  // Outbox
+  const outbox = r.messages?.filter(m => m.from === aid) || [];
+  if (outbox.length > 0) {
+    html += `<details class="card-section"><summary>Outbox (${outbox.length})</summary><div class="content">`;
+    outbox.forEach(m => {
+      const to = m.to ? `<span style="color:${agentColor(m.to)}">${agentShort(m.to)}</span>` : '<span style="color:var(--dim)">all</span>';
+      html += `<div class="msg-item">&rarr; ${to} <span class="msg-text">${escHtml(m.text)}</span></div>`;
+    });
+    html += '</div></details>';
+  }
+
+  // History
+  html += `<details class="card-section"><summary>History (${rounds.length}r)</summary><div class="content"><div class="history-grid">`;
+  rounds.forEach((rd, i) => {
+    const a = rd.agents[aid]; if (!a) return;
+    const tgt = a.target ? agentShort(a.target) : '';
+    const cls = i === currentRound ? 'history-item current' : 'history-item';
+    html += `<div class="${cls}"><span class="round-num">R${rd.round}</span><span class="hist-action ${ACTION_CSS(a.action)}">${a.action}</span><span class="hist-target">${tgt}</span><span class="hist-res">${a.resources.toFixed(0)}</span></div>`;
+  });
+  html += '</div></div></details>';
+
+  body.innerHTML = html;
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══ SPARKLINES ═══
+function drawSparkline(canvasId, values, current, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth * 2;
+  const h = canvas.height = canvas.offsetHeight * 2;
+  ctx.clearRect(0, 0, w, h);
+  if (values.length < 2) return;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const step = w / (values.length - 1);
+
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.6;
+  values.forEach((v, i) => {
+    const x = i * step;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  if (current < values.length) {
+    const x = current * step;
+    const y = h - ((values[current] - min) / range) * (h - 4) - 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+}
+</script>
+</body>
+</html>

@@ -182,17 +182,17 @@
 %	defined as \examname above so you cite it as \examname
 %----------------------------------------------------------------------------------------
 
-\thesistitle{Your Thesis Title} % Your thesis title - this is used in the title and abstract
-%-------------------------------------------------  
-\supervisor{supervisor name} % You supervisor's name - this is used in the title page
-%-------------------------------------------------   
-\examiner{examiner name} % Your examiner's name - this is not currently used anywhere in the template, cite it with \examname if you want it
-%-------------------------------------------------   
-\assessor{assessor name} % Your assesor's name - this is not currently used anywhere in the template, cite it with \assessorname if you want it
-%-------------------------------------------------   
+\thesistitle{The Origins of Order: Strategic Reasoning, Information, and Enforcement in Multi-Agent LLM Societies}
+%-------------------------------------------------
+\supervisor{Dr. Debraj Roy} % You supervisor's name - this is used in the title page
+%-------------------------------------------------
+\examiner{TBD} % Your examiner's name
+%-------------------------------------------------
+\assessor{TBD} % Your assessor's name
+%-------------------------------------------------
 \degree{Master of Science in Computational Science} % Your degree name - this is currently used in the title page and abstract
-%-------------------------------------------------   
-\authors{First name \textsc{surname}} % Your name - this is used in the title page and abstract
+%-------------------------------------------------
+\authors{Koen \textsc{Verlaan}} % Your name - this is used in the title page and abstract
 %-------------------------------------------------   
 \addresses{} % Your address - this is not currently used anywhere in the template, cite it with \addressnames if you want it
 %-------------------------------------------------   

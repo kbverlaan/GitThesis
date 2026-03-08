@@ -1,19 +1,19 @@
 #!/bin/bash
 # Nightrun Stage 1: Qwen 3.5-27B OAT screening sweeps
-# Quick: 10 agents, 10 rounds | invest_self ON but tiny (+2%)
-# Memory OFF for param sweeps, separate memory on/off comparison
+# Quick: 10 agents, 10 rounds | invest_self OFF (default)
+# invest_self on/off tested as separate sweep
 #
-# Total: 132 runs, 17 array tasks
+# Total: 116 runs, 15 array tasks
 #
 # Usage: ssh snellius 'bash ~/origins/simulation/snellius/submit_qwen_nightrun.sh'
 
 cd ~/origins/simulation
 MODEL=/scratch-shared/kverlaan/origins_models/Qwen3.5-27B
-TIME="04:00:00"
+TIME="06:00:00"  # Reduced from 8h: MTP + higher timeout = fewer wasted retries
 
 echo "=== Qwen 3.5-27B Stage 1: Screening Sweeps ==="
 echo "Start: $(date)"
-echo "Quick mode: 10 agents, 10 rounds"
+echo "Quick mode: 10 agents, 10 rounds, invest_self OFF"
 echo "Levels: L1 + L3 | Reps: 2"
 echo ""
 
@@ -21,11 +21,11 @@ mkdir -p logs
 
 # --- Conflict theta ---
 
-# 1. conflict_cost_pct: [0,5,10,20] × L1+L3 × 2 reps = 16 runs
+# 1. conflict_cost_pct: [2,5,10,20] × L1+L3 × 2 reps = 16 runs
 JOB1=$(sbatch --parsable --array=0-1 --gpus-per-node=1 --time=$TIME \
   --job-name=qw_conflict snellius/snellius_run.sh \
   $MODEL experiments/qwen_sweep_conflict_cost.yaml 1 8)
-echo "conflict_cost_pct [0,5,10,20%]: job $JOB1 (16 runs, 2 tasks)"
+echo "conflict_cost_pct [2,5,10,20%]: job $JOB1 (16 runs, 2 tasks)"
 
 # 2. attack_take_pct: [20,40,60,80] × L1+L3 × 2 reps = 16 runs
 JOB2=$(sbatch --parsable --array=0-1 --gpus-per-node=1 --time=$TIME \
@@ -35,17 +35,17 @@ echo "attack_take_pct [20,40,60,80%]: job $JOB2 (16 runs, 2 tasks)"
 
 # --- Arming theta ---
 
-# 3. arm_cost_pct (self): [0,5,10,20] × L1+L3 × 2 reps = 16 runs
+# 3. arm_cost_pct (self): [5,10,20] × L1+L3 × 2 reps = 12 runs
 JOB3=$(sbatch --parsable --array=0-1 --gpus-per-node=1 --time=$TIME \
   --job-name=qw_arm_self snellius/snellius_run.sh \
-  $MODEL experiments/qwen_sweep_arm_self.yaml 1 8)
-echo "arm_cost_pct (self) [0,5,10,20%]: job $JOB3 (16 runs, 2 tasks)"
+  $MODEL experiments/qwen_sweep_arm_self.yaml 1 6)
+echo "arm_cost_pct (self) [5,10,20%]: job $JOB3 (12 runs, 2 tasks)"
 
-# 4. arm_other_cost_pct: [0,5,10,20] × L1+L3 × 2 reps = 16 runs
+# 4. arm_other_cost_pct: [5,10,20] × L1+L3 × 2 reps = 12 runs
 JOB4=$(sbatch --parsable --array=0-1 --gpus-per-node=1 --time=$TIME \
   --job-name=qw_arm_other snellius/snellius_run.sh \
-  $MODEL experiments/qwen_sweep_arm_other.yaml 1 8)
-echo "arm_other_cost_pct [0,5,10,20%]: job $JOB4 (16 runs, 2 tasks)"
+  $MODEL experiments/qwen_sweep_arm_other.yaml 1 6)
+echo "arm_other_cost_pct [5,10,20%]: job $JOB4 (12 runs, 2 tasks)"
 
 # --- Cooperation theta ---
 
@@ -69,15 +69,13 @@ JOB7=$(sbatch --parsable --array=0-1 --gpus-per-node=1 --time=$TIME \
   $MODEL experiments/qwen_sweep_radius.yaml 1 6)
 echo "radius [1,2,3]: job $JOB7 (12 runs, 2 tasks)"
 
-# --- Invest self ---
+# --- Toggles ---
 
 # 8. invest_self on/off: 2 × L1+L3 × 2 reps = 8 runs
 JOB8=$(sbatch --parsable --array=0-0 --gpus-per-node=1 --time=$TIME \
   --job-name=qw_inv_self snellius/snellius_run.sh \
   $MODEL experiments/qwen_sweep_invest_self.yaml 1 8)
 echo "invest_self [on,off]: job $JOB8 (8 runs, 1 task)"
-
-# --- Memory ---
 
 # 9. memory on/off: 2 × L1+L3 × 2 reps = 8 runs
 JOB9=$(sbatch --parsable --array=0-0 --gpus-per-node=1 --time=$TIME \
@@ -86,7 +84,7 @@ JOB9=$(sbatch --parsable --array=0-0 --gpus-per-node=1 --time=$TIME \
 echo "memory [on,off]: job $JOB9 (8 runs, 1 task)"
 
 echo ""
-echo "=== Submitted 9 experiments, 17 array tasks, 132 runs total ==="
-echo "SBU estimate: ~13K (17 tasks × 4h × 192 SBU/GPU-h)"
+echo "=== Submitted 9 experiments, 15 array tasks, 116 runs total ==="
+echo "SBU estimate: ~12K (15 tasks × 4h × 192 SBU/GPU-h)"
 echo "Monitor: squeue -u kverlaan"
 echo "Logs: tail -f ~/origins/simulation/logs/qw_*"

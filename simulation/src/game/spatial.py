@@ -112,22 +112,29 @@ class NetworkTopology:
         """Get direct neighbours of an agent."""
         return sorted(self.adj[agent_id])
 
-    def rewire(self, resource_changes_history: List[Dict[str, float]]) -> dict:
+    def rewire(self, bilateral_flows_history: List[Dict]) -> dict:
         """
-        Payoff-based rewiring (Zimmermann & Eguíluz, 2004).
+        Bilateral payoff-based rewiring (Zimmermann & Eguíluz, 2004).
 
         Each agent rewires with probability w:
-          1. Compute cumulative payoff (net resource change) per neighbour
-             over the payoff window
-          2. Drop the lowest-payoff neighbour
+          1. Compute cumulative bilateral payoff per neighbour over the
+             payoff window: how much did this neighbour GIVE me (invest_other)
+             minus how much did they TAKE from me (attack wins)?
+          2. Drop the neighbour with the lowest bilateral payoff
           3. Add a random non-neighbour
 
-        Constraints: break-one-make-one (edge conservation), min degree ≥ 1.
+        This is unilateral: either side of an edge can sever it. A "bully"
+        wants to keep a victim (high payoff), but the victim can leave
+        (negative payoff from being attacked). This naturally produces
+        cooperator clustering and defector isolation.
+
+        Constraints: break-one-make-one (edge conservation), min degree >= 1.
 
         Args:
-            resource_changes_history: List of resource_changes dicts from
-                recent rounds (most recent last). Each dict maps agent_id
-                to net resource change that round.
+            bilateral_flows_history: List of bilateral_flows dicts from
+                recent rounds (most recent last). Each dict maps
+                (from_agent, to_agent) -> net resource flow (positive =
+                gave resources via invest, negative = took via attack).
 
         Returns:
             Dict with rewiring stats: {edges_dropped, edges_added, agents_rewired}
@@ -136,13 +143,37 @@ class NetworkTopology:
             return {"edges_dropped": 0, "edges_added": 0, "agents_rewired": 0}
 
         # Use the last payoff_window rounds
-        window = resource_changes_history[-self.payoff_window:]
+        window = bilateral_flows_history[-self.payoff_window:]
 
-        # Compute cumulative payoff per agent over the window
-        cumulative_payoff: Dict[str, float] = defaultdict(float)
-        for rc in window:
-            for aid, change in rc.items():
-                cumulative_payoff[aid] += change
+        # Compute cumulative bilateral payoff: what did each neighbour
+        # do FOR me over the window?
+        #
+        # Convention: flows[(A, B)] > 0 means resources moved from A to B.
+        # Two types of flow:
+        #   invest_other: voluntary — A chose to give to B. Positive for B.
+        #   combat: involuntary — loser's resources flow to winner.
+        #
+        # We track BOTH sides so agents can evaluate neighbors properly:
+        #   - Received investment from X → X is valuable (+)
+        #   - Lost combat resources to X → X is harmful (-)
+        #   - Gave investment to X → my choice, doesn't affect X's score
+        #   - Won combat against X → X was profitable (+)
+        #
+        # Implementation: use separate invest/combat flow dicts in engine,
+        # but since we only have total flows here, we use a simpler rule:
+        #   payoff[me][them] = flows[(them, me)] - flows[(me, them)]
+        # This means:
+        #   Mutual invest: A→B=3, B→A=3 → payoff[A][B]=3-3=0 (neutral)
+        #   One-way invest: A→B=3 → payoff[B][A]=3 (B likes A), payoff[A][B]=-3
+        #
+        # Problem: one-way invest penalizes the investor. But that's actually
+        # correct for rewiring: if I invest in you and you never reciprocate,
+        # I SHOULD drop you and find someone who does.
+        bilateral_payoff: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for flows in window:
+            for (from_id, to_id), amount in flows.items():
+                bilateral_payoff[to_id][from_id] += amount
+                bilateral_payoff[from_id][to_id] -= amount
 
         edges_dropped = 0
         edges_added = 0
@@ -158,7 +189,7 @@ class NetworkTopology:
 
             neighbors = list(self.adj[aid])
             if len(neighbors) <= 1:
-                # Can't drop only neighbour (min degree ≥ 1)
+                # Can't drop only neighbour (min degree >= 1)
                 continue
 
             # Find non-neighbours
@@ -170,14 +201,23 @@ class NetworkTopology:
                 # Fully connected — can't add new edge
                 continue
 
-            # Find lowest-payoff neighbour
+            # Find neighbour who gave me the least (or took the most)
             worst_neighbor = min(
                 neighbors,
-                key=lambda x: cumulative_payoff.get(x, 0.0)
+                key=lambda x: bilateral_payoff[aid].get(x, 0.0)
             )
 
-            # Pick random non-neighbour
-            new_neighbor = non_neighbors[np.random.randint(len(non_neighbors))]
+            # Pick best non-neighbour (highest bilateral payoff) — connect
+            # to whoever has been most beneficial. Falls back to random if
+            # no interaction history exists with any non-neighbour.
+            best_non = max(
+                non_neighbors,
+                key=lambda x: bilateral_payoff[aid].get(x, 0.0)
+            )
+            if bilateral_payoff[aid].get(best_non, 0.0) > 0:
+                new_neighbor = best_non
+            else:
+                new_neighbor = non_neighbors[np.random.randint(len(non_neighbors))]
 
             # Sever edge with worst neighbour
             self.adj[aid].discard(worst_neighbor)
@@ -205,6 +245,18 @@ class NetworkTopology:
                 edge = tuple(sorted([aid, nbr]))
                 edges.add(edge)
         return sorted(edges)
+
+    def restore_edges(self, edge_list: List):
+        """Restore network from saved edge list (for resume)."""
+        # Clear existing adjacency
+        for aid in self.adj:
+            self.adj[aid] = set()
+        # Rebuild from edges
+        for edge in edge_list:
+            a, b = edge[0], edge[1]
+            if a in self.adj and b in self.adj:
+                self.adj[a].add(b)
+                self.adj[b].add(a)
 
     def get_adjacency(self) -> Dict[str, set]:
         """Return a copy of the adjacency dict."""

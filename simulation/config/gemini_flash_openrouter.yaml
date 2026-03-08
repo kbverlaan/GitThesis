@@ -1,0 +1,19 @@
+# OpenRouter config for Gemini Flash 2.5 — fast inference
+# Gemini Flash doesn't use <think> tokens, so less max_tokens needed
+
+api_key_env_var: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+
+model: "google/gemini-2.5-flash"
+
+temperature: 0.7
+max_tokens: 2048
+timeout: 60
+requests_per_minute: 30
+retry_attempts: 2
+retry_delay: 3
+
+prompt_config:
+  objective_style: "maximize_resources"
+  hide_resources: false
+  reasoning_level: "level3"

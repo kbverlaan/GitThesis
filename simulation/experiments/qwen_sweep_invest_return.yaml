@@ -15,7 +15,7 @@ base_params:
   conflict_cost_pct: 5
   max_rounds: 10
   history_length: 10
-  allow_invest_self: true
+  allow_invest_self: false
   initial_distribution: "equal"
   action_order: "simultaneous"
   spatial_enabled: true

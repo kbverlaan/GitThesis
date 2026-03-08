@@ -89,6 +89,9 @@ class GameEngine:
                  arm_decay: float = 0.5,
                  attack_take_pct: float = 40,
                  conflict_cost_pct: float = 5,
+                 resource_decay_pct: float = 0,
+                 invest_saturation_decay: float = 1.0,  # 1.0 = no diminishing returns
+                 invest_saturation_window: int = 5,
                  max_rounds: int = None,
                  # Legacy params — ignored, kept for backward compat with old configs
                  **kwargs):
@@ -125,6 +128,9 @@ class GameEngine:
             "arm_decay": arm_decay,
             "attack_take_pct": attack_take_pct,
             "conflict_cost_pct": conflict_cost_pct,
+            "resource_decay_pct": resource_decay_pct,
+            "invest_saturation_decay": invest_saturation_decay,
+            "invest_saturation_window": invest_saturation_window,
         }
 
         if isinstance(initial_resources, dict):
@@ -158,7 +164,9 @@ class GameEngine:
             "round": self.state.round_number,
             "actions": [],
             "resource_changes": {},
-            "combat_results": []
+            "bilateral_flows": defaultdict(float),  # (from, to) -> net resource flow
+            "combat_results": [],
+            "resource_breakdown": {},  # agent -> {invest_self, invest_received, invest_cost, arm_cost, conflict_cost, combat_transfer, decay}
         }
 
         # Validate actions
@@ -178,9 +186,13 @@ class GameEngine:
                     "reason": "insufficient_resources"
                 })
 
-        # Initialize resource changes
+        # Initialize resource changes and breakdown
         for agent_id in self.state.agents:
             round_log["resource_changes"][agent_id] = 0.0
+            round_log["resource_breakdown"][agent_id] = {
+                "invest_self": 0.0, "invest_received": 0.0, "invest_cost": 0.0,
+                "arm_cost": 0.0, "conflict_cost": 0.0, "combat_transfer": 0.0, "decay": 0.0,
+            }
 
         # Process non-attack actions first
         for action in valid_actions:
@@ -204,6 +216,15 @@ class GameEngine:
         for agent_id, change in round_log["resource_changes"].items():
             self.state.resources[agent_id] = max(0, self.state.resources[agent_id] + change)
 
+        # Resource decay: everyone loses a % of resources each round
+        decay_pct = self.params["resource_decay_pct"]
+        if decay_pct > 0:
+            for agent_id in self.state.agents:
+                decay_amount = self.state.resources[agent_id] * (decay_pct / 100.0)
+                self.state.resources[agent_id] = max(0, self.state.resources[agent_id] - decay_amount)
+                round_log["resource_changes"][agent_id] -= decay_amount
+                round_log["resource_breakdown"][agent_id]["decay"] += decay_amount
+
         # Decay arm bonuses
         self._decay_arms()
 
@@ -216,13 +237,29 @@ class GameEngine:
     def _resolve_invest_self(self, action: Action, round_log: Dict):
         """Resolve invest-self action: flat % gain of own resources."""
         agent_id = action.agent_id
-        round_log["resource_changes"][agent_id] += self._pct(agent_id, self.params["invest_self_pct"])
+        gain = self._pct(agent_id, self.params["invest_self_pct"])
+        round_log["resource_changes"][agent_id] += gain
+        round_log["resource_breakdown"][agent_id]["invest_self"] += gain
+
+    def _count_recent_investments(self, investor: str, target: str) -> int:
+        """Count how many times investor→target occurred in recent history."""
+        window = self.params["invest_saturation_window"]
+        recent = self.state.history[-window:] if self.state.history else []
+        count = 0
+        for rd in recent:
+            for act in rd.get("actions", []):
+                if (act.get("agent") == investor and
+                    act.get("action") == "invest_other" and
+                    act.get("target") == target):
+                    count += 1
+        return count
 
     def _resolve_invest_other(self, action: Action, round_log: Dict):
         """Resolve invest-other action.
 
-        Investor pays invest_other_cost_pct% of own resources.
-        Target receives invest_other_return_pct% of investor's resources.
+        Investor pays invest_other_cost_pct% of own resources (always full cost).
+        Target receives invest_other_return_pct% × saturation_decay^prior_investments.
+        Diminishing returns per pair — diversification restores full returns.
         """
         agent_id = action.agent_id
         target_id = action.target_id
@@ -230,8 +267,21 @@ class GameEngine:
         if target_id not in self.state.agents:
             return
 
-        round_log["resource_changes"][agent_id] -= self._pct(agent_id, self.params["invest_other_cost_pct"])
-        round_log["resource_changes"][target_id] += self._pct(agent_id, self.params["invest_other_return_pct"])
+        # Cost is always full (you pay the same regardless of saturation)
+        cost = self._pct(agent_id, self.params["invest_other_cost_pct"])
+        round_log["resource_changes"][agent_id] -= cost
+        round_log["resource_breakdown"][agent_id]["invest_cost"] += cost
+
+        # Return diminishes with repeated investment in same pair
+        decay = self.params["invest_saturation_decay"]
+        prior = self._count_recent_investments(agent_id, target_id)
+        effective_return_pct = self.params["invest_other_return_pct"] * (decay ** prior)
+        transfer = self.state.resources[agent_id] * (effective_return_pct / 100.0)
+
+        round_log["resource_changes"][target_id] += transfer
+        round_log["resource_breakdown"][target_id]["invest_received"] += transfer
+        # Bilateral: agent gave resources to target
+        round_log["bilateral_flows"][(agent_id, target_id)] += transfer
 
     def _resolve_arm_self(self, action: Action, round_log: Dict):
         """Resolve arm-self: pay arm_cost_pct%, gain cost × arm_multiplier as combat bonus."""
@@ -239,6 +289,7 @@ class GameEngine:
         cost = self._pct(agent_id, self.params["arm_cost_pct"])
         bonus = cost * self.params["arm_multiplier"]
         round_log["resource_changes"][agent_id] -= cost
+        round_log["resource_breakdown"][agent_id]["arm_cost"] += cost
         # Add to existing bonus (stacking allowed)
         self.state.arm_bonuses[agent_id] = self.state.arm_bonuses.get(agent_id, 0.0) + bonus
 
@@ -253,6 +304,7 @@ class GameEngine:
         cost = self._pct(agent_id, self.params["arm_other_cost_pct"])
         bonus = cost * self.params["arm_multiplier"]
         round_log["resource_changes"][agent_id] -= cost
+        round_log["resource_breakdown"][agent_id]["arm_cost"] += cost
         self.state.arm_bonuses[target_id] = self.state.arm_bonuses.get(target_id, 0.0) + bonus
 
     def _resolve_attacks_grouped(self, attack_actions: List[Action], round_log: Dict):
@@ -272,16 +324,44 @@ class GameEngine:
         snapshots = {}
         for aid in involved:
             if aid in self.state.agents:
-                snapshots[aid] = self.state.resources[aid] + self.state.arm_bonuses.get(aid, 0.0)
+                snapshots[aid] = self.state.resources[aid] + round_log["resource_changes"].get(aid, 0.0) + self.state.arm_bonuses.get(aid, 0.0)
 
         # Group attacks by target
-        attacks_by_target = defaultdict(list)
+        attack_map = {}  # attacker → target
+        groups = defaultdict(list)  # target → [Action]
         for action in attack_actions:
             if action.target_id in self.state.agents:
-                attacks_by_target[action.target_id].append(action)
+                attack_map[action.agent_id] = action.target_id
+                groups[action.target_id].append(action)
 
-        # Resolve each coalition attack independently
-        for defender_id, attacker_actions in attacks_by_target.items():
+        # Merge mutual/connected conflicts:
+        # If defender D also attacks one of their own attackers, D's attack
+        # is absorbed — it's the same fight, not a separate engagement.
+        # Process larger groups first (coalition = primary conflict).
+        absorbed = set()  # agents whose attack action is absorbed (they're defending)
+        for target in sorted(groups.keys(), key=lambda t: len(groups[t]), reverse=True):
+            if target in absorbed:
+                continue
+            attacker_ids = {a.agent_id for a in groups[target]} - absorbed
+            if not attacker_ids:
+                continue
+            if target in attack_map:
+                counter_target = attack_map[target]
+                if counter_target in attacker_ids:
+                    # Defender counter-attacks one of their attackers — same fight
+                    absorbed.add(target)
+
+        # Build final groups, filtering out absorbed attackers
+        # Note: absorbed agents can still be DEFENDERS — only their attack
+        # action is absorbed, not their role as target.
+        final_groups = {}
+        for target, actions in groups.items():
+            remaining = [a for a in actions if a.agent_id not in absorbed]
+            if remaining:
+                final_groups[target] = remaining
+
+        # Resolve each coalition attack
+        for defender_id, attacker_actions in final_groups.items():
             self._resolve_coalition_attack(attacker_actions, defender_id, snapshots, round_log)
 
     def _resolve_coalition_attack(self, attacker_actions: List[Action],
@@ -311,27 +391,53 @@ class GameEngine:
 
         # Conflict costs: each participant pays own %
         for aid in attacker_ids:
-            round_log["resource_changes"][aid] -= self._pct(aid, self.params["conflict_cost_pct"])
-        round_log["resource_changes"][defender_id] -= self._pct(defender_id, self.params["conflict_cost_pct"])
+            cc = self._pct(aid, self.params["conflict_cost_pct"])
+            round_log["resource_changes"][aid] -= cc
+            round_log["resource_breakdown"][aid]["conflict_cost"] += cc
+        def_cc = self._pct(defender_id, self.params["conflict_cost_pct"])
+        round_log["resource_changes"][defender_id] -= def_cc
+        round_log["resource_breakdown"][defender_id]["conflict_cost"] += def_cc
 
-        # Transfer resources
+        # Transfer resources — pot determined by DEFENDER's resources.
+        # Pot = take_pct × defender's resources, capped by coalition's total resources.
+        # Same pot for both outcomes — winner takes it from loser.
+        # This means:
+        # - Attacking a small agent: small pot (little to gain or lose)
+        # - Attacking a large agent: large pot, but capped by what attackers have
+        # - Being big makes you a target (your resources set the stakes)
+        # - Coalitions pool resources → higher cap → can challenge big agents
         take_pct = self.params["attack_take_pct"] / 100.0
+        total_transfer = 0.0
+
+        defender_effective = max(0, self.state.resources[defender_id] + round_log["resource_changes"][defender_id])
+        coalition_effective = sum(
+            max(0, self.state.resources[aid] + round_log["resource_changes"][aid])
+            for aid in attacker_ids
+        )
+        max_loss_pct = self.params.get("combat_max_loss_pct", 75) / 100.0
+        pot = min(defender_effective * take_pct, coalition_effective * max_loss_pct)  # attackers always keep (1-max_loss)%
+
         if coalition_wins:
-            # Coalition takes from defender, split proportionally by strength
-            defender_effective = self.state.resources[defender_id] + round_log["resource_changes"][defender_id]
-            total_transfer = max(0, defender_effective * take_pct)
+            total_transfer = pot
             round_log["resource_changes"][defender_id] -= total_transfer
+            round_log["resource_breakdown"][defender_id]["combat_transfer"] -= total_transfer
 
             for aid in attacker_ids:
                 share = (attacker_powers[aid] / coalition_power) if coalition_power > 0 else (1.0 / len(attacker_ids))
-                round_log["resource_changes"][aid] += total_transfer * share
+                aid_share = total_transfer * share
+                round_log["resource_changes"][aid] += aid_share
+                round_log["resource_breakdown"][aid]["combat_transfer"] += aid_share
+                round_log["bilateral_flows"][(defender_id, aid)] += aid_share
         else:
-            # Defender takes from each attacker
+            total_transfer = pot
             for aid in attacker_ids:
-                attacker_effective = self.state.resources[aid] + round_log["resource_changes"][aid]
-                transfer = max(0, attacker_effective * take_pct)
-                round_log["resource_changes"][aid] -= transfer
-                round_log["resource_changes"][defender_id] += transfer
+                share = (attacker_powers[aid] / coalition_power) if coalition_power > 0 else (1.0 / len(attacker_ids))
+                aid_loss = total_transfer * share
+                round_log["resource_changes"][aid] -= aid_loss
+                round_log["resource_breakdown"][aid]["combat_transfer"] -= aid_loss
+                round_log["resource_changes"][defender_id] += aid_loss
+                round_log["resource_breakdown"][defender_id]["combat_transfer"] += aid_loss
+                round_log["bilateral_flows"][(aid, defender_id)] += aid_loss
 
         round_log["combat_results"].append({
             "attackers": attacker_ids,
@@ -341,6 +447,7 @@ class GameEngine:
             "defender_power": defender_power,
             "winner": "coalition" if coalition_wins else "defender",
             "attacker_win_prob": attacker_win_prob,
+            "total_transfer": total_transfer,
         })
 
     def _decay_arms(self):

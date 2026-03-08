@@ -16,7 +16,7 @@ base_params:
   conflict_cost_pct: 5
   max_rounds: 10
   history_length: 10
-  allow_invest_self: true
+  allow_invest_self: false
   initial_distribution: "equal"
   action_order: "simultaneous"
   spatial_enabled: true
@@ -25,9 +25,9 @@ sweep:
   grid:
     - param: "arm_other_cost_pct"
       target: "game_params"
-      values: [0, 5, 10, 20]
+      values: [5, 10, 20]
     - param: "reasoning_level"
       target: "prompt_config"
       values: ["level1", "level3"]
-# 4 x 2 = 8 conditions x 2 reps = 16 runs
-# 0% = free alliance arming, 5% = cheap, 10% = baseline, 20% = expensive
+# 3 x 2 = 6 conditions x 2 reps = 12 runs
+# 5% = cheap, 10% = baseline, 20% = expensive

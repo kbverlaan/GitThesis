@@ -56,6 +56,21 @@ class NeighborRecord:
             "messages_sent": self.messages_sent,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict) -> 'NeighborRecord':
+        rec = cls()
+        rec.times_seen = d.get("times_seen", 0)
+        rec.last_seen_round = d.get("last_seen_round", 0)
+        rec.last_known_resources = d.get("last_known_resources", 0.0)
+        rec.their_actions_toward_me = dict(d.get("their_actions_toward_me", {}))
+        rec.my_actions_toward_them = dict(d.get("my_actions_toward_them", {}))
+        rec.their_actions_general = dict(d.get("their_actions_general", {}))
+        rec.outcomes = dict(d.get("outcomes", {}))
+        rec.messages_received = d.get("messages_received", 0)
+        rec.messages_sent = d.get("messages_sent", 0)
+        rec.last_message_from = d.get("last_message_from", "")
+        return rec
+
 
 class AgentMemory:
     """Persistent per-agent memory accumulating observations across rounds."""
@@ -65,6 +80,9 @@ class AgentMemory:
         self.window_size = window_size
         self.action_log: List[dict] = []
         self.neighbor_observations: Dict[str, NeighborRecord] = {}
+        self.note_to_self: Optional[str] = None  # Private strategic note persisted across rounds
+        self.message_log: List[dict] = []  # Sliding window of sent/received messages
+        self.last_round_incoming: List[dict] = []  # Actions directed at me last round
 
     def _get_or_create_record(self, agent_id: str) -> NeighborRecord:
         if agent_id not in self.neighbor_observations:
@@ -130,6 +148,9 @@ class AgentMemory:
             if aid in all_resources:
                 rec.last_known_resources = all_resources[aid]
 
+        # Track incoming actions this round (overwrite previous round)
+        self.last_round_incoming = []
+
         # Process round actions
         for action_entry in round_actions:
             actor = action_entry.get("agent")
@@ -147,6 +168,10 @@ class AgentMemory:
                 # but only this specific interaction (times_seen not incremented)
                 if actor in all_resources:
                     rec.last_known_resources = all_resources[actor]
+                # Store for per-round display
+                self.last_round_incoming.append({
+                    'actor': actor, 'action': act, 'round': round_num,
+                })
 
             # Case 2: Third-party actions (only if both actor and target in radius)
             elif actor != self.agent_id:
@@ -174,12 +199,14 @@ class AgentMemory:
                             rec.outcomes["attacks_lost"] = rec.outcomes.get("attacks_lost", 0) + 1
 
     def record_messages(self, sent_message: Optional[dict],
-                        received_messages: List[dict]):
+                        received_messages: List[dict],
+                        round_num: int = 0):
         """Record sent and received messages.
 
         Args:
             sent_message: This agent's message dict (from/message/message_to) or None.
             received_messages: List of message dicts received this round.
+            round_num: Current round number (for message log).
         """
         # Track sent message
         if sent_message and sent_message.get('message'):
@@ -187,6 +214,13 @@ class AgentMemory:
             if msg_to and msg_to != 'all':
                 rec = self._get_or_create_record(msg_to)
                 rec.messages_sent += 1
+            # Add to message log
+            self.message_log.append({
+                'round': round_num,
+                'dir': 'sent',
+                'to': msg_to,
+                'text': sent_message['message'][:200],
+            })
 
         # Track received messages
         for msg in received_messages:
@@ -195,6 +229,58 @@ class AgentMemory:
                 rec = self._get_or_create_record(sender)
                 rec.messages_received += 1
                 rec.last_message_from = msg.get('message', '')
+            # Add to message log
+            self.message_log.append({
+                'round': round_num,
+                'dir': 'received',
+                'from': msg.get('from', '?'),
+                'text': msg.get('message', '')[:200],
+            })
+
+        # Keep sliding window
+        self.message_log = self.message_log[-self.window_size:]
+
+    def record_note(self, note: Optional[str]):
+        """Store a private note-to-self for next round.
+
+        Agents write these to persist long-term plans, alliance tracking,
+        threat assessments, or strategic reasoning across rounds. Truncated
+        to 1000 characters to bound prompt size.
+        """
+        if note and isinstance(note, str):
+            self.note_to_self = note[:1000]
+        else:
+            self.note_to_self = None
+
+    def format_note(self) -> str:
+        """Format the current note-to-self for prompt injection."""
+        if not self.note_to_self:
+            return ""
+        return f"YOUR STRATEGIC NOTEBOOK (from last round):\n{self.note_to_self}"
+
+    def format_message_history(self) -> str:
+        """Format recent message log for prompt injection."""
+        if not self.message_log:
+            return ""
+        lines = ["RECENT MESSAGES:"]
+        for m in self.message_log:
+            rnd = m.get('round', '?')
+            if m['dir'] == 'sent':
+                lines.append(f"  Round {rnd}: You → {m.get('to', '?')}: \"{m['text']}\"")
+            else:
+                lines.append(f"  Round {rnd}: {m.get('from', '?')} → You: \"{m['text']}\"")
+        return "\n".join(lines)
+
+    def format_incoming_actions(self) -> str:
+        """Format actions directed at this agent last round."""
+        if not self.last_round_incoming:
+            return ""
+        rnd = self.last_round_incoming[0]['round']
+        lines = [f"ACTIONS RECEIVED LAST ROUND (round {rnd}):"]
+        for entry in self.last_round_incoming:
+            act = entry['action'].replace('_', ' ')
+            lines.append(f"  {entry['actor']} → {act} → you")
+        return "\n".join(lines)
 
     def format_own_history(self) -> str:
         """Format last N actions for the prompt."""
@@ -216,10 +302,11 @@ class AgentMemory:
             details = []
             if "combat_won" in outcome and action == "attack":
                 details.append("won" if outcome["combat_won"] else "lost")
-            rc = outcome.get("resource_change")
-            if rc is not None:
-                sign = "+" if rc >= 0 else ""
-                details.append(f"{sign}{rc:.1f}")
+                # Only show resource change for attacks (won/lost context makes it clear)
+                rc = outcome.get("resource_change")
+                if rc is not None:
+                    sign = "+" if rc >= 0 else ""
+                    details.append(f"{sign}{rc:.1f}")
 
             if details:
                 desc += f" ({', '.join(details)})"
@@ -256,48 +343,55 @@ class AgentMemory:
         for aid, rec in sorted(self.neighbor_observations.items(), key=sort_key):
             is_visible = visible_set is None or aid in visible_set
 
-            # Build entry
-            parts = []
-
-            # Resources and seen count
+            # Resources
             if hide_resources:
                 res_str = "?"
+            elif not is_visible and rec.times_seen > 0:
+                rounds_stale = rounds_played - rec.last_seen_round
+                if rounds_stale > 0:
+                    res_str = f"was {rec.last_known_resources:.0f} at R{rec.last_seen_round}"
+                else:
+                    res_str = f"{rec.last_known_resources:.0f}"
             else:
                 res_str = f"{rec.last_known_resources:.0f}" if rec.times_seen > 0 else "?"
-            seen_str = f"seen {rec.times_seen}/{rounds_played} rounds"
+
+            # Visibility status
             if not is_visible and rec.last_seen_round > 0:
-                seen_str += f", last seen round {rec.last_seen_round}"
+                vis_str = f"hidden, last seen R{rec.last_seen_round}"
+            elif not is_visible:
+                vis_str = "hidden"
+            else:
+                vis_str = "visible"
 
-            header = f"  {aid} [{res_str}, {seen_str}]:"
+            lines.append(f"  {aid} [{res_str}, {vis_str}]:")
 
-            # Their actions toward me
+            # Their actions toward me (most important — show first)
             toward_me = []
             for act, count in sorted(rec.their_actions_toward_me.items()):
-                label = act.replace("_", " ")
-                toward_me.append(f"{label} you {count}x")
+                toward_me.append(f"{act.replace('_', ' ')} you {count}x")
+            if toward_me:
+                lines.append(f"    Toward you: {', '.join(toward_me)}")
 
             # My actions toward them
             from_me = []
             for act, count in sorted(rec.my_actions_toward_them.items()):
-                label = act.replace("_", " ")
-                from_me.append(f"you {label} them {count}x")
+                from_me.append(f"{act.replace('_', ' ')} {count}x")
+            if from_me:
+                lines.append(f"    You toward them: {', '.join(from_me)}")
 
-            # Combine interactions
-            interactions = toward_me + from_me
-            if interactions:
-                parts.append(" | ".join(interactions))
-            else:
-                parts.append("no interaction with you")
+            # Combat record (if any)
+            won = rec.outcomes.get("attacks_won", 0)
+            lost = rec.outcomes.get("attacks_lost", 0)
+            if won or lost:
+                lines.append(f"    Combat record: {won}W {lost}L")
 
-            # Observed general actions (third-party)
-            if rec.their_actions_general:
-                obs = []
-                for act, count in sorted(rec.their_actions_general.items()):
-                    label = act.replace("_", " ")
-                    obs.append(f"{label} {count}x")
-                parts.append("observed: " + ", ".join(obs))
+            # Message activity
+            if rec.messages_received or rec.messages_sent:
+                lines.append(f"    Messages: {rec.messages_received} received, {rec.messages_sent} sent")
 
-            lines.append(f"{header} {' | '.join(parts)}")
+            # If no interaction at all
+            if not toward_me and not from_me and not won and not lost and not rec.messages_received and not rec.messages_sent:
+                lines.append(f"    No interaction")
 
         return "\n".join(lines)
 
@@ -307,8 +401,23 @@ class AgentMemory:
             "agent_id": self.agent_id,
             "window_size": self.window_size,
             "action_log": list(self.action_log),
+            "message_log": list(self.message_log),
+            "note_to_self": self.note_to_self,
+            "last_round_incoming": list(self.last_round_incoming),
             "neighbor_observations": {
                 aid: rec.to_dict()
                 for aid, rec in self.neighbor_observations.items()
             },
         }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> 'AgentMemory':
+        """Restore from serialized dict (for resume)."""
+        mem = cls(d["agent_id"], d.get("window_size", 10))
+        mem.action_log = list(d.get("action_log", []))
+        mem.message_log = list(d.get("message_log", []))
+        mem.note_to_self = d.get("note_to_self")
+        mem.last_round_incoming = list(d.get("last_round_incoming", []))
+        for aid, rec_dict in d.get("neighbor_observations", {}).items():
+            mem.neighbor_observations[aid] = NeighborRecord.from_dict(rec_dict)
+        return mem

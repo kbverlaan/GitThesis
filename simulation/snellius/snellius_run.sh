@@ -71,6 +71,14 @@ if [[ "$MODEL_PATH" == *"Qwen3"* ]]; then
   # See: https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen3.5.html
   EXTRA_FLAGS="$EXTRA_FLAGS --reasoning-parser qwen3 --language-model-only"
 fi
+if [[ "$MODEL_PATH" == *"Qwen3.5"* ]]; then
+  # MTP speculative decoding: Qwen3.5 has native multi-token prediction heads
+  # ~1.5-2.75x latency reduction per request (fewer decode steps)
+  EXTRA_FLAGS="$EXTRA_FLAGS --speculative-config {\"method\":\"mtp\",\"num_speculative_tokens\":1}"
+  # Disable async scheduling to fix prefix caching for DeltaNet/Mamba hybrid
+  # See: github.com/vllm-project/vllm/pull/33352
+  EXTRA_FLAGS="$EXTRA_FLAGS --no-async-scheduling"
+fi
 
 # Throughput settings: game engine sends 30 concurrent requests per round
 # --enable-prefix-caching: all agents share game rules prefix (~300 tokens), computed once
@@ -79,8 +87,9 @@ fi
 MAX_MODEL_LEN=16384
 MAX_NUM_SEQS=32
 if [[ "$MODEL_PATH" == *"Qwen3"* ]]; then
-  # Reasoning models generate long thinking traces (up to 8K+ tokens)
-  MAX_MODEL_LEN=32768
+  # Reasoning models: ~2K prompt + ~8K thinking + ~200 response = ~10K
+  # 16K gives headroom without wasting KV cache on unused context
+  MAX_MODEL_LEN=16384
 fi
 
 # Start vLLM in background with bind-mount for model access
@@ -94,7 +103,7 @@ apptainer exec --nv \
   --max-model-len $MAX_MODEL_LEN \
   --max-num-seqs $MAX_NUM_SEQS \
   --enable-prefix-caching \
-  --gpu-memory-utilization 0.9 \
+  --gpu-memory-utilization 0.95 \
   --dtype auto \
   $EXTRA_FLAGS &
 

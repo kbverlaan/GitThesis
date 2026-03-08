@@ -105,6 +105,7 @@ class LLMAgent:
         self.reasoning_traces = []
         self._visible_agents = None
         self._last_message = None  # Last message extracted from LLM response
+        self._last_note = None     # Last note-to-self extracted from LLM response
     
     def _format_observation(self, observation: Dict) -> str:
         """
@@ -119,6 +120,11 @@ class LLMAgent:
         Handles <think>...</think> blocks from reasoning models (Qwen3, QwQ, MiMo):
         extracts thinking content separately, then strips it before JSON parsing.
 
+        Fallbacks:
+        - Strips markdown code fences (```json ... ```) before JSON extraction
+        - Strips trailing commas before closing braces (common LLM error)
+        - Fuzzy action name matching (e.g. "invest_Others" → "invest_other")
+
         Returns:
             Dictionary with action, target, reasoning, and thinking, or None if parsing fails
         """
@@ -130,18 +136,31 @@ class LLMAgent:
             # Strip <think>...</think> blocks before JSON extraction
             clean_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
 
+            # Strip markdown code fences (```json ... ``` or ``` ... ```)
+            clean_text = re.sub(r'```(?:json)?\s*', '', clean_text)
+
             # Try to find JSON in cleaned response
             start_idx = clean_text.find('{')
             end_idx = clean_text.rfind('}') + 1
 
             if start_idx >= 0 and end_idx > start_idx:
                 json_str = clean_text[start_idx:end_idx]
+
+                # Fix trailing commas before closing braces (common LLM error)
+                json_str = re.sub(r',\s*}', '}', json_str)
+                json_str = re.sub(r',\s*]', ']', json_str)
+
                 parsed = json.loads(json_str)
 
                 # Validate required fields
                 if 'action' in parsed:
+                    # Normalize action name (fuzzy match)
+                    action = self._normalize_action(parsed['action'])
+                    if action is None:
+                        return None
+
                     result = {
-                        'action': parsed['action'],
+                        'action': action,
                         'target': parsed.get('target'),
                         'reasoning': parsed.get('reasoning', ''),
                         'thinking': thinking_content,
@@ -150,9 +169,48 @@ class LLMAgent:
                     if parsed.get('message'):
                         result['message'] = parsed['message']
                         result['message_to'] = parsed.get('message_to')
+                    # Extract note-to-self if present
+                    if parsed.get('note_to_self'):
+                        result['note_to_self'] = parsed['note_to_self']
                     return result
         except json.JSONDecodeError:
             pass
+
+        return None
+
+    # Valid action names for fuzzy matching
+    _VALID_ACTIONS = {
+        'invest_self', 'invest_other', 'arm_self', 'arm_other', 'attack', 'do_nothing'
+    }
+
+    def _normalize_action(self, action_raw: str) -> Optional[str]:
+        """Normalize action string with fuzzy matching.
+
+        Handles common LLM errors: extra whitespace, wrong case, trailing 's',
+        underscores vs spaces, close misspellings.
+        """
+        action = action_raw.strip().lower().replace(' ', '_').replace('-', '_')
+
+        # Exact match
+        if action in self._VALID_ACTIONS:
+            return action
+
+        # Strip trailing 's' (e.g. "invest_others" → "invest_other")
+        if action.endswith('s') and action[:-1] in self._VALID_ACTIONS:
+            return action[:-1]
+
+        # Common misspellings
+        aliases = {
+            'nothing': 'do_nothing',
+            'donothing': 'do_nothing',
+            'do_nothing': 'do_nothing',
+            'invest': 'invest_other',
+            'arm': 'arm_self',
+            'self_invest': 'invest_self',
+            'self_arm': 'arm_self',
+        }
+        if action in aliases:
+            return aliases[action]
 
         return None
     
@@ -180,9 +238,8 @@ class LLMAgent:
         if action_type in [ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK]:
             if not target or target == self.agent_id:
                 return None
-            # Network validation: target must be a connected neighbor
-            if self._visible_agents is not None and target not in self._visible_agents:
-                return None
+            # No network restriction on actions — all agents can interact globally
+            # Network only determines information visibility (resources, arm bonuses)
 
         return Action(
             agent_id=self.agent_id,
@@ -206,6 +263,14 @@ class LLMAgent:
                 'message': msg_text.strip(),
                 'message_to': msg_to,
             }
+
+    def _store_note(self, action_dict: Dict):
+        """Store note-to-self from LLM response."""
+        note = action_dict.get('note_to_self')
+        if note and isinstance(note, str) and note.strip():
+            self._last_note = note.strip()
+        else:
+            self._last_note = None
 
     def get_last_message(self) -> Optional[Dict]:
         """Return the message from the last select_action call, or None."""
@@ -299,9 +364,11 @@ class LLMAgent:
                     action = self._action_dict_to_action(action_dict)
                     if action:
                         self._store_message(action_dict)
+                        self._store_note(action_dict)
                         return action
 
                 # JSON missing — send a follow-up requesting structured output
+                # Use low max_tokens for retry: only need JSON, not reasoning
                 if attempt < self.retry_attempts - 1:
                     try:
                         t0 = time.time()
@@ -313,8 +380,8 @@ class LLMAgent:
                                 {"role": "user", "content": "Please respond with ONLY a JSON object in this exact format: {\"reasoning\": \"<think step by step>\", \"action\": \"<action_name>\", \"target\": \"<agent_id or null>\"}"}
                             ],
                             temperature=self.temperature,
-                            max_tokens=self.max_tokens,
-                            timeout=self.timeout
+                            max_tokens=512,
+                            timeout=60
                         )
                         retry_latency = time.time() - t0
                         retry_text = retry_response.choices[0].message.content
@@ -332,6 +399,7 @@ class LLMAgent:
                             action = self._action_dict_to_action(action_dict)
                             if action:
                                 self._store_message(action_dict)
+                                self._store_note(action_dict)
                                 # Log the retry trace
                                 self.reasoning_traces.append({
                                     "round": observation['round'],
@@ -409,10 +477,17 @@ class LLMAgent:
             round_num, visible_agents, round_actions,
             resource_changes, combat_results, all_resources
         )
-        # Record communication
-        if received_messages:
-            self.memory.record_messages(self._last_message, received_messages)
+        # Record communication (always call to log sent messages even without received)
+        self.memory.record_messages(self._last_message, received_messages or [], round_num)
+        # Record note-to-self (persists to next round's prompt)
+        self.memory.record_note(self._last_note)
 
-    def get_reasoning_traces(self) -> list:
-        """Get all reasoning traces for analysis."""
-        return self.reasoning_traces
+    def get_reasoning_traces(self, include_retries=False) -> list:
+        """Get reasoning traces for analysis.
+
+        By default excludes JSON-retry entries so trace count == round count.
+        Set include_retries=True to get all entries (for debugging).
+        """
+        if include_retries:
+            return self.reasoning_traces
+        return [t for t in self.reasoning_traces if not t.get('is_retry')]

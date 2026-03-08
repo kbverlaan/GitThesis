@@ -141,9 +141,21 @@ def compute_round_metrics(resources: Dict[str, float],
         if agent:
             current_actions_map[agent] = action_type
 
+    # Cooperation ratio for this round: invest_other / meaningful actions
+    invest_other_count = 0
+    meaningful_count = 0
+    for action in round_actions:
+        action_type = action.get('action', '')
+        if action_type not in ('no_action', 'do_nothing'):
+            meaningful_count += 1
+            if action_type == 'invest_other':
+                invest_other_count += 1
+    coop_ratio = invest_other_count / meaningful_count if meaningful_count > 0 else 0.0
+
     metrics = {
         'gini': gini_coefficient(resources),
         'palma': palma_ratio(resources),
+        'cooperation_ratio': coop_ratio,
         'action_distribution': action_distribution(round_actions),
     }
 
