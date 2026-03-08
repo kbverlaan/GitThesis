@@ -1,9 +1,9 @@
 """Test unified %-based economy in GameEngine.
 
 All params now match the prompt (prompts.py _format_actions):
-- invest_self_cost_pct / invest_self_return_pct
+- invest_self_pct (flat gain, no cost)
 - invest_other_cost_pct / invest_other_return_pct
-- arm_cost_pct / arm_decay
+- arm_cost_pct / arm_multiplier / arm_decay
 - attack_take_pct / conflict_cost_pct
 """
 
@@ -20,11 +20,11 @@ def make_engine(**overrides):
     defaults = dict(
         agent_ids=["a1", "a2", "a3"],
         initial_resources=100.0,
-        invest_self_cost_pct=10,
-        invest_self_return_pct=20,
+        invest_self_pct=2,
         invest_other_cost_pct=10,
         invest_other_return_pct=15,
         arm_cost_pct=10,
+        arm_multiplier=2.0,
         arm_decay=0.5,
         attack_take_pct=40,
         conflict_cost_pct=5,
@@ -35,17 +35,17 @@ def make_engine(**overrides):
 
 
 def test_invest_self():
-    """invest_self: pay 10%, gain 20% → net +10%."""
+    """invest_self: flat +2% gain (no cost)."""
     engine = make_engine()
     engine.resolve_round([Action("a1", ActionType.INVEST_SELF)])
-    # 100 - 10 + 20 = 110
-    assert engine.state.resources["a1"] == 110.0, f"Expected 110, got {engine.state.resources['a1']}"
+    # 100 + 2 = 102
+    assert abs(engine.state.resources["a1"] - 102.0) < 0.01, f"Expected 102, got {engine.state.resources['a1']}"
 
-    # Second round: scales with wealth (110)
+    # Second round: scales with wealth (102)
     engine.resolve_round([Action("a1", ActionType.INVEST_SELF)])
-    # 110 - 11 + 22 = 121
-    assert abs(engine.state.resources["a1"] - 121.0) < 0.01
-    print("PASS: invest_self → 100→110→121 (scales with wealth)")
+    # 102 + 2.04 = 104.04
+    assert abs(engine.state.resources["a1"] - 104.04) < 0.01
+    print("PASS: invest_self → 100→102→104.04 (flat 2% gain, scales with wealth)")
 
 
 def test_invest_other():
@@ -60,81 +60,77 @@ def test_invest_other():
 
 
 def test_invest_other_more_rewarding():
-    """invest_other yields more to the economy than invest_self."""
+    """invest_other net gain to target exceeds invest_self gain to actor."""
     e1 = make_engine()
     e2 = make_engine()
 
-    # invest_self: only investor gains, net +10% of 100 = +10 for economy
+    # invest_self: flat +2% of 100 = +2 for economy
     e1.resolve_round([Action("a1", ActionType.INVEST_SELF)])
     economy_self = sum(e1.state.resources.values())
 
     # invest_other: investor loses 10, target gains 15 → net +5 for economy
-    # But also: cooperation creates more value than selfishness
     e2.resolve_round([Action("a1", ActionType.INVEST_OTHER, target_id="a2")])
     economy_other = sum(e2.state.resources.values())
 
     # invest_other: 300 + (-10 + 15) = 305
-    # invest_self: 300 + (-10 + 20) = 310
-    # invest_self grows YOUR wealth more, but invest_other is more GENEROUS (target benefits more)
-    assert economy_other == 305.0, f"invest_other economy: {economy_other}"
-    assert economy_self == 310.0, f"invest_self economy: {economy_self}"
+    # invest_self: 300 + 2 = 302
+    assert abs(economy_other - 305.0) < 0.01, f"invest_other economy: {economy_other}"
+    assert abs(economy_self - 302.0) < 0.01, f"invest_self economy: {economy_self}"
 
-    # The key: invest_other gives TARGET more than invest_self gives YOU? No...
-    # invest_self net to actor: +10. invest_other net to target: +15.
-    # Target benefits MORE from receiving invest_other than you benefit from invest_self.
+    # invest_other grows economy more AND target gains more than invest_self actor
+    # invest_self gain to actor: +2. invest_other gain to target: +15.
     target_gain = e2.state.resources["a2"] - 100  # 15
-    self_gain = e1.state.resources["a1"] - 100     # 10
+    self_gain = e1.state.resources["a1"] - 100     # 2
     assert target_gain > self_gain, f"Target gain {target_gain} should exceed self gain {self_gain}"
     print(f"PASS: invest_other target gain ({target_gain}) > invest_self gain ({self_gain})")
 
 
 def test_arm_self_additive():
-    """arm_self: pay 10% → that amount becomes additive combat bonus."""
+    """arm_self: pay 10% → bonus = cost × multiplier (2.0) = 20."""
     engine = make_engine()
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
     # a1 resources: 100 - 10 = 90
-    # a1 arm bonus: 10 (the amount spent)
+    # a1 arm bonus: 10 × 2.0 = 20, after decay ×0.5 = 10
     assert abs(engine.state.resources["a1"] - 90.0) < 0.01
-    assert abs(engine.state.arm_bonuses["a1"] - 5.0) < 0.01  # 10 × 0.5 decay at end of round
-    print("PASS: arm_self → resources -10%, arm bonus = 10 (decayed to 5 after round)")
+    assert abs(engine.state.arm_bonuses["a1"] - 10.0) < 0.01  # 20 × 0.5 decay at end of round
+    print("PASS: arm_self → resources -10%, bonus = cost×2.0 = 20 (decayed to 10 after round)")
 
 
 def test_arm_decay():
     """Arm bonus decays ×0.5 per round."""
     engine = make_engine()
-    # Arm in round 1
+    # Arm in round 1: bonus = 10 × 2.0 = 20, after decay = 10.0
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
-    # After round 1: bonus = 10 × 0.5 = 5.0
-    assert abs(engine.state.arm_bonuses.get("a1", 0) - 5.0) < 0.01
+    assert abs(engine.state.arm_bonuses.get("a1", 0) - 10.0) < 0.01
 
     # Round 2: no action, just decay
     engine.resolve_round([Action("a1", ActionType.DO_NOTHING)])
-    # bonus = 5.0 × 0.5 = 2.5
-    assert abs(engine.state.arm_bonuses.get("a1", 0) - 2.5) < 0.01
+    # bonus = 10.0 × 0.5 = 5.0
+    assert abs(engine.state.arm_bonuses.get("a1", 0) - 5.0) < 0.01
 
     # Round 3: decay again
     engine.resolve_round([Action("a1", ActionType.DO_NOTHING)])
-    # bonus = 2.5 × 0.5 = 1.25
-    assert abs(engine.state.arm_bonuses.get("a1", 0) - 1.25) < 0.01
+    # bonus = 5.0 × 0.5 = 2.5
+    assert abs(engine.state.arm_bonuses.get("a1", 0) - 2.5) < 0.01
 
     # After several more rounds, bonus should vanish (< 0.01)
     for _ in range(10):
         engine.resolve_round([Action("a1", ActionType.DO_NOTHING)])
     assert "a1" not in engine.state.arm_bonuses
-    print("PASS: arm decay → 5.0 → 2.5 → 1.25 → ... → removed")
+    print("PASS: arm decay → 10.0 → 5.0 → 2.5 → ... → removed")
 
 
 def test_arm_other():
-    """arm_other: pay 10% of YOUR resources → adds to TARGET's combat bonus."""
+    """arm_other: pay 10% of YOUR resources → TARGET gets cost × multiplier as combat bonus."""
     engine = make_engine()
     engine.resolve_round([Action("a1", ActionType.ARM_OTHER, target_id="a2")])
     # a1: 100 - 10 = 90
-    # a2 arm bonus: 10 × 0.5 = 5.0 (after decay)
+    # a2 arm bonus: 10 × 2.0 = 20, after decay × 0.5 = 10.0
     assert abs(engine.state.resources["a1"] - 90.0) < 0.01
-    assert abs(engine.state.arm_bonuses.get("a2", 0) - 5.0) < 0.01
+    assert abs(engine.state.arm_bonuses.get("a2", 0) - 10.0) < 0.01
     # a2 resources unchanged
     assert abs(engine.state.resources["a2"] - 100.0) < 0.01
-    print("PASS: arm_other → your -10%, target gets combat bonus (not resources)")
+    print("PASS: arm_other → your -10%, target gets combat bonus ×2.0 (not resources)")
 
 
 def test_combat_additive():
@@ -144,16 +140,16 @@ def test_combat_additive():
 
     # Arm a1, then attack a2
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
-    # a1: resources=90, arm_bonus=5.0 (after decay) → strength = 95
+    # a1: resources=90, arm_bonus=10.0 (20 × 0.5 decay) → strength = 100
     # a2: resources=100, arm_bonus=0 → strength = 100
-    # Win prob for a1 = 95 / (95 + 100) = 0.487...
+    # Win prob for a1 = 100 / (100 + 100) = 0.5
 
     engine.resolve_round([Action("a1", ActionType.ATTACK, target_id="a2")])
     combat = engine.state.history[-1]["combat_results"][0]
-    expected_prob = 95.0 / 195.0
+    expected_prob = 100.0 / 200.0
     assert abs(combat["attacker_win_prob"] - expected_prob) < 0.01, \
         f"Expected win prob {expected_prob:.3f}, got {combat['attacker_win_prob']:.3f}"
-    print(f"PASS: combat additive → armed a1 strength=95 vs a2=100, win_prob={expected_prob:.3f}")
+    print(f"PASS: combat additive → armed a1 strength=100 vs a2=100, win_prob={expected_prob:.3f}")
 
 
 def test_conflict_cost_percentage():
@@ -177,21 +173,21 @@ def test_observation_has_arm_bonuses():
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
     obs = engine.state.get_observation("a2")
     assert "arm_bonuses" in obs
-    assert abs(obs["arm_bonuses"].get("a1", 0) - 5.0) < 0.01
+    assert abs(obs["arm_bonuses"].get("a1", 0) - 10.0) < 0.01
     print("PASS: observation includes arm_bonuses")
 
 
 def test_arm_stacking():
     """Multiple arm actions stack (bonus accumulates)."""
     engine = make_engine()
-    # Round 1: arm_self → bonus = 10, after decay = 5.0
+    # Round 1: arm_self → cost=10, bonus=20, after decay = 10.0
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
-    assert abs(engine.state.arm_bonuses["a1"] - 5.0) < 0.01
+    assert abs(engine.state.arm_bonuses["a1"] - 10.0) < 0.01
 
-    # Round 2: arm_self again → resources now 90, so new bonus = 9
-    # Before new arm: existing = 5.0. Add 9.0 → 14.0. After decay: 7.0
+    # Round 2: arm_self again → resources now 90, so cost=9, new bonus = 18
+    # Before new arm: existing = 10.0. Add 18.0 → 28.0. After decay: 14.0
     engine.resolve_round([Action("a1", ActionType.ARM_SELF)])
-    assert abs(engine.state.arm_bonuses["a1"] - 7.0) < 0.01
+    assert abs(engine.state.arm_bonuses["a1"] - 14.0) < 0.01
     print("PASS: arm stacking → bonuses accumulate")
 
 

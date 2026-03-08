@@ -29,6 +29,7 @@ wheels/
 *.egg
 MANIFEST
 venv/
+.venv/
 ENV/
 env/
 
@@ -59,6 +60,10 @@ wandb/
 tmp/
 temp/
 *.tmp
+
+# Simulation data (large experiment outputs)
+simulation/data/runs/
+simulation/archive/runs/
 
 # LaTeX auxiliary files
 *.aux
