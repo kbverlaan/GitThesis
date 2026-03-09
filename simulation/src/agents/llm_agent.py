@@ -65,11 +65,13 @@ class LLMAgent:
         self.agent_id = agent_id
         self.model = model
         self.temperature = temperature
-        # Thinking models need more tokens for reasoning + JSON response
+        # Thinking models need more tokens for reasoning + JSON response.
+        # Qwen3/3.5 thinking tokens count toward completion_tokens — 2048 is
+        # far too low (thinking alone uses 4-6K tokens). Default to 16384.
         model_lower = model.lower()
         self.is_thinking_model = any(t in model_lower for t in ["qwq", "qwen3"])
-        if self.is_thinking_model and max_tokens < 2048:
-            self.max_tokens = 2048
+        if self.is_thinking_model and max_tokens < 16384:
+            self.max_tokens = 16384
         else:
             self.max_tokens = max_tokens
         # Thinking models need longer timeout (long reasoning chains)
@@ -238,8 +240,9 @@ class LLMAgent:
         if action_type in [ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK]:
             if not target or target == self.agent_id:
                 return None
-            # No network restriction on actions — all agents can interact globally
-            # Network only determines information visibility (resources, arm bonuses)
+            # Network restriction: actions only allowed on neighbors
+            if self._visible_agents is not None and target not in self._visible_agents:
+                return None
 
         return Action(
             agent_id=self.agent_id,
@@ -424,33 +427,166 @@ class LLMAgent:
                 if attempt < self.retry_attempts - 1:
                     time.sleep(self.retry_delay)
 
-        # Log fallback with error context
+        # Try to recover intended action from thinking traces before giving up.
+        # When thinking models exhaust their token budget, the thinking often
+        # contains the decision ("Attack Storm", "invest in Sage") even though
+        # the JSON response was never generated.
+        last_trace = self.reasoning_traces[-1] if self.reasoning_traces else None
+        thinking_text = last_trace.get("thinking", "") if last_trace else ""
+        fallback_action = self._parse_action_from_thinking(thinking_text, observation)
+
+        if fallback_action:
+            print(f"Warning: {self.agent_id} recovered action from thinking: "
+                  f"{fallback_action.action_type.name} -> {fallback_action.target_id}")
+            # Log as thinking-recovered fallback
+            self.reasoning_traces.append({
+                "round": observation['round'],
+                "agent_id": self.agent_id,
+                "prompt": prompt,
+                "response": None,
+                "model": self.model,
+                "fallback": "thinking_recovery",
+                "recovered_action": fallback_action.action_type.name.lower(),
+                "recovered_target": fallback_action.target_id,
+                "errors": errors,
+            })
+            return fallback_action
+
+        # Last resort: do_nothing (safest neutral action)
+        print(f"Warning: {self.agent_id} falling back to do_nothing (no action recoverable)")
         self.reasoning_traces.append({
             "round": observation['round'],
             "agent_id": self.agent_id,
             "prompt": prompt,
             "response": None,
             "model": self.model,
-            "fallback": True,
+            "fallback": "default",
             "errors": errors,
         })
-
-        # Fallback: do_nothing if invest_self disabled, else invest_self
-        if self.game_params.get('allow_invest_self', True):
-            print(f"Warning: {self.agent_id} falling back to invest_self")
-            return Action(
-                agent_id=self.agent_id,
-                action_type=ActionType.INVEST_SELF,
-                target_id=None
-            )
-        else:
-            print(f"Warning: {self.agent_id} falling back to do_nothing")
-            return Action(
-                agent_id=self.agent_id,
-                action_type=ActionType.DO_NOTHING,
-                target_id=None
-            )
+        return Action(
+            agent_id=self.agent_id,
+            action_type=ActionType.DO_NOTHING,
+            target_id=None
+        )
     
+    def _parse_action_from_thinking(self, thinking: str, observation: Dict) -> Optional[Action]:
+        """Try to recover intended action from thinking text when JSON response is missing.
+
+        When thinking models exhaust their token budget, the thinking often contains
+        the intended decision even though the JSON was never generated. This method
+        scans for decision patterns in the thinking text.
+
+        Strategy: scan the TAIL (last 2000 chars) for explicit decision statements,
+        then fall back to the LAST mention of an action + target pair anywhere in
+        the thinking. The last mention is most likely the final decision.
+
+        Returns Action if a clear decision is found, None otherwise.
+        """
+        if not thinking or len(thinking) < 50:
+            return None
+
+        # Known agent IDs from observation
+        all_agents = set(observation.get('resources', {}).keys())
+        all_agents.discard(self.agent_id)
+        # Build case-insensitive lookup
+        agent_lookup = {a.lower(): a for a in all_agents}
+
+        def _match_agent(name: str) -> Optional[str]:
+            """Match a candidate name to a known agent ID."""
+            return agent_lookup.get(name.lower())
+
+        def _try_build_action(action_name: str, target_name: Optional[str]) -> Optional[Action]:
+            """Try to build a valid Action from an action name and optional target."""
+            action_str = self._normalize_action(action_name)
+            if not action_str:
+                return None
+            action_map = {
+                'invest_self': ActionType.INVEST_SELF,
+                'invest_other': ActionType.INVEST_OTHER,
+                'arm_self': ActionType.ARM_SELF,
+                'arm_other': ActionType.ARM_OTHER,
+                'attack': ActionType.ATTACK,
+                'do_nothing': ActionType.DO_NOTHING,
+            }
+            action_type = action_map.get(action_str)
+            if not action_type:
+                return None
+            needs_target = action_type in (ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK)
+            target_id = _match_agent(target_name) if target_name else None
+            if needs_target and not target_id:
+                return None
+            return Action(agent_id=self.agent_id, action_type=action_type,
+                          target_id=target_id if needs_target else None)
+
+        tail = thinking[-2000:]
+        tail_lower = tail.lower()
+
+        # --- Phase 1: Explicit decision statements (high confidence) ---
+        decision_prefixes = (
+            r'(?:decision|final plan|final choice|final confirmation|my (?:best )?action|'
+            r'plan confirmed|okay,? (?:ready|proceeding)|i\'m confident)'
+        )
+        # "Decision: Attack Storm" / "Final Plan: invest_other -> Sage"
+        for pattern in [
+            decision_prefixes + r'[:\s]*\**\s*(attack)\s+(\w+)',
+            decision_prefixes + r'[:\s]*\**\s*(invest(?:[_ ]?other)?(?:[_ ]?in)?)\s+(\w+)',
+            decision_prefixes + r'[:\s]*\**\s*(arm[_ ]?other)\s+(\w+)',
+            decision_prefixes + r'[:\s]*\**\s*(arm[_ ]?self)',
+            decision_prefixes + r'[:\s]*\**\s*(invest[_ ]?self)',
+            decision_prefixes + r'[:\s]*\**\s*(do[_ ]?nothing)',
+        ]:
+            match = re.search(pattern, tail_lower)
+            if match:
+                groups = match.groups()
+                action_name = groups[0].replace(' ', '_').strip('_')
+                target_name = groups[1] if len(groups) > 1 else None
+                # Normalize "invest in" / "invest" to "invest_other" when target present
+                if action_name.startswith('invest') and target_name and 'self' not in action_name:
+                    action_name = 'invest_other'
+                result = _try_build_action(action_name, target_name)
+                if result:
+                    return result
+
+        # --- Phase 2: "Action: attack. Target: Storm." pattern ---
+        action_target_match = re.search(
+            r'action[:\s]*\**\s*(attack|invest[_ ]?(?:other|self)|arm[_ ]?(?:self|other)|do[_ ]?nothing)\**'
+            r'.*?target[:\s]*\**\s*(\w+)',
+            tail_lower, re.DOTALL
+        )
+        if action_target_match:
+            action_name = action_target_match.group(1).replace(' ', '_')
+            target_name = action_target_match.group(2)
+            if target_name in ('null', 'none', 'n/a'):
+                target_name = None
+            result = _try_build_action(action_name, target_name)
+            if result:
+                return result
+
+        # --- Phase 3: Last mention of action + agent name (lower confidence) ---
+        # Scan for the LAST occurrence of "attack <Agent>" etc. in the tail
+        agent_pattern = '|'.join(re.escape(a) for a in agent_lookup.keys())
+        last_action_patterns = [
+            (rf'(attack)\s+({agent_pattern})', 'attack'),
+            (rf'(invest(?:[_ ]?(?:other|in))?)\s+({agent_pattern})', 'invest_other'),
+            (rf'(arm[_ ]?other)\s+({agent_pattern})', 'arm_other'),
+            (rf'(arm[_ ]?self)', 'arm_self'),
+            (rf'(invest[_ ]?self)', 'invest_self'),
+            (rf'(do[_ ]?nothing)', 'do_nothing'),
+        ]
+        best_match = None
+        best_pos = -1
+        for pattern, action_name in last_action_patterns:
+            for match in re.finditer(pattern, tail_lower):
+                if match.start() > best_pos:
+                    groups = match.groups()
+                    target_name = groups[1] if len(groups) > 1 else None
+                    result = _try_build_action(action_name, target_name)
+                    if result:
+                        best_match = result
+                        best_pos = match.start()
+
+        return best_match
+
     def update_memory(self, round_num: int, action_str: str, target: Optional[str],
                       outcome: Optional[Dict], visible_agents: Optional[list],
                       round_actions: list, resource_changes: Dict,

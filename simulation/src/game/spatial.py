@@ -202,8 +202,12 @@ class NetworkTopology:
                 continue
 
             # Find neighbour who gave me the least (or took the most)
+            # Skip neighbours who would be left at degree 0 if dropped
+            droppable = [x for x in neighbors if len(self.adj[x]) > 1]
+            if not droppable:
+                continue
             worst_neighbor = min(
-                neighbors,
+                droppable,
                 key=lambda x: bilateral_payoff[aid].get(x, 0.0)
             )
 

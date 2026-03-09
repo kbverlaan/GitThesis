@@ -123,12 +123,17 @@ class BaselinePrompt:
         obj_text = self.OBJECTIVES.get(self.objective_style, self.OBJECTIVES['maximize_resources'])
         parts.append(f"OBJECTIVE: {obj_text}")
 
-        # Temporal context (neutral — no behavioral nudges)
-        parts.append(
-            "This is a repeated game with multiple rounds. "
-            "Other agents can observe your past actions. "
-            "Consider how your choice this round may affect future rounds."
-        )
+        # Temporal context — L0 gets minimal framing (no forward-looking nudge)
+        if self.reasoning_level == 'level0':
+            parts.append(
+                "This is a repeated game with multiple rounds."
+            )
+        else:
+            parts.append(
+                "This is a repeated game with multiple rounds. "
+                "Other agents can observe your past actions. "
+                "Consider how your choice this round may affect future rounds."
+            )
 
         # Framing instruction
         framing_text = FRAMINGS.get(self.framing, '')
@@ -162,44 +167,47 @@ class BaselinePrompt:
         # Network mode: show connected agents
         visible = observation.get('visible_agents', None)
         if visible is not None:
-            lines.append(f"\nYou can invest in, attack, and message ANY agent. Your network connections only determine whose resources and strength you can observe.")
+            lines.append(f"\nYou can ONLY invest in, attack, or arm agents you are directly connected to. You can message any agent.")
             lines.append(f"Each agent has their own set of connections — other agents may see different agents than you do.")
-            lines.append(f"You cannot verify claims about agents whose resources are hidden from you — such claims may be inaccurate or deliberately misleading.")
-            lines.append(f"Connected agents (you can see their resources): {', '.join(visible) if visible else 'none'}")
-            # Show all agents so they know who exists
-            all_others = [aid for aid in observation['resources'] if aid != agent_id and aid not in (visible or [])]
-            if all_others:
-                lines.append(f"Other agents (you cannot see their resources): {', '.join(all_others)}")
+            lines.append(f"Connections can change over time based on how agents interact.")
+            lines.append(f"You cannot verify claims about agents whose resources are hidden from you.")
+            lines.append(f"Connected agents (you can interact with and see their resources): {', '.join(visible) if visible else 'none'}")
 
-        # Resources -- show all agents, but only visible agents' resources in spatial mode
+        # Resources -- in network mode, only show self + neighbors (no ??? rows)
         if self.hide_resources:
             lines.append("\nAGENTS:")
             for aid, resources in _shuffled_items(observation['resources']):
+                if visible is not None and aid != agent_id and aid not in visible:
+                    continue  # Don't expose non-neighbor IDs
                 if aid == agent_id:
                     lines.append(f"  {aid}: {resources:.1f} (you)")
-                elif visible is not None and aid not in visible:
-                    lines.append(f"  {aid}: ???")
                 else:
                     lines.append(f"  {aid}: ???")
         else:
             lines.append("\nRESOURCES:")
             for aid, resources in _shuffled_items(observation['resources']):
+                if visible is not None and aid != agent_id and aid not in visible:
+                    continue  # Don't expose non-neighbor IDs
                 if aid == agent_id:
                     lines.append(f"  {aid}: {resources:.1f} (you)")
-                elif visible is not None and aid not in visible:
-                    lines.append(f"  {aid}: ??? (not connected)")
                 else:
                     broke_marker = " [BROKE]" if aid in observation.get('broke_agents', []) else ""
                     lines.append(f"  {aid}: {resources:.1f}{broke_marker}")
 
         # Arm bonuses — single pool of combat bonus per agent, decaying
-        # When hiding resources, only show own arm bonus (others' combat strength is hidden)
+        # Only show self + neighbors (consistent with network restriction)
         arm_bonuses = observation.get('arm_bonuses', observation.get('active_arms', {}))
         if arm_bonuses:
-            lines.append("")
-            lines.append("ARM BONUSES (combat strength = resources + arm bonus):")
-            for aid, bonus in _shuffled_items(arm_bonuses):
+            visible_arms = {}
+            for aid, bonus in arm_bonuses.items():
                 if isinstance(bonus, (int, float)) and bonus > 0:
+                    if visible is not None and aid != agent_id and aid not in visible:
+                        continue  # Don't show non-neighbor arm bonuses
+                    visible_arms[aid] = bonus
+            if visible_arms:
+                lines.append("")
+                lines.append("ARM BONUSES (combat strength = resources + arm bonus):")
+                for aid, bonus in _shuffled_items(visible_arms):
                     if self.hide_resources and aid != agent_id:
                         lines.append(f"  {aid}: +???")
                     else:
@@ -377,7 +385,7 @@ class BaselinePrompt:
 
         saturation_decay = self.game_params.get('invest_saturation_decay', 1.0)
         saturation_window = self.game_params.get('invest_saturation_window', 5)
-        invest_desc = f"- invest_other: you pay {invest_other_cost_pct}% of your resources, TARGET receives {invest_other_return_pct}% of your resources. Example: you have 25.0 → you pay {25.0 * invest_other_cost_pct / 100:.1f} (left: {25.0 * (1 - invest_other_cost_pct / 100):.1f}), target gains {25.0 * invest_other_return_pct / 100:.1f}"
+        invest_desc = f"- invest_other: you pay {invest_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) receives {invest_other_return_pct}% of your resources. Example: you have 25.0 → you pay {25.0 * invest_other_cost_pct / 100:.1f} (left: {25.0 * (1 - invest_other_cost_pct / 100):.1f}), target gains {25.0 * invest_other_return_pct / 100:.1f}"
         if saturation_decay < 1.0:
             invest_desc += f"\n    DIMINISHING RETURNS: the system tracks a rolling {saturation_window}-round window. Each repeat investment in the SAME agent within that window reduces the target's gain by {(1 - saturation_decay) * 100:.0f}% per repeat. Example: invest in X at round 3, invest again at round 6 = reduced (round 6 is within 3+{saturation_window-1}). Invest at round 3, invest again at round {3 + saturation_window + 1} = full return (outside window). Investing in a DIFFERENT agent always gives full returns."
         actions.append(invest_desc)
@@ -385,8 +393,8 @@ class BaselinePrompt:
         arm_cost_ex = 25.0 * arm_cost_pct / 100
         arm_bonus_ex = arm_cost_ex * arm_multiplier
         actions.append(f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay {arm_cost_ex:.1f}, bonus = {arm_cost_ex:.1f} x {arm_multiplier} = {arm_bonus_ex:.1f}. Resources left: {25.0 - arm_cost_ex:.1f}. Combat strength: {25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = {25.0 - arm_cost_ex + arm_bonus_ex:.1f}")
-        actions.append(f"- arm_other: you pay {arm_other_cost_pct}% of your resources, TARGET gains combat bonus = cost x {arm_multiplier}. TARGET's resources do NOT increase — only their fighting power.")
-        actions.append(f"- attack: both sides pay {conflict_cost_pct}% conflict cost. Stakes = {attack_take_pct}% of DEFENDER's resources (capped at {combat_max_loss_pct}% of attacker's). Winner takes the pot from the loser.")
+        actions.append(f"- arm_other: you pay {arm_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) gains combat bonus = cost x {arm_multiplier}. TARGET's resources do NOT increase — only their fighting power.")
+        actions.append(f"- attack: TARGET must be a connected neighbor. Both sides pay {conflict_cost_pct}% conflict cost. Stakes = {attack_take_pct}% of DEFENDER's resources (capped at {combat_max_loss_pct}% of attacker's). Winner takes the pot from the loser.")
         actions.append("- do_nothing: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -442,7 +450,7 @@ COMBAT RULES:
         if self.comm_scope != 'none':
             comm_lines = [
                 "COMMUNICATION:",
-                "You may send ONE message this round to ANY agent. Messages are non-binding and costless.",
+                "You may send ONE message this round to ANY agent. Messages have no resource cost.",
                 "",
                 "MESSAGE TIMING:",
                 "- Messages you RECEIVE this round were sent LAST round (before the sender saw your latest action).",
@@ -465,8 +473,15 @@ COMBAT RULES:
         note_field = ""
         note_instruction = ""
         if note_enabled:
-            note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
-            note_instruction = """
+            if self.reasoning_level == 'level0':
+                note_field = '\n  "note_to_self": "<your personal notes — see instructions below>",'
+                note_instruction = """
+note_to_self (REQUIRED): Your private notes. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Write whatever you find useful to remember.
+
+Max ~1000 characters. Be concise."""
+            else:
+                note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
+                note_instruction = """
 note_to_self (REQUIRED): Your private strategic notebook. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Use these sections:
 
 STRATEGY: Your overall long-term plan (who to ally with, when to pivot to attacks, etc.)

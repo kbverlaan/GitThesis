@@ -143,6 +143,15 @@ class GameEngine:
             resources=resources,
             max_rounds=max_rounds
         )
+        self._valid_targets: Optional[Dict[str, List[str]]] = None
+
+    def set_valid_targets(self, valid_targets: Optional[Dict[str, List[str]]]):
+        """Set per-agent valid targets for network-restricted actions.
+
+        Args:
+            valid_targets: Dict mapping agent_id -> list of neighbor IDs, or None to disable.
+        """
+        self._valid_targets = valid_targets
 
     def _pct(self, agent_id: str, pct_value: float) -> float:
         """Compute pct_value% of agent's current resources."""
@@ -266,6 +275,9 @@ class GameEngine:
 
         if target_id not in self.state.agents:
             return
+        # Network restriction: target must be a neighbor
+        if self._valid_targets and target_id not in self._valid_targets.get(agent_id, []):
+            return
 
         # Cost is always full (you pay the same regardless of saturation)
         cost = self._pct(agent_id, self.params["invest_other_cost_pct"])
@@ -300,6 +312,9 @@ class GameEngine:
 
         if target_id not in self.state.agents:
             return
+        # Network restriction: target must be a neighbor
+        if self._valid_targets and target_id not in self._valid_targets.get(agent_id, []):
+            return
 
         cost = self._pct(agent_id, self.params["arm_other_cost_pct"])
         bonus = cost * self.params["arm_multiplier"]
@@ -315,6 +330,15 @@ class GameEngine:
         (e.g., attacking one target while being attacked by others) uses the
         same strength everywhere. No order dependence.
         """
+        # Network restriction: filter out attacks on non-neighbors
+        if self._valid_targets:
+            attack_actions = [
+                a for a in attack_actions
+                if a.target_id in self._valid_targets.get(a.agent_id, [])
+            ]
+            if not attack_actions:
+                return
+
         # Snapshot combat strengths for all agents involved in any attack
         involved = set()
         for action in attack_actions:

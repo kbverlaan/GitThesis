@@ -619,6 +619,13 @@ def run_simulation(game_params: dict,
         if network:
             d.print_network(agent_ids, network.get_neighbors)
         
+        # Set valid targets for network-restricted actions
+        if network:
+            valid_targets = {aid: network.get_neighbors(aid) for aid in agent_ids}
+            engine.set_valid_targets(valid_targets)
+        else:
+            engine.set_valid_targets(None)
+
         # Get history length from config
         history_length = game_params.get('history_length', 10)
 
@@ -892,7 +899,7 @@ def run_simulation(game_params: dict,
                     'target': action_entry.get('target'),
                     'reasoning': reasoning_text,
                     'thinking': thinking if thinking else None,
-                    'note_to_self': agents[aid]._last_note,
+                    'note_to_self': agents[aid].memory.note_to_self,
                     'tokens': last.get('usage', {}).get('total_tokens', 0),
                     'latency_s': last.get('latency_s') or last.get('latency', 0),
                     'prompt': last.get('prompt', ''),

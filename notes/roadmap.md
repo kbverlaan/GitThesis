@@ -7,13 +7,18 @@
 | IV | Manipulation | Mechanism Design | Hobbes | Mapping quality |
 |----|-------------|-----------------|--------|----------------|
 | 1. **Reasoning depth** (L0-L3) | K-level prompts | Solution concept | "Competition" — rational self-interest | Strong |
-| 2. **Network rewiring** (w ∈ {0, 0.05, 0.3, 1.0}) | Payoff-based rewiring probability | Type space | "Diffidence" — two-layered (see below) | Moderate |
+| 2. **Network viscosity** (frozen / viscous / fluid) | Payoff-based rewiring rate | Type space | "Diffidence" — two-layered (see below) | Moderate |
 | 3. **Communication scope** (no-comm / DM / broadcast / choice) | Pre-action messaging phase | Message space | "Lack of common power" — can words alone create order? | Strong |
 
-**IV2 two-layer nuance:**
+**IV2 — Network viscosity (reframed Mar 8):**
 - Layer 1: Hidden resources (base default, always ON) = direct Hobbes diffidence. Agents face genuine type uncertainty.
-- Layer 2: Network rewiring w (the IV) = structural RESPONSE to diffidence. Higher w gives EXIT OPTION from bad neighbours.
-- MD mapping is cleaner: w directly manipulates the type space (who you observe/interact with).
+- Layer 2: Network viscosity (the IV) = how persistent are social relationships? How easily do you lose sight of someone?
+- **Frozen** (w=0): static network, no exit option. Stuck with your neighbours → conflict escalates within clusters.
+- **Viscous** (w≈low): links break slowly. Relationships are sticky — you need sustained bad treatment before leaving. In-group/out-group formation.
+- **Fluid** (w≈high): links break fast. Agents drift through the network. Predators lose targets, but everyone is displaced. Cold wars.
+- Exact w values to be determined by OAT sweep (test range of w, find qualitative breakpoints).
+- Lit: Zimmermann & Eguíluz (2005) vary link replacement rate; Santos et al. (2006) show even low viscosity boosts cooperation via assortative mixing.
+- MD mapping: viscosity directly manipulates the type space (who you observe/interact with over time).
 
 **Base defaults (not IVs):** hidden resources ON, memory ON (window 10), 6 actions (invest_self/other, arm_self/other, attack, do_nothing), %-based economy.
 
@@ -96,6 +101,23 @@ Per Debraj (Feb 13): "Without understanding the system, it's impossible to say a
 - [ ] arXiv:2502.20432 - "LLM Strategic Reasoning: Agentic Study through Behavioral Game Theory". CoT not universally effective — interacts with model capability.
 - [ ] arXiv:2601.15047 - "Game-Theoretic Lens on LLM-based Multi-Agent Systems". Formalizes reasoning equilibria — reasoning strategy changes the game's equilibrium.
 - [ ] Abdelnabi et al. 2024 - "Cooperation, Competition, and Maliciousness: LLM-Stakeholders Interactive Negotiation" (NeurIPS 2024). Structured CoT in multi-agent negotiation.
+
+**IV grounding — top 3 per IV (added Mar 9)**:
+
+*IV1: Reasoning Depth (L0–L3)*
+- [x] de Weerd, Verbrugge & Verheij 2013 - "How much does it help to know what she knows you know?" (AI 199-200). ToM levels 0-2 in competitive settings, higher ToM wins with diminishing returns. [Zotero: TDUDW48L]
+- [ ] Zhang et al. 2024 - "K-Level Reasoning with LLMs" (NAACL 2024). LLMs can implement k-level reasoning in strategic games. [Zotero: N9MGJS8C]
+- [x] Kuusela & Roy 2024 - "The Hobbesian Trap" (AAMAS 2024). Direct predecessor. [Zotero: MAK7JGZQ]
+
+*IV2: Network Viscosity (frozen / viscous / fluid)*
+- [ ] Zimmermann & Eguíluz 2005 - "Cooperation, social networks, and the emergence of leadership" (Phys Rev E 72). Dynamic rewiring promotes cooperation. DOI: 10.1103/PhysRevE.72.056118 [NOT IN ZOTERO — add]
+- [ ] Santos, Pacheco & Lenaerts 2006 - "Cooperation Prevails When Individuals Adjust Their Social Ties" (PLoS Comp Bio). Network topology as causal driver of cooperation. [NOT IN ZOTERO — add]
+- [ ] Rand, Arbesman & Christakis 2011 - "Dynamic social networks promote cooperation in experiments with humans" (PNAS 108). Human evidence for frozen→fluid gradient. [Zotero: BZ3X64KL]
+
+*IV3: Communication Scope (no-comm / DM / broadcast / choice)*
+- [ ] Crawford & Sobel 1982 - "Strategic Information Transmission" (Econometrica 50). Canonical cheap talk model. [NOT IN ZOTERO — add]
+- [ ] Sally 1995 - "Conversation and Cooperation in Social Dilemmas" (Rationality & Society 7). Meta-analysis: communication +40pp cooperation. [Zotero: BWXXUK4B]
+- [ ] de Weerd, Verbrugge & Verheij 2017 - "Negotiating with other minds" (AAMAS 31). ToM interacts with communication. Bridges IV1 and IV3. [Zotero: YUG3BZTT]
 
 **IR theory** (background, not central):
 - [ ] Waltz 1979 - Theory of International Politics
@@ -598,11 +620,19 @@ Slides archived: `notes/archive/slides/meeting27slidedeck.key`
 - [x] Deep research: network rewiring literature reviewed and saved
 
 #### Still TODO
-- [ ] Network rewiring implementation
-- [ ] Communication mechanism implementation
+- [x] Network rewiring implementation — done (spatial.py)
+- [x] Communication mechanism implementation — done (IV3)
 - [ ] Methods chapter prose (write from TODOs)
 - [ ] Analyze Snellius OAT results
 - [ ] TextGrad analysis
+
+#### Debraj communication (Mar 6-9)
+- **SBU budget**: Can't get NWO SBUs directly as masters student. Debraj applying for small compute grant tomorrow, will add Koen's ID. Also applying for large grant (~100K) expected May.
+- **Budget calculation**: Full factorial (4³ × 20 reps = 1280 runs) infeasible at 819K SBU. Revised plan: OAT screening (9 unique) + selected factorial (2×2×2 = 8) × 10 reps = 170 runs ≈ 75K SBU. More reps in May with additional budget.
+- **Showcase run**: Sent L3/DM/sticky showcase HTML + JSONL + UMAP embedding plot. Debraj: "This looks cool. We can host it somewhere." Will review Wednesday.
+- **Big update sent** (Mar 9): Qwen operational, TextGrad prompt opt, memory system, network topology, coalition attacks, %-economy, HTML viewer, invest saturation. Showcase analysis: 69% in-group cooperation (EI=-0.38), 75% out-group attacks (EI=+0.5), Gini 0.05→0.61, 5.7% deceptive messages, stratified order (elites prey on weak).
+- **Open questions for Debraj**: (1) Generative sufficiency still defensible? (2) Network viscosity as replacement for grid movement? (3) 25 rounds sufficient? (4) Run viewer hosting.
+- **Network restriction added** (Mar 9): Actions (invest/arm/attack) restricted to neighbors only. Messages stay global. "Geruchten reizen verder dan het zwaard." Strengthens IV2 as both information AND action structure.
 
 ---
 
@@ -659,6 +689,10 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Mar 3 | Network topology implemented (replaces SpatialField) | ER graph G(n,p) with ⟨k⟩≈5, connected component guaranteed. Payoff-based rewiring (Zimmermann 2004): with prob w, drop lowest-payoff neighbour, add random non-neighbour. Break-one-make-one, min degree ≥ 1. Config: network_enabled, mean_degree, rewiring_prob, payoff_window. Backward compat: falls back to spatial_enabled. | - |
 | Mar 3 | Communication scope implemented (IV3) | 4 levels: none/dm/broadcast/choice. Agents output message + message_to in JSON alongside action. Messages routed to recipients, delivered next round in observation context. Cheap talk only (non-binding). DM = private to 1 neighbour, broadcast = all neighbours. Choice = agent picks channel. Scope enforced server-side. Messages logged in round_result and agent memory. | - |
 | Mar 3 | Methods §3.1 restructurering: follow formal tuple | §3.1 now structured as N → S → A → O → T → u, following the formal game tuple. Transition function T was nowhere explicitly described — now fully specified (6-step resolution including coalition attacks, snapshot combat, simultaneous resolution). | - |
+| Mar 8 | IV2 reframed: "network rewiring w" → "network viscosity" | Abstract rewiring probability is hard to interpret. Reframe as viscosity = how persistent are social relationships? Three levels: frozen (static, w=0), viscous (sticky, w≈low), fluid (fast drift, w≈high). Exact w values from OAT sweep. Lit: Zimmermann & Eguíluz (2005). Intuitive, theoretically grounded, cleaner narrative. | - |
+| Mar 8 | Prompt confounds fixed | Removed ToM-priming from base prompt: (1) "Consider how your choice may affect future rounds" only for L1+, (2) "deliberately misleading" removed, (3) "non-binding" → "no resource cost", (4) note_to_self strategic scaffold (ALLIES/THREATS/PROMISES) only for L1+, L0 gets unstructured "write whatever you find useful". | - |
+| Mar 8 | Token exhaustion fix | max_tokens default for thinking models: 2048→16384. Added thinking-aware fallback: parse intended action from thinking text before defaulting to do_nothing. Old fallback (invest_self) corrupted 22% of showcase traces. | - |
+| Mar 8 | Showcase v2 params | invest_cost 10→8%, attack_take 50→30%. Net surplus per invest = 7% (was 5%). Cooperative pairs can grow despite decay. Lower attack stakes → more genuine dilemma. | - |
 
 ---
 
@@ -669,7 +703,7 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | System doesn't stabilize / no clear baseline behavior | High | Vary theta systematically, try different parameter regimes | ✅ Resolved — system well-characterized |
 | Scaling to 30 agents: API costs, runtime, context window limits | Medium | Test incrementally (6 -> 15 -> 30), monitor costs | ✅ Resolved — 30 agents works fine |
 | Prompt sensitivity makes LLM results unreliable | Medium | FormatSpread analysis, semantically equivalent reformulations | Active — Phase 2d |
-| Compute budget exceeded before Origins factorial | Low | 75K extra SBU goedgekeurd (totaal ~77.4K). Ruim voldoende. | ✅ Resolved |
+| Compute budget exceeded before Origins factorial | Medium | ~14.5K remaining. Debraj applying for small grant + large grant (~100K in May). Revised plan: 170 runs × 10 reps ≈ 75K SBU. Monitor closely. | **Active** |
 | Results show no difference across reasoning levels | Low (moot) | "Null result" = publishable. But pilot shows strong effects. | ✅ Moot — strong effects found |
 | Faithfulness objection undermines trace analysis | High | Frame as computational depth, not cognitive claims. Implement Lanham/Thought Anchors validation. | Phase 2d |
 | Single-model limitation weakens generalizability claim | Medium | Using Qwen 3.5 only. Acknowledge in limitations. Credible commitment chapter generalizes across models by design. | Accepted |
