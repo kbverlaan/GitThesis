@@ -395,6 +395,34 @@ As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfa
 %   Prompt is deterministic given state — same state = same prompt.
 %   Full prompt text in Appendix.
 %
+% TODO: Koen — TEXTGRAD PROMPT OPTIMIZATION
+%   Before running experiments, we optimized all prompts for INSTRUCTION CLARITY
+%   using TextGrad (Yuksekgonul et al., 2024). This separates the IV (reasoning
+%   level framing) from differential prompt quality as a confound.
+%
+%   Two-stage optimization:
+%     Stage 1: Shared base prompt (action descriptions, costs, combat rules).
+%       Loss: Claude Opus scores 1-10 on whether Qwen showed confusion about
+%       game mechanics (wrong costs, invalid JSON, hallucinated state).
+%     Stage 2: Per-level reasoning blocks (L0-L3).
+%       Loss: Claude Opus scores 1-10 on whether the reasoning instruction is
+%       unambiguous. Explicitly: "Do NOT score based on whether the model
+%       actually reasoned at the correct depth — only whether the instruction
+%       clearly communicated what was expected."
+%
+%   Architecture: reasoning_var (system prompt, requires_grad=True) →
+%     BlackboxLLM (Qwen 3.5-27B, vLLM) → response → TextLoss (Opus, rubric) →
+%     loss.backward() → textual gradient → TGD updates reasoning_var.
+%
+%   Key finding: 5 recurring clarity issues identified and fixed (arm_other
+%   mechanic, JSON format, combat formula, one-action constraint, ARMED status).
+%   Level boundaries (L1↔L2, L2↔L3) needed explicit "do NOT" constraints.
+%   Scores improved from ~6-7/10 to 8-9/10 across 3 epochs × 10 scenarios.
+%
+%   Full rubrics and optimization traces: scripts/textgrad_optimize.py
+%   Results: notes/research/textgrad_results.md
+%   See also §\ref{Validation} for prompt sensitivity analysis.
+%
 % TODO: Koen — NOTE-TO-SELF toevoegen
 %   Elke agent schrijft een private strategische notitie (max 500 chars)
 %   als onderdeel van hun JSON response. Deze note_to_self wordt ALLEEN

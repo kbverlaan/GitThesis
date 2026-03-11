@@ -111,6 +111,13 @@
 %   - Test semantically equivalent reformulations of L0-L3 instructions
 %   - Report FormatSpread or PromptSensiScore
 %   - Key question: are results robust to wording, or fragile?
+%
+%   NOTE: Pre-experiment prompt optimization via TextGrad is described in
+%   §3.2.2 (Prompt Structure). TextGrad optimized for instruction CLARITY
+%   (not reasoning depth), using Claude Opus as evaluator with level-specific
+%   rubrics. This subsection tests post-optimization ROBUSTNESS: do
+%   semantically equivalent reformulations of the optimized prompts produce
+%   consistent results? This is a separate question from clarity optimization.
 
 % TODO: 6.4.2 — Seed stability
 \subsection{Seed Stability}
