@@ -634,6 +634,32 @@ Slides archived: `notes/archive/slides/meeting27slidedeck.key`
 - **Open questions for Debraj**: (1) Generative sufficiency still defensible? (2) Network viscosity as replacement for grid movement? (3) 25 rounds sufficient? (4) Run viewer hosting.
 - **Network restriction added** (Mar 9): Actions (invest/arm/attack) restricted to neighbors only. Messages stay global. "Geruchten reizen verder dan het zwaard." Strengthens IV2 as both information AND action structure.
 
+#### Debraj feedback (Mar 11) — VERY enthusiastic!!!
+**Answers to open questions:**
+- **Generative sufficiency**: YES, defensible. Key framing: none of the added mechanics prescribe cooperation/hierarchy/predation — they ensure the strategy space is rich enough for outcomes to emerge (or not). Model doesn't need to be minimal, it needs to be sufficient.
+- **Network viscosity**: Strong endorsement. Maps onto coevolution-of-network-and-cooperation literature. Can now test predictions from that literature with LLM agents.
+- **25 rounds**: Likely sufficient for emergence, probably insufficient for equilibrium. Discuss further at meeting.
+- **Coalition dynamics**: Interesting — he'll think more about it for meeting.
+
+**His headline result prediction:** Reasoning Level × Communication interaction. "Does L3 + DM produce qualitatively different deception than L1 + broadcast?" Koen's observation of "optimisation-driven ambiguity" (not explicit lying) in showcase — Debraj: "a fascinating finding I think!!!"
+
+**Methodological feedback & action items:**
+- [ ] TextGrad: what is the loss function? (he asked — prepare answer)
+- [ ] Note-to-self length as confound: check if L3 writes systematically longer notes than L1. Report mean note-length per reasoning level.
+- [ ] Truncation-induced do_nothing defaults: report frequency per condition in final runs (confound if asymmetric across levels).
+- [ ] EI values with confidence intervals across runs (not single-run).
+- [ ] Modularity maximization as cross-check on Leiden clustering.
+- [ ] UMAP: consider embedding strategy-relevant features (attack/alliance/deception mention proportions) instead of full reasoning text. Or track cosine similarity of reasoning over time as strategic drift measure.
+- [ ] Track interaction effects beyond factorial, especially Reasoning × Communication.
+
+**Literature suggestions from Debraj:**
+- [ ] Santos & Pacheco (2005) — heterogeneous networks promote cooperation across full PD parameter range
+- [ ] Rand et al. (2014) — static networks stabilize human cooperation when b/c > k
+- [ ] VanSegbroeck et al. (2010) — active linking + strategy co-evolution enhances cooperation
+- [ ] Curvo (2025) — "The Traitors" framework, persistent memory + LLM deception
+- [ ] Recent LLM deception work: advanced models develop deceptive capabilities outpacing detection ability
+- [ ] de Weerd et al. (2017) — second-order ToM enables signalling through actions + manipulation in mixed-motive negotiations
+
 ---
 
 ## Decision Log
@@ -693,6 +719,9 @@ Track major decisions and WHY you made them. (Rubric: independence, creativity)
 | Mar 8 | Prompt confounds fixed | Removed ToM-priming from base prompt: (1) "Consider how your choice may affect future rounds" only for L1+, (2) "deliberately misleading" removed, (3) "non-binding" → "no resource cost", (4) note_to_self strategic scaffold (ALLIES/THREATS/PROMISES) only for L1+, L0 gets unstructured "write whatever you find useful". | - |
 | Mar 8 | Token exhaustion fix | max_tokens default for thinking models: 2048→16384. Added thinking-aware fallback: parse intended action from thinking text before defaulting to do_nothing. Old fallback (invest_self) corrupted 22% of showcase traces. | - |
 | Mar 8 | Showcase v2 params | invest_cost 10→8%, attack_take 50→30%. Net surplus per invest = 7% (was 5%). Cooperative pairs can grow despite decay. Lower attack stakes → more genuine dilemma. | - |
+| Mar 11 | Headline result: Reasoning × Communication interaction | Debraj identifies L3+DM vs L1+broadcast as the key prediction. Koen's observation of "optimisation-driven ambiguity" (not explicit lying) in showcase run — Debraj finds this fascinating. de Weerd (2017) predicts second-order ToM enables action signalling — our setup can test whether LLM agents replicate these patterns. | Debraj: "The Reasoning Level × Communication interaction is the headline result to me!!!" |
+| Mar 11 | Generative sufficiency confirmed | Added mechanics don't prescribe outcomes, they prevent degenerate equilibria. Model is sufficient, not minimal. Framing matters. | Debraj confirmed |
+| Mar 11 | Network restriction: actions neighbor-only, messages global | Strengthens IV2 (network = action + info structure). Keeps IV3 independent. Rewiring min-degree-1 guard added for drop victims. | - |
 
 ---
 
