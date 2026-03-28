@@ -834,3 +834,109 @@ L3 agents calculate the same negative EV as L1 but some break equilibrium by rea
 ### Rerun
 - Job 20203534: 20 rounds, 5h time limit, logging fix applied
 - Config: `experiments/qwen_l3_rerun_invest_return.yaml`
+
+---
+
+## Run 023: Throughput Benchmark — 10 agents, parallel runs
+- **Date**: 2026-03-12
+- **Phase**: Infrastructure optimization
+- **Purpose**: Measure throughput gain from parallel runs on single vLLM instance
+
+### Config
+| Parameter | Value |
+|-----------|-------|
+| num_agents | 10 |
+| max_rounds | 5 |
+| model | Qwen3.5-27B |
+| reasoning_level | L2 |
+| comm_scope | dm |
+| vLLM flags | --enable-prefix-caching --no-async-scheduling --max-num-seqs 256 |
+| Prompt order | Refactored: [shared rules → per-agent state] for prefix caching |
+| Note-to-self | Unified structured template across all levels (confound fix) |
+
+### Results
+| Condition | Runs completed | Wall time per run | KV cache peak | Max concurrent reqs |
+|-----------|---------------|-------------------|---------------|---------------------|
+| 2x parallel (job 20687706) | 2 | 951s, 843s | 27% | 20 |
+| 3x parallel (job 20687707) | 3 | 817s, 1170s, 903s | 52% | 30 |
+
+- Prefix cache hit rate: 0.6-1.1% (GatedDeltaNet not yet supported, PR #26807 pending)
+- Zero retries across all runs
+- Runs alternate on GPU rather than overlap — --no-async-scheduling prevents continuous batching
+
+---
+
+## Run 024: Throughput Benchmark — 30 agents, single run per GPU
+- **Date**: 2026-03-12
+- **Phase**: Infrastructure optimization
+- **Purpose**: Measure wall time per round at production scale (30 agents). Parallel run script bug: only 1 run per job due to run_index overflow.
+
+### Config
+| Parameter | Value |
+|-----------|-------|
+| num_agents | 30 |
+| max_rounds | 5 |
+| model | Qwen3.5-27B |
+| reasoning_level | L2 |
+| comm_scope | dm |
+| MAX_NUM_SEQS | 256 (was 32) |
+
+### Results
+| Job | Node | Elapsed | Sec/round |
+|-----|------|---------|-----------|
+| bench30-1x (20689472) | gcn110 | 1230s | 246s (4.1 min) |
+| bench30-2x (20689474) | gcn127 | 1121s | 224s (3.7 min) |
+| bench30-3x (20689547) | gcn140 | 1048s | 210s (3.5 min) |
+
+- All effectively single runs on separate nodes (parallel script bug: run_index out of range)
+- ~15% variability across nodes is normal
+- **Key finding: 30 agents @ L2 ≈ 4 min/round, not 5.5 min** — SBU calculation is conservative
+
+### Observations
+1. **Parallel runs on 1 GPU don't help at 30 agents**: --no-async-scheduling serializes batches. Max concurrent reqs = 30 (never 60+).
+2. **Prefix caching not functional for Qwen3.5**: GatedDeltaNet PR pending. Prompt refactor ready for when it lands.
+3. **MAX_NUM_SEQS was 32, now 256**: old setting was bottleneck for 10-agent parallel runs.
+4. **Way forward**: separate SLURM jobs on separate GPUs, not parallel runs on 1 GPU.
+5. **SBU impact**: 4 min/round × 25 rounds = 100 min/run. Conservative estimate (5.5 min) gives buffer.
+
+## Run 025: Async Scheduling Benchmark — 30 agents, 2x parallel (STALLED)
+- **Job ID**: 20692281
+- **Date**: 2026-03-12
+- **Phase**: Infrastructure optimization
+- **Purpose**: Test whether removing `--no-async-scheduling` enables continuous batching for 2 parallel 30-agent runs on 1 GPU. Hypothesis: async interleaves prefill/decode across 60 sequences → higher throughput.
+
+### Config
+| Parameter | Value |
+|-----------|-------|
+| num_agents | 30 |
+| max_rounds | 5 |
+| reps | 3 (split across 2 processes) |
+| model | Qwen3.5-27B |
+| reasoning_level | L2 |
+| comm_scope | dm |
+| MAX_NUM_SEQS | 256 |
+| MTP speculative decoding | ON (num_speculative_tokens=1) |
+| `--no-async-scheduling` | **REMOVED** (async enabled) |
+| Script | `parallel_runs_async.sh` |
+
+### Results
+- **Job cancelled after ~30 min** — engine deadlocked
+- Process 0: completed rep0, reached round 4/5 of rep1
+- Process 1: reached round 3/5 of rep2
+- **Deadlock**: vLLM stalled at 36 running + 24 waiting, 0.0 tokens/s, KV cache 58.5%
+- **~96 SBU burned** (30 min × 192 SBU/h)
+
+### Key vLLM Metrics (before stall)
+| Metric | Value |
+|--------|-------|
+| Peak concurrent reqs | 37 (vs 30 max with --no-async-scheduling) |
+| Peak KV cache usage | 59.8% |
+| Generation throughput | ~1200-1350 tokens/s (during active generation) |
+| MTP acceptance rate | 82-83% |
+| Prefix cache hit rate | 0.7-0.9% (not functional for GatedDeltaNet) |
+
+### Observations
+1. **Async scheduling + MTP = deadlock at high concurrency**: Works fine at 30-37 concurrent sequences. Deadlocks when both runs submit 60 prompts simultaneously (new round start).
+2. **`--no-async-scheduling` is mandatory for Qwen3.5 with MTP**: The flag exists specifically for hybrid architectures like GatedDeltaNet.
+3. **No need to test async without MTP**: MTP gives 1.82x tokens/step — losing that for async interleaving is a net loss. GPU is already saturated at 30 concurrent decode sequences.
+4. **Final verdict: 1 run per GPU is optimal for 30 agents**. Throughput gains must come from prefix caching (pending PR #26807) or multi-GPU, not parallelization.
