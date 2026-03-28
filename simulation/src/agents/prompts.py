@@ -110,12 +110,27 @@ class BaselinePrompt:
     def format_observation(self, observation: Dict, agent_id: str) -> str:
         """Format game observation into a minimal prompt.
 
+        Prompt is ordered for vLLM prefix caching: shared rules first (identical
+        across all agents in the same config), then per-agent state. vLLM's
+        automatic prefix caching matches the longest common prefix across
+        concurrent requests, so all 30 agents in a round share a single
+        prefill for the rules section.
+
+        Order: [rules/actions/combat/comm/reasoning] → [identity/state/memory/JSON]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^
+               SHARED PREFIX (cached after 1st agent)     PER-AGENT SUFFIX
+
         If observation contains an 'agent_memory' key (an AgentMemory instance),
         uses persistent memory for history/neighbor sections. Otherwise falls back
         to the god-view neighbor profiles built from recent_history.
         """
         parts = []
 
+        # ── SHARED PREFIX (identical for all agents in same config) ──────────
+        # Actions, combat rules, resource decay, communication, reasoning block
+        parts.append(self._format_rules())
+
+        # ── PER-AGENT SUFFIX ────────────────────────────────────────────────
         # Identity
         parts.append(f"You are {observation['agent_id']}.")
 
@@ -152,8 +167,8 @@ class BaselinePrompt:
         # No memory = no history. Agent sees only current state.
         # (Legacy god-view neighbor profiles removed — they leak omniscient info)
 
-        # Actions + reasoning block
-        parts.append(self._format_actions())
+        # JSON response template (per-agent because note_to_self differs by level)
+        parts.append(self._format_json_template())
 
         return "\n\n".join(parts)
 
@@ -360,8 +375,13 @@ class BaselinePrompt:
 
         return "\n\n".join(parts)
 
-    def _format_actions(self) -> str:
-        """Format available actions, reasoning block, and JSON template."""
+    def _format_rules(self) -> str:
+        """Format shared game rules: actions, combat, communication, reasoning block.
+
+        This section is IDENTICAL for all agents in the same config+level.
+        Placed first in the prompt so vLLM's automatic prefix caching can
+        reuse the KV cache across all concurrent agent requests in a round.
+        """
         allow_invest_self = self.game_params.get('allow_invest_self', True)
         invest_self_pct = self.game_params.get('invest_self_pct', 2)
         invest_other_cost_pct = self.game_params.get('invest_other_cost_pct', 10)
@@ -468,20 +488,24 @@ COMBAT RULES:
                 comm_lines.append("Set message_to to a specific agent_id for private, or \"all\" for broadcast.")
             parts.append("\n".join(comm_lines))
 
+        return "\n\n".join(parts)
+
+    def _format_json_template(self) -> str:
+        """Format JSON response template and note-to-self instructions.
+
+        This is per-agent (note_to_self differs by reasoning level), placed
+        AFTER the shared rules prefix and per-agent state/memory sections.
+        """
         # Note-to-self instruction (if enabled in game params)
         note_enabled = self.game_params.get('note_to_self', True)
         note_field = ""
         note_instruction = ""
         if note_enabled:
-            if self.reasoning_level == 'level0':
-                note_field = '\n  "note_to_self": "<your personal notes — see instructions below>",'
-                note_instruction = """
-note_to_self (REQUIRED): Your private notes. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Write whatever you find useful to remember.
-
-Max ~1000 characters. Be concise."""
-            else:
-                note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
-                note_instruction = """
+            # Same note instruction for ALL reasoning levels to avoid scaffolding confound.
+            # The structured template (STRATEGY/ALLIES/THREATS/PROMISES/NEXT) is given to
+            # every agent regardless of level. Only REASONING_BLOCKS differs between levels.
+            note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
+            note_instruction = """
 note_to_self (REQUIRED): Your private strategic notebook. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Use these sections:
 
 STRATEGY: Your overall long-term plan (who to ally with, when to pivot to attacks, etc.)
@@ -494,15 +518,15 @@ Max ~1000 characters. Be concise — use abbreviations."""
 
         # JSON template — no reasoning field, we read thinking traces directly
         if self.comm_scope == 'none':
-            parts.append(f"""Your final output MUST be valid JSON with exactly these fields:
+            return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "action": "<one of the action names above>",
   "target": "<agent_id or null>"
 }}
 target must be null (not the string "null") when no target is needed.{note_instruction}
-Do not include any text outside the JSON.""")
+Do not include any text outside the JSON."""
         elif self.comm_scope == 'dm':
-            parts.append(f"""Your final output MUST be valid JSON with exactly these fields:
+            return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "message": "<your message, or null to stay silent>",
   "message_to": "<agent_id of recipient, or null>",
@@ -512,9 +536,9 @@ Do not include any text outside the JSON.""")
 target must be null (not the string "null") when no target is needed.
 Messaging is optional. To send no message, set both message and message_to to null.
 To send a message, message_to must be a valid agent_id.{note_instruction}
-Do not include any text outside the JSON.""")
+Do not include any text outside the JSON."""
         elif self.comm_scope == 'broadcast':
-            parts.append(f"""Your final output MUST be valid JSON with exactly these fields:
+            return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "message": "<your message to all agents, or empty string to stay silent>",
   "action": "<one of the action names above>",
@@ -522,9 +546,9 @@ Do not include any text outside the JSON.""")
 }}
 target must be null (not the string "null") when no target is needed.
 Your message will be seen by all agents next round. Set message to "" to send no message.{note_instruction}
-Do not include any text outside the JSON.""")
+Do not include any text outside the JSON."""
         elif self.comm_scope == 'choice':
-            parts.append(f"""Your final output MUST be valid JSON with exactly these fields:
+            return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "message": "<your message, or empty string to stay silent>",
   "message_to": "<agent_id for private, or \\"all\\" for broadcast>",
@@ -534,9 +558,9 @@ Do not include any text outside the JSON.""")
 target must be null (not the string "null") when no target is needed.
 message_to: use a specific agent_id for a private message, or "all" to broadcast to all agents.
 Set message to "" to send no message.{note_instruction}
-Do not include any text outside the JSON.""")
-
-        return "\n\n".join(parts)
+Do not include any text outside the JSON."""
+        else:
+            return ""
 
 
 def get_prompt_style(prompt_config: Dict, game_params: Optional[Dict] = None) -> BaselinePrompt:
