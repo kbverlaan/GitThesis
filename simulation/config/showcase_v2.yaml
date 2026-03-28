@@ -1,0 +1,53 @@
+# Showcase v2 — rebalanced for genuine dilemma + net-positive outcomes
+# Changes vs showcase v1:
+#   invest_other_cost_pct: 10 → 8  (cheaper cooperation → longer profitable)
+#   attack_take_pct: 50 → 30        (lower stakes → attack less dominant)
+# Net surplus per invest = 7% (was 5%). Cooperative pairs can grow despite decay.
+# Attack EV lower → agents need stronger reason to pivot to predation.
+
+# Agent Configuration
+num_agents: 10
+initial_resources: 100.0
+
+# Investment Parameters (% of actor's resources)
+invest_other_cost_pct: 8         # You pay 8%
+invest_other_return_pct: 15      # Target gets 15% — cooperation surplus +7%
+allow_invest_self: false         # OFF — forces social interaction
+
+# Military Parameters (% of actor's resources)
+arm_cost_pct: 10
+arm_multiplier: 3.0              # +30% combat bonus
+arm_decay: 0.5                   # Fades in ~3 rounds
+
+# Combat Parameters
+attack_take_pct: 30              # Winner takes 30% of loser (was 50%)
+combat_max_loss_pct: 75
+conflict_cost_pct: 1             # Both pay 1%
+
+# Resource Decay
+resource_decay_pct: 2            # 2% per round — creates urgency
+
+# Diminishing Returns on Investment
+invest_saturation_decay: 0.8     # 20% reduction per repeat in window
+invest_saturation_window: 5      # 5-round rolling window
+
+# Game Length
+max_rounds: 25
+history_length: 10
+
+# Network Topology
+network_enabled: true
+mean_degree: 4.0
+rewiring_prob: 0.3
+payoff_window: 3
+
+# Communication
+comm_scope: "dm"
+
+# Agent Memory
+memory:
+  enabled: true
+  window_size: 10
+
+# Note-to-self
+note_to_self: true

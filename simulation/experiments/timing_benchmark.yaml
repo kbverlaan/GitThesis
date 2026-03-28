@@ -1,0 +1,52 @@
+# Timing benchmark: measure per-round cost per reasoning level with MTP enabled
+# Purpose: get hard numbers for SBU budget calculation
+# Expected cost: 4 runs × ~1h avg = 4 GPU-h × 192 = ~768 SBU
+# Run with: sbatch --gpus-per-node=1 --array=0-3 snellius/snellius_run.sh \
+#   /scratch-shared/kverlaan/origins_models/Qwen3.5-27B experiments/timing_benchmark.yaml 1
+
+name: timing_benchmark
+description: "Timing benchmark: per-round cost at each reasoning level (L0-L3) with MTP"
+reps: 1
+api_config: vllm_config.yaml
+base_params:
+  # Use showcase_v2 params as production baseline
+  num_agents: 10
+  initial_resources: 100.0
+  invest_other_cost_pct: 8
+  invest_other_return_pct: 15
+  allow_invest_self: false
+  arm_cost_pct: 10
+  arm_multiplier: 3.0
+  arm_decay: 0.5
+  attack_take_pct: 30
+  combat_max_loss_pct: 75
+  conflict_cost_pct: 1
+  resource_decay_pct: 2
+  invest_saturation_decay: 0.8
+  invest_saturation_window: 5
+  max_rounds: 10
+  history_length: 10
+  action_order: "simultaneous"
+
+  # Network — production baseline
+  network_enabled: true
+  mean_degree: 4.0
+  rewiring_prob: 0.3
+  payoff_window: 3
+
+  # Communication — DM baseline
+  comm_scope: "dm"
+
+  # Memory
+  memory:
+    enabled: true
+    window_size: 10
+  note_to_self: true
+
+sweep:
+  grid:
+    - param: "reasoning_level"
+      target: "prompt_config"
+      values: ["level0", "level1", "level2", "level3"]
+# 4 conditions × 1 rep = 4 runs
+# Watch the logs for "Time elapsed" and "per round" timing
