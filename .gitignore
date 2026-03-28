@@ -76,3 +76,6 @@ simulation/archive/runs/
 *.toc
 *.lof
 *.lot
+
+# Generated PDF
+text/main/CLS_thesis_template/main.pdf
