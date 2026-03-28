@@ -423,6 +423,11 @@ As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfa
 %   Results: notes/research/textgrad_results.md
 %   See also §\ref{Validation} for prompt sensitivity analysis.
 %
+% TODO (Debraj feedback #2, 10 mrt): TextGrad loss function — Debraj asked
+%   "What is the loss function?" Explain LLM-as-evaluator: Opus 4.6 for game
+%   comprehension, Sonnet 4.6 for reasoning level clarity. Koen answered in
+%   Slack thread (12 mrt).
+%
 % TODO: Koen — NOTE-TO-SELF toevoegen
 %   Elke agent schrijft een private strategische notitie (max 500 chars)
 %   als onderdeel van hun JSON response. Deze note_to_self wordt ALLEEN
@@ -436,6 +441,12 @@ As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfa
 %       ziet alleen memory window, geen eigen intenties van vorige ronde.
 %   In exploratory runs: agents gebruiken notes voor EV berekeningen,
 %   alliance tracking, defection detection, en target prioritering.
+%
+% TODO (Debraj feedback #3, 10 mrt): Note-to-self confound — Debraj asked about
+%   context space confound: "can agents write arbitrarily long planning notes?"
+%   RESOLVED: all levels get same structured template (STRATEGY/ALLIES/THREATS/
+%   PROMISES/NEXT), 1000 char cap for all. Koen confirmed in thread (12 mrt).
+%   Mention this explicitly as confound mitigation.
 %
 % TODO: Koen — MESSAGING + TIMING toevoegen
 %   Pre-action messaging phase (comm_scope=dm):
@@ -854,6 +865,23 @@ As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfa
 %   - Phase transition indicators: variance peak, rolling-window EWS
 %     (Scheffer et al., 2009)
 %   - Stabilisation round: post-hoc convergence detection for validation
+%
+% TODO (Debraj feedback #9, 10 mrt): EI index met confidence intervals across
+%   runs. Gebruik modularity maximization als cross-check op Leiden clustering.
+%   E-I values cooperation: -0.38, attacks: 0.50 zijn "compelling" — maar
+%   rapporteer CIs.
+%
+% TODO (Debraj feedback #8, 10 mrt): Embedding-analyse — embed niet volledige
+%   reasoning maar extracted strategy-relevant features (proportion sentences
+%   mentioning attack, alliance, deception, resource assessment). Of: track
+%   cosine similarity of agents' reasoning over time als maat voor strategic
+%   drift. "This needs some exploration." Koen: UMAP plots tonen nog geen
+%   duidelijke trajecten. Bespreken met Debraj vrijdag.
+%
+% TODO (Debraj feedback #7, 10 mrt): Truncation confound — rapporteer of
+%   truncation-induced action defaults voorkwamen in final runs. Koen:
+%   "doesn't happen on Snellius, added reasoning parsing fallback."
+%   Track fallback count als metric.
 
 % TODO: 3.5.3 — Statistical analysis
 \subsection{Statistical Analysis}
@@ -866,6 +894,13 @@ As far as I understand, graphs are initialized using Erdos-Reyni. Is it not unfa
 %   - ICC for within-run vs between-run variance
 %   - Early stopping analysis: compare metrics at fixed checkpoints (round 10, 20, 30)
 %     regardless of total run length, to handle variable-length runs
+%
+% TODO (Debraj feedback #5, 10 mrt): Interaction effects — track beyond just
+%   factorial, especially Reasoning Level × Communication. "These are where your
+%   strongest theoretical predictions lie." Debraj: "The Reasoning Level ×
+%   Communication interaction is the headline result: does L3+DM produce
+%   qualitatively different deception than L1+broadcast?"
+%   Koen agreed in thread: "Will prioritise analysis on that beyond main results"
 
 % -----------------------------------------------------------------------------
 % SECTION 3.6: Computational Infrastructure
