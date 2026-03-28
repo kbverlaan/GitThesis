@@ -81,11 +81,12 @@ if [[ "$MODEL_PATH" == *"Qwen3.5"* ]]; then
 fi
 
 # Throughput settings: game engine sends 30 concurrent requests per round
-# --enable-prefix-caching: all agents share game rules prefix (~300 tokens), computed once
-# --max-num-seqs: allow all 30 agents to be processed concurrently
+# --enable-prefix-caching: all agents share game rules prefix (~600 tokens), computed once
+#   Prompt is ordered: [shared rules] → [per-agent state] for optimal prefix reuse
+# --max-num-seqs: vLLM default=256, queues excess requests automatically via KV cache pressure
 # --max-model-len: reasoning models need headroom (thinking + JSON response)
 MAX_MODEL_LEN=16384
-MAX_NUM_SEQS=32
+MAX_NUM_SEQS=256
 if [[ "$MODEL_PATH" == *"Qwen3"* ]]; then
   # Reasoning models: ~2K prompt + ~8K thinking + ~200 response = ~10K
   # 16K gives headroom without wasting KV cache on unused context
