@@ -1,7 +1,7 @@
 # The Origins of Order
 
-**Author**: Koen Verlaan
-**Programme**: Master Computational Science, University of Amsterdam
+**Author**: Koen Verlaan  
+**Programme**: Master Computational Science, University of Amsterdam  
 **Year**: 2025-2026
 
 ## Research Question
@@ -10,35 +10,36 @@ How do strategic reasoning, information structure, and communication scope shape
 
 ## Repository Structure
 
+This repo contains **code only**. All research notes, roadmap, sprint logs, meeting notes, reading lists, and design docs live in Obsidian (single source of truth).
+
 ```
 GitThesis/
-├── text/
-│   ├── proposal/          # Submitted proposal (Jan 2026)
-│   └── main/              # Thesis chapters (CLS template)
-├── notes/                 # Research notes, meeting prep, reading lists
-│   └── archive/           # Older notes (Feb 2026 bulk archival)
 ├── simulation/
 │   ├── src/               # Game engine, agents, prompts, analysis
 │   ├── config/            # YAML configurations
 │   ├── experiments/       # Experiment YAML definitions
-│   ├── scripts/           # Utility scripts
+│   ├── scripts/           # Utility scripts (UMAP, TextGrad, etc.)
 │   ├── snellius/          # SLURM job scripts (SURF HPC)
-│   ├── data/              # Active run data, showcase, figures
 │   └── archive/           # Archived scripts and old runs
-├── data/experiment_log/   # Phase 1 experiment logs
-├── docs/                  # Reference PDFs, archived plans
-└── scripts/               # Paper search utilities
+├── text/
+│   ├── proposal/          # Submitted proposal (Jan 2026)
+│   └── main/              # Thesis chapters (CLS LaTeX template)
+├── scripts/               # Zotero helper scripts
+├── docs/                  # Reference PDFs (rubric, manual, tips)
+├── claude.md              # Agent instructions (for Claude Code)
+└── README.md
 ```
 
 ## Quickstart
 
 ```bash
 cd simulation
-python3 src/main.py --game config/game.yaml --api config/api.yaml
+python3 src/main.py --game config/game_params.yaml --api config/vllm_config.yaml
 ```
 
-## Key Documents
+## Key Links
 
-- **Roadmap**: `notes/roadmap.md`
+- **Roadmap + sprint log**: Obsidian → Projecten/Thesis/Roadmap
+- **Experiment log**: Obsidian → Projecten/Thesis/Experiment Log
 - **Proposal**: `text/proposal/VerlaanProposal_1.pdf`
 - **Experiment configs**: `simulation/experiments/`
