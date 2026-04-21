@@ -1,0 +1,64 @@
+# Main factorial experiment (§3.4.1)
+# 4 × 4 × 4 grid: ToM × communication × rewiring rate × 20 reps = 1280 runs.
+# Base parameters follow §3.1 defaults (fractions in [0, 1]).
+
+name: main_factorial
+description: >
+  Primary factorial for the thesis. Manipulates reasoning depth, communication
+  scope, and rewiring probability on Qwen 3.5-27B. Base parameters match §3.1.
+
+api_config: vllm_config.yaml
+
+reps: 20
+
+base_params:
+  # Agents
+  num_agents: 30
+  initial_resources: 100.0
+  initial_distribution: equal
+
+  # Investment
+  c_inv: 0.10
+  g_inv: 0.15
+  gamma_sat: 0.80
+  tau_sat: 5
+
+  # Arming
+  c_arm: 0.10
+  mu_arm: 3.0
+  delta_B: 0.50
+
+  # Combat
+  alpha: 0.20
+  c_atk: 0.01
+  eta_atk: 1.2
+  tau_atk: 5
+
+  # Economy
+  delta_R: 0.95
+
+  # Length
+  max_rounds: 60
+  history_length: 10
+
+  # Network
+  network_enabled: true
+  mean_degree: 5.0
+
+  # Memory
+  memory:
+    enabled: true
+    window_size: 10
+
+# Three IVs — full factorial
+sweep:
+  grid:
+    - param: reasoning_level
+      target: prompt_config
+      values: [level0, level1, level2, level3]
+    - param: comm_scope
+      target: game_params
+      values: [none, dm, broadcast, choice]
+    - param: rewiring_prob
+      target: game_params
+      values: [0.0, 0.1, 0.3, 1.0]

@@ -382,29 +382,30 @@ class BaselinePrompt:
         Placed first in the prompt so vLLM's automatic prefix caching can
         reuse the KV cache across all concurrent agent requests in a round.
         """
-        allow_invest_self = self.game_params.get('allow_invest_self', True)
-        invest_self_pct = self.game_params.get('invest_self_pct', 2)
-        invest_other_cost_pct = self.game_params.get('invest_other_cost_pct', 10)
-        invest_other_return_pct = self.game_params.get('invest_other_return_pct', 15)
-        arm_cost_pct = self.game_params.get('arm_cost_pct', 10)
-        arm_multiplier = self.game_params.get('arm_multiplier', 2.0)
-        arm_other_cost_pct = self.game_params.get('arm_other_cost_pct', arm_cost_pct)
-        arm_decay = self.game_params.get('arm_decay', 0.5)
-        attack_take_pct = self.game_params.get('attack_take_pct', 40)
-        combat_max_loss_pct = self.game_params.get('combat_max_loss_pct', 75)
-        conflict_cost_pct = self.game_params.get('conflict_cost_pct', 5)
-        resource_decay_pct = self.game_params.get('resource_decay_pct', 0)
+        # Read fractions, render as percentages for agent-facing text
+        c_inv = self.game_params.get('c_inv', 0.10)
+        g_inv = self.game_params.get('g_inv', 0.15)
+        c_arm = self.game_params.get('c_arm', 0.10)
+        mu_arm = self.game_params.get('mu_arm', 3.0)
+        delta_B = self.game_params.get('delta_B', 0.5)
+        alpha = self.game_params.get('alpha', 0.20)
+        c_atk = self.game_params.get('c_atk', 0.01)
+        delta_R = self.game_params.get('delta_R', 1.0)
 
-        # Compute theta ratio for invest_other
-        invest_other_ratio = f"1:{invest_other_return_pct/invest_other_cost_pct:.1f}" if invest_other_cost_pct > 0 else "free"
+        invest_other_cost_pct = c_inv * 100
+        invest_other_return_pct = g_inv * 100
+        arm_cost_pct = c_arm * 100
+        arm_other_cost_pct = c_arm * 100
+        arm_multiplier = mu_arm
+        arm_decay = delta_B
+        attack_take_pct = alpha * 100
+        conflict_cost_pct = c_atk * 100
+        resource_decay_pct = (1.0 - delta_R) * 100.0
 
         actions = []
 
-        if allow_invest_self:
-            actions.append(f"- invest_self: gain {invest_self_pct}% of your resources. Example: 25.0 resources → gain {25.0 * invest_self_pct / 100:.2f}, new total {25.0 * (1 + invest_self_pct / 100):.2f}")
-
-        saturation_decay = self.game_params.get('invest_saturation_decay', 1.0)
-        saturation_window = self.game_params.get('invest_saturation_window', 5)
+        saturation_decay = self.game_params.get('gamma_sat', 1.0)
+        saturation_window = self.game_params.get('tau_sat', 5)
         invest_desc = f"- invest_other: you pay {invest_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) receives {invest_other_return_pct}% of your resources. Example: you have 25.0 → you pay {25.0 * invest_other_cost_pct / 100:.1f} (left: {25.0 * (1 - invest_other_cost_pct / 100):.1f}), target gains {25.0 * invest_other_return_pct / 100:.1f}"
         if saturation_decay < 1.0:
             invest_desc += f"\n    DIMINISHING RETURNS: the system tracks a rolling {saturation_window}-round window. Each repeat investment in the SAME agent within that window reduces the target's gain by {(1 - saturation_decay) * 100:.0f}% per repeat. Example: invest in X at round 3, invest again at round 6 = reduced (round 6 is within 3+{saturation_window-1}). Invest at round 3, invest again at round {3 + saturation_window + 1} = full return (outside window). Investing in a DIFFERENT agent always gives full returns."
@@ -414,7 +415,7 @@ class BaselinePrompt:
         arm_bonus_ex = arm_cost_ex * arm_multiplier
         actions.append(f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay {arm_cost_ex:.1f}, bonus = {arm_cost_ex:.1f} x {arm_multiplier} = {arm_bonus_ex:.1f}. Resources left: {25.0 - arm_cost_ex:.1f}. Combat strength: {25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = {25.0 - arm_cost_ex + arm_bonus_ex:.1f}")
         actions.append(f"- arm_other: you pay {arm_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) gains combat bonus = cost x {arm_multiplier}. TARGET's resources do NOT increase — only their fighting power.")
-        actions.append(f"- attack: TARGET must be a connected neighbor. Both sides pay {conflict_cost_pct}% conflict cost. Stakes = {attack_take_pct}% of DEFENDER's resources (capped at {combat_max_loss_pct}% of attacker's). Winner takes the pot from the loser.")
+        actions.append(f"- attack: TARGET must be a connected neighbor. Both sides pay {conflict_cost_pct}% conflict cost (scaled up by recent attack history). Winner takes {attack_take_pct}% of the loser's resources.")
         actions.append("- do_nothing: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -430,14 +431,13 @@ COMBAT RULES:
 - All arm bonuses decay at the END of each round (multiply by {arm_decay})
 - If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender. This is the ONLY way to share spoils — you must both choose "attack" with the same target in the same round.
 - Win probability = attacker_strength / (attacker_strength + defender_strength)
-- The DEFENDER's resources determine the stakes: pot = {attack_take_pct}% of defender's resources (but you can never lose more than {combat_max_loss_pct}% of your own resources).
-- Both sides risk the SAME pot. Winner takes it from the loser.
-- Example: you (10) attack someone (50) → pot = {attack_take_pct}% of 50 = {50 * attack_take_pct / 100:.0f}, capped at {10 * combat_max_loss_pct / 100:.0f} (you keep at least {10 * (100 - combat_max_loss_pct) / 100:.0f}). A lost attack never wipes you out.
-- Example: you (50) attack someone (10) → pot = {attack_take_pct}% of 10 = {10 * attack_take_pct / 100:.0f}. Small target = small stakes.
-- Coalition of 3 (total 15) attacks someone (50) → pot = {attack_take_pct}% of 50 = {50 * attack_take_pct / 100:.0f}, capped at {15 * combat_max_loss_pct / 100:.0f}. Coalitions pool resources to unlock bigger pots.
+- Winner takes {attack_take_pct}% of the LOSER's resources:
+    - If the coalition wins, the defender loses {attack_take_pct}% of their own resources; attackers split it proportionally to the combat strength they contributed.
+    - If the defender wins, each attacker loses {attack_take_pct}% of their OWN resources; the defender gains the sum.
+- Example: you (10) attack someone (50) and win → you gain {50 * attack_take_pct / 100:.1f}, defender loses the same. If you lose, you lose {10 * attack_take_pct / 100:.1f} (half your resources) and the defender gains it.
 - Coalition members split gains/losses proportionally by combat strength.
 - Investing in an attacker does NOT give you a share of their spoils. Only agents who attack share the winnings.
-- Both sides pay {conflict_cost_pct}% conflict cost regardless of outcome"""]
+- Both sides pay {conflict_cost_pct}% conflict cost, scaled up by each participant's own recent attack history (rolling window)."""]
 
         if resource_decay_pct > 0:
             decay_ex = 25.0 * resource_decay_pct / 100
@@ -493,17 +493,14 @@ COMBAT RULES:
     def _format_json_template(self) -> str:
         """Format JSON response template and note-to-self instructions.
 
-        This is per-agent (note_to_self differs by reasoning level), placed
-        AFTER the shared rules prefix and per-agent state/memory sections.
+        Rewire fields are added whenever rewiring_prob > 0. All other fields
+        follow comm_scope toggles. Per-agent because note_to_self text differs
+        by config; placed AFTER the shared rules prefix.
         """
-        # Note-to-self instruction (if enabled in game params)
         note_enabled = self.game_params.get('note_to_self', True)
         note_field = ""
         note_instruction = ""
         if note_enabled:
-            # Same note instruction for ALL reasoning levels to avoid scaffolding confound.
-            # The structured template (STRATEGY/ALLIES/THREATS/PROMISES/NEXT) is given to
-            # every agent regardless of level. Only REASONING_BLOCKS differs between levels.
             note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
             note_instruction = """
 note_to_self (REQUIRED): Your private strategic notebook. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Use these sections:
@@ -516,14 +513,28 @@ NEXT: Specific plan for next round.
 
 Max ~1000 characters. Be concise — use abbreviations."""
 
-        # JSON template — no reasoning field, we read thinking traces directly
+        rewiring_prob = self.game_params.get('rewiring_prob', 0.0)
+        rewire_fields = ""
+        rewire_instruction = ""
+        if rewiring_prob > 0:
+            rewire_fields = (
+                '\n  "rewire_drop": "<neighbour agent_id to disconnect from, or null>",'
+                '\n  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>",'
+            )
+            rewire_instruction = (
+                f"\nREWIRING: Each round with probability {rewiring_prob:.2f} the system will apply your nominations. "
+                "Breaks are resolved first, then connects. Nominations are unilateral — no consent needed. "
+                "If someone drops you but you invite them back the same round, the edge survives (at the cost of your connect-slot). "
+                "Set either field to null to skip. You have at most one drop and one invite per round."
+            )
+
         if self.comm_scope == 'none':
             return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "action": "<one of the action names above>",
-  "target": "<agent_id or null>"
+  "target": "<agent_id or null>"{rewire_fields}
 }}
-target must be null (not the string "null") when no target is needed.{note_instruction}
+target must be null (not the string "null") when no target is needed.{note_instruction}{rewire_instruction}
 Do not include any text outside the JSON."""
         elif self.comm_scope == 'dm':
             return f"""Your final output MUST be valid JSON with exactly these fields:
@@ -531,21 +542,21 @@ Do not include any text outside the JSON."""
   "message": "<your message, or null to stay silent>",
   "message_to": "<agent_id of recipient, or null>",
   "action": "<one of the action names above>",
-  "target": "<agent_id or null>"
+  "target": "<agent_id or null>"{rewire_fields}
 }}
 target must be null (not the string "null") when no target is needed.
 Messaging is optional. To send no message, set both message and message_to to null.
-To send a message, message_to must be a valid agent_id.{note_instruction}
+To send a message, message_to must be a valid agent_id.{note_instruction}{rewire_instruction}
 Do not include any text outside the JSON."""
         elif self.comm_scope == 'broadcast':
             return f"""Your final output MUST be valid JSON with exactly these fields:
 {{{note_field}
   "message": "<your message to all agents, or empty string to stay silent>",
   "action": "<one of the action names above>",
-  "target": "<agent_id or null>"
+  "target": "<agent_id or null>"{rewire_fields}
 }}
 target must be null (not the string "null") when no target is needed.
-Your message will be seen by all agents next round. Set message to "" to send no message.{note_instruction}
+Your message will be seen by all agents next round. Set message to "" to send no message.{note_instruction}{rewire_instruction}
 Do not include any text outside the JSON."""
         elif self.comm_scope == 'choice':
             return f"""Your final output MUST be valid JSON with exactly these fields:
@@ -553,11 +564,11 @@ Do not include any text outside the JSON."""
   "message": "<your message, or empty string to stay silent>",
   "message_to": "<agent_id for private, or \\"all\\" for broadcast>",
   "action": "<one of the action names above>",
-  "target": "<agent_id or null>"
+  "target": "<agent_id or null>"{rewire_fields}
 }}
 target must be null (not the string "null") when no target is needed.
 message_to: use a specific agent_id for a private message, or "all" to broadcast to all agents.
-Set message to "" to send no message.{note_instruction}
+Set message to "" to send no message.{note_instruction}{rewire_instruction}
 Do not include any text outside the JSON."""
         else:
             return ""

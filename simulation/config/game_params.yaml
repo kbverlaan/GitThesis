@@ -1,47 +1,45 @@
-# Game Parameters — unified with prompt (see prompts.py _format_actions)
-# All costs/returns are percentages of the acting agent's current resources.
+# Game Parameters — symbols match §3.1 of thesis.
+# All proportional values are fractions in [0, 1]; multipliers are scalars;
+# windows are integer rounds.
 
-# Agent Configuration
+# Agents
 num_agents: 30
-initial_resources: 25.0
-
-# Investment Parameters (% of actor's resources)
-invest_self_pct: 2            # Flat gain: +2% of your resources (no cost)
-invest_other_cost_pct: 10     # You pay 10% of your resources
-invest_other_return_pct: 15   # Target gains 15% of your resources
-
-# Military Parameters (% of actor's resources)
-arm_cost_pct: 10              # You pay 10% of your resources
-arm_multiplier: 2.0           # Combat bonus = cost × multiplier (pay 10%, get +20% bonus)
-arm_decay: 0.5                # Bonus halves each round (×0.5)
-
-# Combat Parameters
-attack_take_pct: 40           # Winner takes 40% of loser's resources
-conflict_cost_pct: 5          # Each fighter pays 5% of own resources
-
-# Game Length
-max_rounds: 50
-history_length: 10            # Number of rounds of history agents can see
-
-# Action Restrictions
-allow_invest_self: false      # invest_self OFF — forces social dilemma
-
-# Distribution
+initial_resources: 100.0
 initial_distribution: "equal"
 
-# Action Order
-action_order: "simultaneous"
+# Investment
+c_inv: 0.10                          # invest cost (fraction of actor's R)
+g_inv: 0.15                          # invest return (fraction of actor's R transferred)
+gamma_sat: 0.80                      # saturation factor per repeat in window
+tau_sat: 5                           # saturation window (rounds)
 
-# Network Topology (replaces spatial field)
+# Arming
+c_arm: 0.10                          # arm cost (fraction of actor's R)
+mu_arm: 3.0                          # arm multiplier (bonus = cost × mu_arm)
+delta_B: 0.50                        # arm decay factor
+
+# Combat
+alpha: 0.20                          # spoils = alpha × loser's R
+c_atk: 0.01                          # base conflict cost (fraction of own R)
+eta_atk: 1.2                         # per-prior-attack multiplier
+tau_atk: 5                           # sliding-window rounds
+
+# Economy
+delta_R: 0.95                        # resource decay factor: R(t+1) = delta_R × (R(t) + ΔR)
+
+# Game length
+max_rounds: 60
+history_length: 10
+
+# Network
 network_enabled: true
-mean_degree: 5.0              # Expected degree ⟨k⟩ for initial ER graph
-rewiring_prob: 0.0            # w: 0=static, 0.05=viscous, 0.3=fluid, 1.0=fully dynamic
-payoff_window: 5              # Rounds of resource changes used for rewiring decisions
+mean_degree: 5.0
+rewiring_prob: 0.0                   # w — IV (§3.3.2)
 
-# Communication Scope (IV3)
-comm_scope: "none"              # none | dm | broadcast | choice
+# Communication
+comm_scope: "none"                   # IV (§3.3.3): none | dm | broadcast | choice
 
-# Agent Memory
+# Memory
 memory:
   enabled: true
   window_size: 10

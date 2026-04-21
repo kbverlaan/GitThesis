@@ -108,6 +108,7 @@ class LLMAgent:
         self._visible_agents = None
         self._last_message = None  # Last message extracted from LLM response
         self._last_note = None     # Last note-to-self extracted from LLM response
+        self._last_rewire_nom = None  # {'drop': id_or_None, 'invite': id_or_None}
     
     def _format_observation(self, observation: Dict) -> str:
         """
@@ -174,6 +175,12 @@ class LLMAgent:
                     # Extract note-to-self if present
                     if parsed.get('note_to_self'):
                         result['note_to_self'] = parsed['note_to_self']
+                    # Extract rewire nomination if present
+                    drop = parsed.get('rewire_drop')
+                    invite = parsed.get('rewire_invite')
+                    if drop is not None or invite is not None:
+                        result['rewire_drop'] = drop
+                        result['rewire_invite'] = invite
                     return result
         except json.JSONDecodeError:
             pass
@@ -182,7 +189,7 @@ class LLMAgent:
 
     # Valid action names for fuzzy matching
     _VALID_ACTIONS = {
-        'invest_self', 'invest_other', 'arm_self', 'arm_other', 'attack', 'do_nothing'
+        'invest_other', 'arm_self', 'arm_other', 'attack', 'do_nothing'
     }
 
     def _normalize_action(self, action_raw: str) -> Optional[str]:
@@ -208,7 +215,6 @@ class LLMAgent:
             'do_nothing': 'do_nothing',
             'invest': 'invest_other',
             'arm': 'arm_self',
-            'self_invest': 'invest_self',
             'self_arm': 'arm_self',
         }
         if action in aliases:
@@ -223,7 +229,6 @@ class LLMAgent:
         
         # Map action string to ActionType
         action_map = {
-            'invest_self': ActionType.INVEST_SELF,
             'invest_other': ActionType.INVEST_OTHER,
             'arm_self': ActionType.ARM_SELF,
             'arm_other': ActionType.ARM_OTHER,
@@ -275,9 +280,35 @@ class LLMAgent:
         else:
             self._last_note = None
 
+    def _store_rewire(self, action_dict: Dict):
+        """Store rewire nomination ({drop, invite}) from LLM response."""
+        drop = action_dict.get('rewire_drop')
+        invite = action_dict.get('rewire_invite')
+
+        def _norm(v):
+            if v is None:
+                return None
+            if isinstance(v, str):
+                s = v.strip()
+                if not s or s.lower() in ('null', 'none', 'no_one', 'nobody'):
+                    return None
+                return s
+            return None
+
+        drop_n = _norm(drop)
+        invite_n = _norm(invite)
+        if drop_n is None and invite_n is None:
+            self._last_rewire_nom = None
+        else:
+            self._last_rewire_nom = {'drop': drop_n, 'invite': invite_n}
+
     def get_last_message(self) -> Optional[Dict]:
         """Return the message from the last select_action call, or None."""
         return self._last_message
+
+    def get_last_rewire_nomination(self) -> Optional[Dict]:
+        """Return the rewire nomination from the last select_action call, or None."""
+        return self._last_rewire_nom
 
     def select_action(self, observation: Dict) -> Action:
         """
@@ -292,6 +323,7 @@ class LLMAgent:
         # Store visible agents for network target validation
         self._visible_agents = observation.get('visible_agents', None)
         self._last_message = None  # Reset each round
+        self._last_rewire_nom = None  # Reset each round
 
         prompt = self._format_observation(observation)
 
@@ -368,6 +400,7 @@ class LLMAgent:
                     if action:
                         self._store_message(action_dict)
                         self._store_note(action_dict)
+                        self._store_rewire(action_dict)
                         return action
 
                 # JSON missing — send a follow-up requesting structured output
@@ -403,6 +436,7 @@ class LLMAgent:
                             if action:
                                 self._store_message(action_dict)
                                 self._store_note(action_dict)
+                                self._store_rewire(action_dict)
                                 # Log the retry trace
                                 self.reasoning_traces.append({
                                     "round": observation['round'],
@@ -501,7 +535,6 @@ class LLMAgent:
             if not action_str:
                 return None
             action_map = {
-                'invest_self': ActionType.INVEST_SELF,
                 'invest_other': ActionType.INVEST_OTHER,
                 'arm_self': ActionType.ARM_SELF,
                 'arm_other': ActionType.ARM_OTHER,
@@ -532,7 +565,6 @@ class LLMAgent:
             decision_prefixes + r'[:\s]*\**\s*(invest(?:[_ ]?other)?(?:[_ ]?in)?)\s+(\w+)',
             decision_prefixes + r'[:\s]*\**\s*(arm[_ ]?other)\s+(\w+)',
             decision_prefixes + r'[:\s]*\**\s*(arm[_ ]?self)',
-            decision_prefixes + r'[:\s]*\**\s*(invest[_ ]?self)',
             decision_prefixes + r'[:\s]*\**\s*(do[_ ]?nothing)',
         ]:
             match = re.search(pattern, tail_lower)
@@ -549,7 +581,7 @@ class LLMAgent:
 
         # --- Phase 2: "Action: attack. Target: Storm." pattern ---
         action_target_match = re.search(
-            r'action[:\s]*\**\s*(attack|invest[_ ]?(?:other|self)|arm[_ ]?(?:self|other)|do[_ ]?nothing)\**'
+            r'action[:\s]*\**\s*(attack|invest[_ ]?other|arm[_ ]?(?:self|other)|do[_ ]?nothing)\**'
             r'.*?target[:\s]*\**\s*(\w+)',
             tail_lower, re.DOTALL
         )
@@ -570,7 +602,6 @@ class LLMAgent:
             (rf'(invest(?:[_ ]?(?:other|in))?)\s+({agent_pattern})', 'invest_other'),
             (rf'(arm[_ ]?other)\s+({agent_pattern})', 'arm_other'),
             (rf'(arm[_ ]?self)', 'arm_self'),
-            (rf'(invest[_ ]?self)', 'invest_self'),
             (rf'(do[_ ]?nothing)', 'do_nothing'),
         ]
         best_match = None

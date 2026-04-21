@@ -335,7 +335,7 @@ def print_round_time(seconds):
 
 def print_metrics_dashboard(metrics, prev_metrics=None):
     """Print colorful metrics dashboard with trend arrows."""
-    coop = metrics.get('cooperation_ratio', 0)
+    coop = metrics.get('cooperation_rate', metrics.get('cooperation_ratio', 0))
     gini = metrics.get('gini', 0)
     mod = metrics.get('modularity', 0)
     stab = metrics.get('action_stability')
@@ -353,7 +353,7 @@ def print_metrics_dashboard(metrics, prev_metrics=None):
     # Cooperation: green when high, red when low
     coop_color = 'green' if coop >= 0.4 else 'yellow' if coop >= 0.15 else 'red'
     coop_bar = C('▮' * int(10 * coop), coop_color) + C('▯' * (10 - int(10 * coop)), 'dim')
-    coop_trend = _trend(coop, prev.get('cooperation_ratio'))
+    coop_trend = _trend(coop, prev.get('cooperation_rate', prev.get('cooperation_ratio')))
 
     # Gini: green when low (equal), red when high (unequal)
     gini_color = 'green' if gini < 0.15 else 'yellow' if gini < 0.35 else 'red'
