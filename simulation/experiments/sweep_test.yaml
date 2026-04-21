@@ -1,0 +1,54 @@
+# Sweep-plumbing validator. Covers all IVs and both target types
+# (prompt_config + game_params). 5 agents × 3 rounds × 4 conditions.
+# Goal: verify apply_condition, flat indexing, batch mode.
+
+name: sweep_test
+description: >
+  Validates experiment.py dispatch pipeline (single / batch / full sweep)
+  on a minimal 2×2×1 grid before launching the real factorial.
+
+api_config: openrouter_config.yaml
+
+reps: 1
+
+base_params:
+  num_agents: 5
+  initial_resources: 100.0
+
+  c_inv: 0.10
+  g_inv: 0.15
+  gamma_sat: 0.80
+  tau_sat: 5
+
+  c_arm: 0.10
+  mu_arm: 3.0
+  delta_B: 0.50
+
+  alpha: 0.20
+  c_atk: 0.01
+  eta_atk: 1.2
+  tau_atk: 5
+
+  delta_R: 0.95
+
+  max_rounds: 3
+  history_length: 10
+
+  network_enabled: true
+  mean_degree: 5.0
+
+  memory:
+    enabled: true
+    window_size: 10
+
+sweep:
+  grid:
+    - param: tom_level
+      target: prompt_config
+      values: [level0, level2]
+    - param: comm_scope
+      target: game_params
+      values: [none, dm]
+    - param: rewiring_prob
+      target: game_params
+      values: [0.3]
