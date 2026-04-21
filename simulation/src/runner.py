@@ -12,6 +12,7 @@ import json
 import time
 import platform
 import random
+import subprocess
 import yaml
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,6 +44,28 @@ except ImportError:
 def load_config(config_path: str) -> dict:
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
+
+
+def _git_info() -> dict:
+    try:
+        sha = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL, text=True).strip()
+        dirty = bool(subprocess.check_output(
+            ['git', 'status', '--porcelain'], stderr=subprocess.DEVNULL, text=True).strip())
+        return {'commit': sha, 'dirty': dirty}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {'commit': None, 'dirty': None}
+
+
+def _package_versions() -> dict:
+    versions = {}
+    for pkg in ('numpy', 'networkx', 'openai', 'yaml'):
+        try:
+            mod = __import__(pkg)
+            versions[pkg] = getattr(mod, '__version__', 'unknown')
+        except ImportError:
+            pass
+    return versions
 
 
 def _modularity_from_edges(edges: list) -> float:
@@ -565,6 +588,8 @@ def run_simulation(game_params: dict,
             "slurm_nodelist": os.getenv("SLURM_NODELIST"),
             "cuda_visible": os.getenv("CUDA_VISIBLE_DEVICES"),
         },
+        "git": _git_info(),
+        "packages": _package_versions(),
     }
 
     print()

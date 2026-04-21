@@ -24,7 +24,6 @@ from runner import run_simulation, save_results, load_config
 from analysis.metrics import (
     gini, first_attack_round, cooperation_rate_timeseries,
 )
-from run_logger import RunLogger
 
 
 def load_experiment(spec_path: str) -> dict:
@@ -138,10 +137,6 @@ def run_sweep(spec_path: str):
     reps = spec['reps']
     base_params = spec['base_params']
 
-    logger = RunLogger()
-    experiment_id = logger.start_experiment(spec, or_config)
-    print(f"Experiment logged: {experiment_id}")
-
     conditions = generate_conditions(spec['sweep'])
     output_dir = project_root / "data" / "runs" / name
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -183,9 +178,6 @@ def run_sweep(spec_path: str):
             save_results(state, traces, round_logs, output_dir, run_id, run_metadata)
             run_results = _summarize_run(round_logs, run_elapsed, condition, rep, run_id)
             manifest['runs'].append(run_results)
-            logger.log_run(experiment_id, run_id,
-                           {e['param']: e['value'] for e in condition},
-                           params, cfg, run_results)
 
     manifest['completed_at'] = datetime.now().isoformat()
     manifest['total_elapsed_seconds'] = round(time.time() - t0, 1)
