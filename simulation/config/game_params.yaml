@@ -5,7 +5,6 @@
 # Agents
 num_agents: 30
 initial_resources: 100.0
-initial_distribution: "equal"
 
 # Investment
 c_inv: 0.10                          # invest cost (fraction of actor's R)

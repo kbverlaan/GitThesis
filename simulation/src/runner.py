@@ -158,22 +158,7 @@ def run_simulation(game_params: dict,
         names = [f"agent_{i+1}" for i in range(n_agents)]
     agent_ids = names
 
-    dist_type = game_params.get('initial_distribution', 'equal')
-    base_resources = game_params['initial_resources']
-    n = len(agent_ids)
-    total = base_resources * n
-    if dist_type == 'unequal':
-        rich_share = total * 0.4
-        poor_share = (total - rich_share) / (n - 1)
-        initial_resources = {agent_ids[0]: rich_share}
-        for aid in agent_ids[1:]:
-            initial_resources[aid] = poor_share
-    elif dist_type == 'random':
-        raw = np.random.uniform(5, 45, size=n)
-        scaled = raw / raw.sum() * total
-        initial_resources = {aid: float(s) for aid, s in zip(agent_ids, scaled)}
-    else:
-        initial_resources = base_resources
+    initial_resources = game_params['initial_resources']
 
     engine = GameEngine(
         agent_ids=agent_ids,
@@ -296,6 +281,10 @@ def run_simulation(game_params: dict,
         state = engine.get_state()
         round_num = state.round_number
 
+        # Snapshot incoming messages before pending_messages gets overwritten
+        # with next round's outgoing traffic later in the loop.
+        received_this_round = {aid: list(msgs) for aid, msgs in pending_messages.items()}
+
         d.print_round_header(round_num, max_rounds)
         d.print_resource_bars(state.resources, state.arm_bonuses, agent_ids)
         if network:
@@ -348,10 +337,11 @@ def run_simulation(game_params: dict,
         round_notes = {}
         for aid in agent_ids:
             agent = agents[aid]
-            if getattr(agent, '_last_note', None):
-                round_notes[aid] = agent._last_note
-            elif agent.memory and agent.memory.note_to_self:
-                round_notes[aid] = agent.memory.note_to_self
+            mem_text = getattr(agent, '_last_memory', None)
+            if not mem_text and agent.memory:
+                mem_text = agent.memory.last_note()
+            if mem_text:
+                round_notes[aid] = mem_text
 
         d.print_agent_round_summary(display_action_map, round_notes, agent_ids)
         d.print_combat_results(round_result.get('combat_results', []))
@@ -421,7 +411,7 @@ def run_simulation(game_params: dict,
             agent_traces[aid] = {
                 'reasoning': reasoning_text,
                 'thinking': thinking or None,
-                'note_to_self': agents[aid].memory.note_to_self if agents[aid].memory else None,
+                'memory': getattr(agents[aid], '_last_memory', None),
                 'tokens': last.get('usage', {}).get('total_tokens', 0),
                 'latency_s': last.get('latency_s') or last.get('latency', 0),
                 'prompt': last.get('prompt', ''),
@@ -524,6 +514,16 @@ def run_simulation(game_params: dict,
                         outcome['combat_won'] = (combat['winner'] == 'coalition')
                         break
                 agent_outcomes[aid] = outcome
+            # Rewire info per agent (may be None if no rewiring this round or no nomination)
+            rewire_per_agent = {}
+            if rewire_stats:
+                for entry in rewire_stats.get('intents', []):
+                    rewire_per_agent[entry['agent']] = {
+                        'drop': entry.get('drop_intent'),
+                        'invite': entry.get('invite_intent'),
+                        'drop_outcome': entry.get('drop_outcome'),
+                        'invite_outcome': entry.get('invite_outcome'),
+                    }
             for aid in agent_ids:
                 action_str = action_by_agent.get(aid, {}).get('action', 'no_action')
                 target = action_by_agent.get(aid, {}).get('target')
@@ -535,10 +535,9 @@ def run_simulation(game_params: dict,
                     outcome=agent_outcomes.get(aid, {}),
                     visible_agents=visible,
                     round_actions=round_actions,
-                    resource_changes=resource_changes,
-                    combat_results=combat_results,
                     all_resources=post_resources,
-                    received_messages=pending_messages.get(aid, []),
+                    received_messages=received_this_round.get(aid, []),
+                    rewire=rewire_per_agent.get(aid),
                 )
 
         save_checkpoint(checkpoint_path, engine, agents, network,

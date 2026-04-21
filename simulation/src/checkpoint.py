@@ -116,37 +116,58 @@ def reconstruct_from_jsonl(jsonl_path: str, game_params: dict) -> dict:
             else:
                 round_actions.append({'agent': aid, 'action': 'no_action'})
 
-        all_resources = {aid: adata.get('resources', 0) for aid, adata in agents_data.items()}
-        resource_changes = {aid: 0.0 for aid in agent_ids}
         combat_results = rd.get('combat', [])
+        post_resources = {aid: adata.get('resources', 0) for aid, adata in agents_data.items()}
+
+        # Sent messages per agent (for this round's memory entry)
+        msgs = rd.get('messages', [])
+        sent_by = {}
+        for msg in msgs:
+            sender = msg.get('from') or msg.get('agent_id')
+            msg_to = msg.get('to') or msg.get('message_to')
+            text = msg.get('text') or msg.get('message', '')
+            if sender and text:
+                sent_by[sender] = {'message_to': msg_to, 'message': text}
 
         for aid in agent_ids:
             adata = agents_data.get(aid, {})
             act = adata.get('action', 'no_action')
             target = adata.get('target')
-            memories[aid].record_action(rnd, act, target, {})
-            memories[aid].update_observations(
-                rnd, list(visible.get(aid, [])), round_actions,
-                resource_changes, combat_results, all_resources,
-            )
-            note = adata.get('note_to_self')
-            if note:
-                memories[aid].record_note(note)
+            breakdown = adata.get('breakdown', {}) or {}
+            outcome = {}
+            rc = breakdown.get('resource_change') if isinstance(breakdown, dict) else None
+            if rc is not None:
+                outcome['resource_change'] = rc
+            # Combat outcome: is this agent an attacker in any combat?
+            for c in combat_results:
+                if aid in (c.get('attackers') or []):
+                    outcome['combat_won'] = (c.get('winner') == 'coalition')
+                    break
 
-        msgs = rd.get('messages', [])
+            own_action = {'action': act, 'target': target, 'outcome': outcome}
+            rewire_intent = adata.get('rewire_intent') or None
+
+            memories[aid].record_round(
+                round_num=rnd,
+                own_action=own_action,
+                round_actions=round_actions,
+                visible_agents=list(visible.get(aid, [])) if visible.get(aid) else None,
+                all_resources=post_resources,
+                sent_message=sent_by.get(aid),
+                received_messages=pending_messages.get(aid, []),
+                rewire=rewire_intent,
+            )
+            mem_text = adata.get('memory') or adata.get('note_to_self')
+            if mem_text:
+                memories[aid].record_memory(rnd, mem_text)
+
         next_messages = {aid: [] for aid in agent_ids}
         for msg in msgs:
             sender = msg.get('from') or msg.get('agent_id')
-            msg_to = msg.get('message_to')
-            text = msg.get('message', '')
+            msg_to = msg.get('to') or msg.get('message_to')
+            text = msg.get('text') or msg.get('message', '')
             if not text:
                 continue
-            if sender in memories:
-                memories[sender].record_messages(
-                    {'message': text, 'message_to': msg_to},
-                    pending_messages.get(sender, []),
-                    rnd,
-                )
             if msg_to and msg_to != 'all' and msg_to in agent_ids:
                 next_messages[msg_to].append({'from': sender, 'message': text, 'channel': 'dm'})
             elif msg_to == 'all':

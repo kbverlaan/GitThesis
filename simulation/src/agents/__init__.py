@@ -1,5 +1,5 @@
 """Agents package."""
 from .llm_agent import LLMAgent
-from .memory import AgentMemory, NeighborRecord
+from .memory import AgentMemory, RoundEvents, MemoryEntry
 
-__all__ = ['LLMAgent', 'AgentMemory', 'NeighborRecord']
+__all__ = ['LLMAgent', 'AgentMemory', 'RoundEvents', 'MemoryEntry']

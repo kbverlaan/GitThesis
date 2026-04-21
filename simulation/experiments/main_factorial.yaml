@@ -15,7 +15,6 @@ base_params:
   # Agents
   num_agents: 30
   initial_resources: 100.0
-  initial_distribution: equal
 
   # Investment
   c_inv: 0.10
@@ -53,7 +52,7 @@ base_params:
 # Three IVs — full factorial
 sweep:
   grid:
-    - param: reasoning_level
+    - param: tom_level
       target: prompt_config
       values: [level0, level1, level2, level3]
     - param: comm_scope

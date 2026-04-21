@@ -62,7 +62,18 @@ def main():
     game_params = load_config(game_path)
     openrouter_config = load_config(api_path)
 
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # When resuming, keep the original run_id so logs stay in one file.
+    # Pattern: data/runs/<run_id>_log.jsonl  or  <run_id>_reasoning_live.jsonl
+    run_id = None
+    if args.resume:
+        stem = Path(args.resume).stem  # e.g. "20260421_221222_log" or "..._reasoning_live"
+        for suffix in ('_reasoning_live', '_log', '_checkpoint'):
+            if stem.endswith(suffix):
+                run_id = stem[: -len(suffix)]
+                break
+    if run_id is None:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     state, traces, round_logs, run_metadata = run_simulation(
         game_params, openrouter_config, run_id, resume_path=args.resume
     )

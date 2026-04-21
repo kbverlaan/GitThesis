@@ -1,22 +1,18 @@
 """
-Baseline prompt for LLM agents.
-Single minimal prompt -- no narrative framing, no social CoT, no toggles.
-Used for Phase 1 system characterization.
+Prompt harness for LLM agents.
 
-Old prompt variations archived in git history (pre-Feb 2026).
+A single baseline prompt drives all conditions. The primary IV is ToM depth
+(§3.3.1): four standalone instruction blocks, one per level, each introducing
+its own concepts from scratch. Orthogonal feature flags (communication scope,
+rewiring, hide_resources) are driven by game_params.
 
 Design references:
-- Reasoning levels L0-L3: operationalize Theory of Mind depth
-  (de Weerd et al., 2013; 2017) and extend Kuusela & Roy (AAMAS 2024) from RL
-  to prompted LLM reasoning. Also informed by K-Level Reasoning in LLMs
-  (Zhang et al., NAACL 2025).
-- L0 = no ToM (reactive), L1 = zero-order ToM (no modeling of others' minds),
-  L2 = first-order ToM (predict what others will do),
-  L3 = second-order ToM (model what others think about you).
-- CoT-as-computation framing: each reasoning level adds computational depth
-  (Pfau et al., 2024 "Let's Think Dot by Dot"; Goyal et al., 2024 "Think Before You Speak").
-- Framing effects: FRAMINGS dict implements the "Name of the Game" manipulation
-  (Liberman et al., 2004; Loré & Brockman, 2024).
+- ToM levels L0-L3 per de Weerd et al. (2013, 2017, 2022): depth of
+  MENTAL-STATE modelling (beliefs, desires, intentions), not K-level
+  action-forecasting.
+- Prompt ordering: shared rules first, per-agent state last — lets
+  vLLM's automatic prefix caching reuse the KV cache across all agents
+  in the same round.
 """
 
 import random
@@ -24,398 +20,295 @@ from typing import Dict, Optional
 
 
 def _shuffled_items(d: dict) -> list:
-    """Return dict items in random order to avoid positional bias in LLM prompts."""
+    """Return dict items in random order to avoid positional bias."""
     items = list(d.items())
     random.shuffle(items)
     return items
 
 
-FRAMINGS = {
-    'neutral': '',
-    'cooperative': 'Your goal is best achieved through building partnerships and mutual benefit with other agents.',
-    'competitive': 'Your goal is best achieved by maximizing your advantage over other agents.',
-    'strategic': 'Think carefully about how other agents will respond to your actions before deciding.',
-    'cautious': 'Prioritize safe actions that protect your resources from potential losses.',
-}
-
-# Theory of Mind reasoning levels (de Weerd et al., 2013; 2017).
-# Key: levels are defined by DEPTH OF MENTAL MODELING, not by computation method.
-# L0: no ToM (reactive). L1: zero-order (assume others are naive).
-# L2: first-order (predict what others will do). L3: second-order (model what
-# others think about you — enables both deception AND coordination).
-REASONING_LEVELS = {
-    'level0': 'State your choice briefly. Do not deliberate.',
-    'level1': 'Assume other agents act without strategy. Given that, choose your best action.',
-    'level2': 'Assume some agents act naively while others calculate their best move. Predict what each will do, then choose your best response.',
-    'level3': 'Assume other agents are trying to predict YOUR next action based on your history, and will respond to that prediction. What do they expect? Given their response, what should you actually do?',
-}
-
-# Structured reasoning blocks shown as a separate prompt section before the JSON template.
-# Each level operationalizes ToM depth: the ONLY difference between levels is the
-# depth of mental modeling of other agents. Agents at all levels may reason as deeply
-# as they want — the level constrains their MODEL OF OTHERS, not their own computation.
-REASONING_BLOCKS = {
-    'level0': None,  # No reasoning block for L0 — act on instinct
-    'level1': (
-        "THINK BEFORE CHOOSING:\n"
-        "Assume other agents act WITHOUT strategic intent — they pick actions naively "
-        "(e.g., repeating habits, acting impulsively, or choosing at random).\n"
-        "Given this assumption, what is YOUR best action?\n"
-        "Do NOT try to predict what specific agents will do — just assume they are not strategizing."
+# Four standalone ToM blocks. An agent only ever sees its own level — each
+# block must read cleanly without knowledge of the others. Length grows with
+# depth: higher-order ToM requires more explanation.
+TOM_LEVELS = {
+    "level0": (
+        "Reason only about the game itself: your resources, the available "
+        "actions, how payoffs work, and how outcomes combine. Do not form "
+        "any model of what other agents think, believe, want, or intend. "
+        "Treat their past actions as observable game-state — data points "
+        "about the environment — not as choices expressing an inner mental "
+        "life. Decide what is best for you based on the game state alone."
     ),
-    'level2': (
-        "THINK BEFORE CHOOSING:\n"
-        "Assume agents are a MIX: some act naively (without strategy), while others "
-        "calculate their best action given the current state.\n"
-        "1. For each agent you know about, estimate: is this agent acting naively or strategically?\n"
-        "   Use their recent behavior, resources, and armed status as evidence.\n"
-        "2. Predict what each agent will likely do this round.\n"
-        "3. Given these predictions, choose YOUR best response.\n"
-        "Do NOT reason about what others think about YOU — only predict what they will do."
+    "level1": (
+        "Other agents are minds. Each one has beliefs (what they think is "
+        "true about the game and about others), desires (what outcomes they "
+        "want), and intentions (what they plan to do). When deciding, form "
+        "a model of each relevant agent's mental state based on what you "
+        "have observed them do, the resources they hold, and the position "
+        "they are in. Use those mental models to anticipate their likely "
+        "next action, then choose your best response. Assume the others "
+        "are simpler than you — they do not model what YOU believe or want; "
+        "they simply react to the game as they see it."
     ),
-    'level3': (
-        "THINK BEFORE CHOOSING:\n"
-        "Assume other agents are ALSO trying to predict what YOU will do.\n"
-        "They observe your recent actions and form expectations about your next move.\n"
-        "1. What pattern do others see in YOUR recent actions? What would they predict you do this round?\n"
-        "2. If they act on that prediction, what will each agent do?\n"
-        "3. Given their likely response to what they expect from you, choose YOUR best action — "
-        "whether that means confirming or defying their expectations."
+    "level2": (
+        "Other agents are minds that model minds. Each one has beliefs, "
+        "desires, and intentions of their own — and each one is also "
+        "modelling the mental states of the OTHER agents they interact "
+        "with, you among them. When they decide, they act on their picture "
+        "of what everyone around them, including you, believes and will "
+        "do. When deciding, work in two layers.\n"
+        "  First, model the mental state of each relevant agent: what they "
+        "want, what they fear, what they plan.\n"
+        "  Second, model the mental models THEY hold of the agents around "
+        "them — the model they hold of you, but also of the others they "
+        "can see. What do they think each of those agents, you among them, "
+        "believes and intends?\n"
+        "Choose your action knowing others will respond to their "
+        "expectations of the whole social field — and that your choice "
+        "helps shape the place YOU occupy in their picture of that field."
+    ),
+    "level3": (
+        "Other agents are minds that model minds that model minds. Everyone "
+        "around you tracks several mental layers at once: their own beliefs "
+        "and plans, a model of the beliefs and plans of every agent they "
+        "interact with (you included, among many), and a model of the "
+        "models those agents in turn hold of everyone else. At this depth "
+        "the group is a web of mutually held mental models.\n"
+        "\n"
+        "When deciding, work in three layers.\n"
+        "  First, model each relevant agent's mental state: beliefs, "
+        "desires, intentions.\n"
+        "  Second, model how they are modelling the OTHER agents they can "
+        "see — their model of you, but also their models of third parties.\n"
+        "  Third, model how they think others are modelling THEM in turn — "
+        "what they believe the web of impressions around them looks like, "
+        "and where YOUR picture of them sits in that web.\n"
+        "\n"
+        "At this depth, your actions and any messages you send are not just "
+        "moves in the game. They are signals that reshape the mental models "
+        "agents hold of each other across the group. This enables strategic "
+        "deception, credible commitment, coordination through mutual "
+        "inference, and long-run trust or distrust. Choose your action with "
+        "all three layers in mind."
     ),
 }
 
 
 class BaselinePrompt:
-    """
-    Minimal baseline prompt for system characterization.
-    Shows: agent ID, objective, resources, arms, coalitions, history, actions.
-    """
+    """Single baseline prompt; ToM level is the primary experimental IV."""
 
-    OBJECTIVES = {
-        'maximize_resources': "Maximize your absolute resource count.",
-        'avoid_last': "Avoid being the agent with the fewest resources at the end of the game.",
-    }
+    OBJECTIVE = "Maximize your absolute resource count."
 
-    def __init__(self, game_params: Optional[Dict] = None, objective_style: str = 'maximize_resources',
-                 hide_resources: bool = False, show_reputation: bool = False, framing: str = 'neutral',
-                 reasoning_level: str = 'default', comm_scope: str = 'none'):
+    def __init__(self, game_params: Optional[Dict] = None,
+                 tom_level: str = "level0",
+                 hide_resources: bool = False,
+                 comm_scope: str = "none",
+                 network_enabled: bool = True):
         self.game_params = game_params or {}
-        self.objective_style = objective_style
+        self.tom_level = tom_level
         self.hide_resources = hide_resources
-        self.show_reputation = show_reputation
-        self.framing = framing
-        self.reasoning_level = reasoning_level
         self.comm_scope = comm_scope
+        self.network_enabled = network_enabled
 
     def format_observation(self, observation: Dict, agent_id: str) -> str:
-        """Format game observation into a minimal prompt.
+        """Build the prompt for one agent on one round.
 
-        Prompt is ordered for vLLM prefix caching: shared rules first (identical
-        across all agents in the same config), then per-agent state. vLLM's
-        automatic prefix caching matches the longest common prefix across
-        concurrent requests, so all 30 agents in a round share a single
-        prefill for the rules section.
-
-        Order: [rules/actions/combat/comm/reasoning] → [identity/state/memory/JSON]
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^
-               SHARED PREFIX (cached after 1st agent)     PER-AGENT SUFFIX
-
-        If observation contains an 'agent_memory' key (an AgentMemory instance),
-        uses persistent memory for history/neighbor sections. Otherwise falls back
-        to the god-view neighbor profiles built from recent_history.
+        Layout:
+            [shared rules — cacheable across agents in same config]
+            ---
+            [per-agent: identity → approach → memory → state → JSON]
         """
         parts = []
 
-        # ── SHARED PREFIX (identical for all agents in same config) ──────────
-        # Actions, combat rules, resource decay, communication, reasoning block
+        # ── SHARED PREFIX: intro + game rules (identical across agents) ─
+        parts.append(self._format_intro())
         parts.append(self._format_rules())
 
-        # ── PER-AGENT SUFFIX ────────────────────────────────────────────────
-        # Identity
-        parts.append(f"You are {observation['agent_id']}.")
+        # ── Separator: rules above, per-agent context below ─────────────
+        parts.append("---")
 
-        # Objective
-        obj_text = self.OBJECTIVES.get(self.objective_style, self.OBJECTIVES['maximize_resources'])
-        parts.append(f"OBJECTIVE: {obj_text}")
+        # ── PER-AGENT SUFFIX ────────────────────────────────────────────
+        # 1. Identity + objective + repeated-game context
+        parts.append(self._format_identity(observation))
 
-        # Temporal context — L0 gets minimal framing (no forward-looking nudge)
-        if self.reasoning_level == 'level0':
-            parts.append(
-                "This is a repeated game with multiple rounds."
-            )
-        else:
-            parts.append(
-                "This is a repeated game with multiple rounds. "
-                "Other agents can observe your past actions. "
-                "Consider how your choice this round may affect future rounds."
-            )
+        # 2. Approach (ToM — the IV)
+        tom_block = TOM_LEVELS.get(self.tom_level)
+        if tom_block:
+            parts.append(f"APPROACH:\n{tom_block}")
 
-        # Framing instruction
-        framing_text = FRAMINGS.get(self.framing, '')
-        if framing_text:
-            parts.append(framing_text)
+        # 3. Memory (recent rounds)
+        memory = observation.get("agent_memory")
+        if memory is not None:
+            recent = memory.format_recent_rounds()
+            if recent:
+                parts.append(recent)
 
-        # State
+        # 4. Current state
         parts.append(self._format_state(observation, agent_id))
 
-        # Memory-based history sections (only when memory is enabled)
-        memory = observation.get('agent_memory')
-        if memory is not None:
-            memory_section = self._format_memory_section(memory, observation)
-            if memory_section:
-                parts.append(memory_section)
-        # No memory = no history. Agent sees only current state.
-        # (Legacy god-view neighbor profiles removed — they leak omniscient info)
-
-        # JSON response template (per-agent because note_to_self differs by level)
+        # 5. JSON output schema
         parts.append(self._format_json_template())
 
         return "\n\n".join(parts)
 
+    def _format_identity(self, observation: Dict) -> str:
+        return (
+            f"IDENTITY:\n"
+            f"You are {observation['agent_id']}.\n"
+            f"Objective: {self.OBJECTIVE}\n"
+            f"This is a repeated game with multiple rounds. Other agents can "
+            f"observe your past actions. Your choice this round may affect "
+            f"future rounds."
+        )
+
     def _format_state(self, observation: Dict, agent_id: str) -> str:
-        """Format current game state."""
-        round_num = observation['round']
-        round_info = f"Round {round_num}"
+        round_num = observation["round"]
+        lines = [f"CURRENT STATE (Round {round_num}):"]
 
-        lines = [f"CURRENT STATE ({round_info}):"]
+        visible = observation.get("visible_agents", None)
+        resources = observation["resources"]
+        arm_bonuses = observation.get("arm_bonuses", observation.get("active_arms", {})) or {}
+        broke = set(observation.get("broke_agents", []))
 
-        # Network mode: show connected agents
-        visible = observation.get('visible_agents', None)
         if visible is not None:
-            lines.append(f"\nYou can ONLY invest in, attack, or arm agents you are directly connected to. You can message any agent.")
-            lines.append(f"Each agent has their own set of connections — other agents may see different agents than you do.")
-            lines.append(f"Connections can change over time based on how agents interact.")
-            lines.append(f"You cannot verify claims about agents whose resources are hidden from you.")
-            lines.append(f"Connected agents (you can interact with and see their resources): {', '.join(visible) if visible else 'none'}")
+            lines.append(
+                f"Connected agents (you can interact with and see their "
+                f"resources): {', '.join(visible) if visible else 'none'}"
+            )
 
-        # Resources -- in network mode, only show self + neighbors (no ??? rows)
+        # Unified agents block with resources, arm bonus, and explicit combat
+        # strength (pre-calculated so models don't have to do arithmetic).
+        lines.append("")
         if self.hide_resources:
-            lines.append("\nAGENTS:")
-            for aid, resources in _shuffled_items(observation['resources']):
-                if visible is not None and aid != agent_id and aid not in visible:
-                    continue  # Don't expose non-neighbor IDs
-                if aid == agent_id:
-                    lines.append(f"  {aid}: {resources:.1f} (you)")
-                else:
-                    lines.append(f"  {aid}: ???")
+            lines.append(
+                "AGENTS (resources + arm bonus = combat strength):"
+            )
         else:
-            lines.append("\nRESOURCES:")
-            for aid, resources in _shuffled_items(observation['resources']):
-                if visible is not None and aid != agent_id and aid not in visible:
-                    continue  # Don't expose non-neighbor IDs
-                if aid == agent_id:
-                    lines.append(f"  {aid}: {resources:.1f} (you)")
-                else:
-                    broke_marker = " [BROKE]" if aid in observation.get('broke_agents', []) else ""
-                    lines.append(f"  {aid}: {resources:.1f}{broke_marker}")
+            lines.append(
+                "AGENTS (resources + arm bonus = combat strength):"
+            )
 
-        # Arm bonuses — single pool of combat bonus per agent, decaying
-        # Only show self + neighbors (consistent with network restriction)
-        arm_bonuses = observation.get('arm_bonuses', observation.get('active_arms', {}))
-        if arm_bonuses:
-            visible_arms = {}
-            for aid, bonus in arm_bonuses.items():
-                if isinstance(bonus, (int, float)) and bonus > 0:
-                    if visible is not None and aid != agent_id and aid not in visible:
-                        continue  # Don't show non-neighbor arm bonuses
-                    visible_arms[aid] = bonus
-            if visible_arms:
-                lines.append("")
-                lines.append("ARM BONUSES (combat strength = resources + arm bonus):")
-                for aid, bonus in _shuffled_items(visible_arms):
-                    if self.hide_resources and aid != agent_id:
-                        lines.append(f"  {aid}: +???")
-                    else:
-                        lines.append(f"  {aid}: +{bonus:.1f}")
+        for aid, r in _shuffled_items(resources):
+            if visible is not None and aid != agent_id and aid not in visible:
+                continue
+            bonus = arm_bonuses.get(aid, 0.0) or 0.0
+            is_self = aid == agent_id
+            suffix = " (you)" if is_self else (" [BROKE]" if aid in broke else "")
 
-        # Show messages received from other agents (from previous round)
-        received_messages = observation.get('received_messages', [])
+            if self.hide_resources and not is_self:
+                lines.append(f"  {aid}: ??? + ??? = ???{suffix}")
+            else:
+                r_f = float(r)
+                b_f = float(bonus)
+                lines.append(
+                    f"  {aid}: {r_f:.1f} + {b_f:.1f} = {r_f + b_f:.1f}{suffix}"
+                )
+
+        received_messages = observation.get("received_messages", [])
         if received_messages:
             lines.append("")
-            lines.append("MESSAGES RECEIVED (from last round):")
+            lines.append("INCOMING MESSAGES (sent to you LAST round — your reply arrives NEXT round):")
             for msg in received_messages:
-                sender = msg.get('from', '?')
-                text = msg.get('message', '')
-                channel = msg.get('channel', 'dm')
-                if channel == 'broadcast':
+                sender = msg.get("from", "?")
+                text = msg.get("message", "")
+                channel = msg.get("channel", "dm")
+                if channel == "broadcast":
                     lines.append(f"  {sender} (to all): {text}")
                 else:
                     lines.append(f"  {sender} (private): {text}")
 
         return "\n".join(lines)
 
-    def _format_neighbor_profiles(self, observation: Dict, agent_id: str) -> str:
-        """Personalized neighbor profiles from history.
+    def _format_intro(self) -> str:
+        n_agents = self.game_params.get("num_agents", 30)
+        rewiring_on = self.game_params.get("rewiring_prob", 0.0) > 0
+        comm_on = self.comm_scope != "none"
 
-        Replaces the old flat history dump with compact per-neighbor summaries:
-        - Interaction counts (what they did to you, what you did to them)
-        - Their dominant behavior pattern
-        - Resource trend (rising/falling/stable)
+        rules_items = ["available actions", "resource decay", "combat (incl. coalitions)"]
+        if self.network_enabled:
+            rules_items.append("network and rewiring" if rewiring_on else "the network")
+        if comm_on:
+            rules_items.append("communication")
+        rules_summary = ", ".join(rules_items)
 
-        Only shows visible neighbors in spatial mode. Subsumes _format_reputation().
-        """
-        if not observation.get('recent_history'):
-            return ""
-
-        visible = observation.get('visible_agents', None)
-        resources = observation.get('resources', {})
-
-        # {agent_id: {"toward_you": {act: n}, "from_you": {act: n}, "all_actions": {act: n}}}
-        profiles: Dict[str, Dict] = {}
-
-        for hist in observation['recent_history']:
-            for action in hist['actions']:
-                actor = action.get('agent')
-                act = action.get('action', '')
-                target = action.get('target')
-
-                if act == 'no_action':
-                    continue
-
-                # Track all actions for behavior profiling
-                for aid in [actor, target]:
-                    if aid and aid != agent_id:
-                        if visible is not None and aid not in visible:
-                            continue
-                        profiles.setdefault(aid, {
-                            'toward_you': {}, 'from_you': {}, 'all_actions': {}
-                        })
-
-                # Actions directed at this agent
-                if target == agent_id and actor and actor != agent_id:
-                    p = profiles.get(actor)
-                    if p is not None:
-                        p['toward_you'][act] = p['toward_you'].get(act, 0) + 1
-
-                # This agent's actions toward others
-                if actor == agent_id and target and target != agent_id:
-                    p = profiles.get(target)
-                    if p is not None:
-                        p['from_you'][act] = p['from_you'].get(act, 0) + 1
-
-                # All actions by each agent (for behavior profiling)
-                if actor and actor != agent_id:
-                    p = profiles.get(actor)
-                    if p is not None:
-                        p['all_actions'][act] = p['all_actions'].get(act, 0) + 1
-
-        if not profiles:
-            return ""
-
-        # Build output
-        n_rounds = len(observation['recent_history'])
-        lines = [f"NEIGHBOR PROFILES (last {n_rounds} rounds):"]
-
-        for aid in sorted(profiles):
-            p = profiles[aid]
-            res = resources.get(aid, 0)
-
-            # Dominant behavior
-            if p['all_actions']:
-                dominant = max(p['all_actions'], key=p['all_actions'].get)
-                total = sum(p['all_actions'].values())
-                dominant_pct = p['all_actions'][dominant] / total
-                if dominant_pct >= 0.5:
-                    behavior = dominant.replace('_', ' ')
-                else:
-                    behavior = 'mixed'
-            else:
-                behavior = 'inactive'
-
-            # Interaction summary with you
-            interactions = []
-            for act, count in sorted(p['toward_you'].items()):
-                label = act.replace('_', ' ')
-                interactions.append(f"{label} you {count}x")
-            for act, count in sorted(p['from_you'].items()):
-                label = act.replace('_', ' ')
-                interactions.append(f"you {label} them {count}x")
-
-            interaction_str = ' | '.join(interactions) if interactions else 'no direct interaction'
-            broke_marker = " BROKE" if aid in observation.get('broke_agents', []) else ""
-
-            lines.append(f"  {aid} [{res:.0f}{broke_marker}]: {behavior} | {interaction_str}")
-
-        return "\n".join(lines)
-
-    def _format_memory_section(self, memory, observation: Dict) -> str:
-        """Format memory-based history and neighbor sections.
-
-        Uses the agent's persistent AgentMemory to build:
-        - YOUR RECENT ACTIONS (own action sliding window)
-        - NEIGHBOR MEMORY (accumulated per-agent observations)
-        """
-        visible = observation.get('visible_agents', None)
-        current_round = observation.get('round', 0)
-
-        parts = []
-
-        # Incoming actions from last round (most salient — show first)
-        incoming = memory.format_incoming_actions()
-        if incoming:
-            parts.append(incoming)
-
-        own_history = memory.format_own_history()
-        if own_history:
-            parts.append(own_history)
-
-        neighbor_mem = memory.format_neighbor_memory(
-            visible, current_round, hide_resources=self.hide_resources
+        return (
+            f"INTRODUCTION:\n"
+            f"You are one of {n_agents} agents playing a repeated multi-agent "
+            f"game. You will receive a new prompt like this every round. The "
+            f"sections below appear in this order:\n"
+            f"  1. Game rules — {rules_summary}.\n"
+            f"  2. Identity — who you are and your objective.\n"
+            f"  3. Approach — how to reason about other agents.\n"
+            f"  4. Recent rounds — what you observed and noted lately.\n"
+            f"  5. Current state — who is connected to you, current resources, "
+            f"combat strengths.\n"
+            f"  6. Output — the JSON format your response must follow.\n"
+            f"Read everything carefully, then submit your decision as valid JSON."
         )
-        if neighbor_mem:
-            parts.append(neighbor_mem)
-
-        msg_history = memory.format_message_history()
-        if msg_history:
-            parts.append(msg_history)
-
-        note = memory.format_note()
-        if note:
-            parts.append(note)
-
-        return "\n\n".join(parts)
 
     def _format_rules(self) -> str:
-        """Format shared game rules: actions, combat, communication, reasoning block.
+        c_inv = self.game_params.get("c_inv", 0.10)
+        g_inv = self.game_params.get("g_inv", 0.15)
+        c_arm = self.game_params.get("c_arm", 0.10)
+        mu_arm = self.game_params.get("mu_arm", 3.0)
+        delta_B = self.game_params.get("delta_B", 0.5)
+        alpha = self.game_params.get("alpha", 0.20)
+        c_atk = self.game_params.get("c_atk", 0.01)
+        delta_R = self.game_params.get("delta_R", 1.0)
 
-        This section is IDENTICAL for all agents in the same config+level.
-        Placed first in the prompt so vLLM's automatic prefix caching can
-        reuse the KV cache across all concurrent agent requests in a round.
-        """
-        # Read fractions, render as percentages for agent-facing text
-        c_inv = self.game_params.get('c_inv', 0.10)
-        g_inv = self.game_params.get('g_inv', 0.15)
-        c_arm = self.game_params.get('c_arm', 0.10)
-        mu_arm = self.game_params.get('mu_arm', 3.0)
-        delta_B = self.game_params.get('delta_B', 0.5)
-        alpha = self.game_params.get('alpha', 0.20)
-        c_atk = self.game_params.get('c_atk', 0.01)
-        delta_R = self.game_params.get('delta_R', 1.0)
+        eta_atk = self.game_params.get("eta_atk", 1.0)
+        tau_atk = self.game_params.get("tau_atk", 5)
 
-        invest_other_cost_pct = c_inv * 100
-        invest_other_return_pct = g_inv * 100
-        arm_cost_pct = c_arm * 100
-        arm_other_cost_pct = c_arm * 100
+        invest_other_cost_pct = round(c_inv * 100, 2)
+        invest_other_return_pct = round(g_inv * 100, 2)
+        arm_cost_pct = round(c_arm * 100, 2)
+        arm_other_cost_pct = round(c_arm * 100, 2)
         arm_multiplier = mu_arm
         arm_decay = delta_B
-        attack_take_pct = alpha * 100
-        conflict_cost_pct = c_atk * 100
-        resource_decay_pct = (1.0 - delta_R) * 100.0
+        attack_take_pct = round(alpha * 100, 2)
+        conflict_cost_pct = round(c_atk * 100, 2)
+        resource_decay_pct = round((1.0 - delta_R) * 100.0, 2)
 
         actions = []
-
-        saturation_decay = self.game_params.get('gamma_sat', 1.0)
-        saturation_window = self.game_params.get('tau_sat', 5)
-        invest_desc = f"- invest_other: you pay {invest_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) receives {invest_other_return_pct}% of your resources. Example: you have 25.0 → you pay {25.0 * invest_other_cost_pct / 100:.1f} (left: {25.0 * (1 - invest_other_cost_pct / 100):.1f}), target gains {25.0 * invest_other_return_pct / 100:.1f}"
+        saturation_decay = self.game_params.get("gamma_sat", 1.0)
+        saturation_window = self.game_params.get("tau_sat", 5)
+        invest_desc = (
+            f"- invest_other: you pay {invest_other_cost_pct}% of your resources, "
+            f"TARGET (must be a connected neighbor) receives {invest_other_return_pct}% "
+            f"of your resources. Example: you have 25.0 → you pay "
+            f"{25.0 * invest_other_cost_pct / 100:.1f} (left: "
+            f"{25.0 * (1 - invest_other_cost_pct / 100):.1f}), target gains "
+            f"{25.0 * invest_other_return_pct / 100:.1f}"
+        )
         if saturation_decay < 1.0:
-            invest_desc += f"\n    DIMINISHING RETURNS: the system tracks a rolling {saturation_window}-round window. Each repeat investment in the SAME agent within that window reduces the target's gain by {(1 - saturation_decay) * 100:.0f}% per repeat. Example: invest in X at round 3, invest again at round 6 = reduced (round 6 is within 3+{saturation_window-1}). Invest at round 3, invest again at round {3 + saturation_window + 1} = full return (outside window). Investing in a DIFFERENT agent always gives full returns."
+            invest_desc += (
+                f"\n    DIMINISHING RETURNS: the system tracks a rolling "
+                f"{saturation_window}-round window. Each repeat investment in the "
+                f"SAME agent within that window reduces the target's gain by "
+                f"{(1 - saturation_decay) * 100:.0f}% per repeat. Investing in a "
+                f"DIFFERENT agent always gives full returns."
+            )
         actions.append(invest_desc)
-        arm_bonus_example = arm_cost_pct * arm_multiplier
+
         arm_cost_ex = 25.0 * arm_cost_pct / 100
         arm_bonus_ex = arm_cost_ex * arm_multiplier
-        actions.append(f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay {arm_cost_ex:.1f}, bonus = {arm_cost_ex:.1f} x {arm_multiplier} = {arm_bonus_ex:.1f}. Resources left: {25.0 - arm_cost_ex:.1f}. Combat strength: {25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = {25.0 - arm_cost_ex + arm_bonus_ex:.1f}")
-        actions.append(f"- arm_other: you pay {arm_other_cost_pct}% of your resources, TARGET (must be a connected neighbor) gains combat bonus = cost x {arm_multiplier}. TARGET's resources do NOT increase — only their fighting power.")
-        actions.append(f"- attack: TARGET must be a connected neighbor. Both sides pay {conflict_cost_pct}% conflict cost (scaled up by recent attack history). Winner takes {attack_take_pct}% of the loser's resources.")
+        actions.append(
+            f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat "
+            f"bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay "
+            f"{arm_cost_ex:.1f}, bonus = {arm_bonus_ex:.1f}. Combat strength: "
+            f"{25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = "
+            f"{25.0 - arm_cost_ex + arm_bonus_ex:.1f}"
+        )
+        actions.append(
+            f"- arm_other: you pay {arm_other_cost_pct}% of your resources, "
+            f"TARGET (must be a connected neighbor) gains combat bonus = cost x "
+            f"{arm_multiplier}. TARGET's resources do NOT increase — only their "
+            f"fighting power."
+        )
+        actions.append(
+            f"- attack: TARGET must be a connected neighbor. Both sides pay "
+            f"{conflict_cost_pct}% conflict cost (scaled up by recent attack "
+            f"history). Winner takes {attack_take_pct}% of the loser's resources."
+        )
         actions.append("- do_nothing: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -423,171 +316,189 @@ class BaselinePrompt:
         parts = [f"""Choose exactly ONE action this round.
 
 AVAILABLE ACTIONS:
-{actions_text}
+{actions_text}"""]
 
-COMBAT RULES:
-- Combat strength = your current resources (after costs this round) + your arm bonus
-- Agents not listed under ARM BONUSES have arm bonus = 0
-- All arm bonuses decay at the END of each round (multiply by {arm_decay})
-- If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender. This is the ONLY way to share spoils — you must both choose "attack" with the same target in the same round.
-- Win probability = attacker_strength / (attacker_strength + defender_strength)
-- Winner takes {attack_take_pct}% of the LOSER's resources:
-    - If the coalition wins, the defender loses {attack_take_pct}% of their own resources; attackers split it proportionally to the combat strength they contributed.
-    - If the defender wins, each attacker loses {attack_take_pct}% of their OWN resources; the defender gains the sum.
-- Example: you (10) attack someone (50) and win → you gain {50 * attack_take_pct / 100:.1f}, defender loses the same. If you lose, you lose {10 * attack_take_pct / 100:.1f} (half your resources) and the defender gains it.
-- Coalition members split gains/losses proportionally by combat strength.
-- Investing in an attacker does NOT give you a share of their spoils. Only agents who attack share the winnings.
-- Both sides pay {conflict_cost_pct}% conflict cost, scaled up by each participant's own recent attack history (rolling window)."""]
-
+        # Resource decay — continuous pressure, stated early so agents know
+        # inaction shrinks them before they read the rest.
         if resource_decay_pct > 0:
             decay_ex = 25.0 * resource_decay_pct / 100
-            parts.append(f"""RESOURCE DECAY:
-- Every agent loses {resource_decay_pct}% of their resources at the END of each round (after all actions resolve)
-- Example: 25.0 resources → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}
-- This means doing nothing causes you to shrink. You NEED income (from others investing in you, or from winning attacks) to sustain yourself.
-- After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}
-- Agents CANNOT be eliminated. Even at very low resources you remain in the game, but you become too weak to act meaningfully.""")
-
-        # EV formula removed — agents must reason about attack risk/reward themselves.
-        # Higher reasoning levels may derive EV calculations independently.
-
-        # Reasoning block — separate section before JSON template
-        reasoning_block = REASONING_BLOCKS.get(self.reasoning_level)
-        if reasoning_block:
-            parts.append(reasoning_block)
-
-        # Reasoning efficiency instruction — reduces mechanic recaps in thinking traces
-        # without limiting strategic depth. Only added for thinking models (L1+).
-        if reasoning_block:
             parts.append(
-                "REASONING EFFICIENCY: You already know the rules — do NOT restate action definitions, "
-                "combat formulas, or game mechanics. Do NOT repeat the same analysis multiple times. "
-                "Focus on: (1) what changed since last round, (2) which 2-3 options are worth considering, "
-                "(3) your decision and why. Be concise."
+                f"""RESOURCE DECAY:
+- Every agent loses {resource_decay_pct}% of their resources at the END of each round.
+- Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}.
+- Doing nothing causes you to shrink. You NEED income (from others investing in you, or from winning attacks) to sustain yourself.
+- After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}.
+- Agents CANNOT be eliminated. At very low resources you become too weak to act meaningfully."""
             )
 
+        # Conflict cost scaling example: compute cost at N=0, 1, 2 attacks in window
+        cc_at_0 = conflict_cost_pct
+        cc_at_1 = round(c_atk * eta_atk * 100, 2)
+        cc_at_2 = round(c_atk * (eta_atk ** 2) * 100, 2)
+
+        parts.append(f"""COMBAT RULES:
+- Combat strength = your current resources (after any costs paid this round) + your arm bonus.
+- All arm bonuses decay at the END of each round (multiply by {arm_decay}).
+- Win probability = attacker_strength / (attacker_strength + defender_strength).
+- Winner takes {attack_take_pct}% of the LOSER's resources.
+- Both sides pay a conflict cost = {conflict_cost_pct}% × {eta_atk}^N, where N = number of attacks that participant made in the last {tau_atk} rounds. Example: first attack in {tau_atk} rounds → {cc_at_0}% cost. Second → {cc_at_1}%. Third → {cc_at_2}%.
+- Example: you have 10, defender has 50. If you win → you gain {attack_take_pct}% of 50 = {50 * attack_take_pct / 100:.1f} (defender loses the same). If you lose → you lose {attack_take_pct}% of 10 = {10 * attack_take_pct / 100:.1f} (defender gains it).
+
+COALITIONS (multi-attacker combat):
+- If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender.
+- This is the ONLY way to share spoils from an attack — you must both choose "attack" with the same target, on the same round.
+- If the coalition wins, the defender loses {attack_take_pct}% of their resources; attackers split the gain proportionally to the combat strength each contributed.
+- If the defender wins, each attacker loses {attack_take_pct}% of their OWN resources; the defender gains the sum.
+- Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.
+
+RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
+1. Investments and arming resolve first (resource transfers and combat-bonus gains are applied).
+2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as current resources + arm bonus.
+3. Spoils transfer according to the combat outcome.
+4. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources), then arm bonuses decay (×{arm_decay}).""")
+
+        # Network + rewiring grouped together — same mechanism, two knobs.
+        rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
+        if self.network_enabled:
+            network_block = [
+                "NETWORK:",
+                "Agents are connected through a network. You can ONLY invest in, attack, or arm agents you are directly connected to. You can message any agent regardless of connection.",
+                "Connections are symmetric: if you are connected to Blue, then Blue is also connected to you. But each agent has its own set of connections — other agents generally see a different set of neighbours than you do.",
+                "Connections can change over time based on how agents interact.",
+                "You cannot verify claims about agents whose resources are hidden from you.",
+            ]
+            if rewiring_prob > 0:
+                network_block.append("")
+                network_block.append(
+                    f"REWIRING: each round, with probability {rewiring_prob:.2f}, the system applies your rewiring nominations. You may nominate at most one neighbour to disconnect from (drop) and at most one agent — neighbour or not — to connect with (invite). Nominations are unilateral: no consent is required from the counterparty."
+                )
+                network_block.append(
+                    "Resolution order: breaks execute first, then connects. Implication: if someone drops you but you invite them back in the same round, the edge is re-added. Using your invite this way costs your connect-slot (you cannot also invite someone new)."
+                )
+                network_block.append(
+                    "Example: you and Blue are connected. Blue nominates drop=you; you nominate invite=Blue. Breaks run → edge severed. Connects run → your invite re-adds the edge. Result: you stay connected, but your connect-slot is used on Blue (no new neighbour added this round)."
+                )
+            parts.append("\n".join(network_block))
+
         # Communication rules (if enabled)
-        if self.comm_scope != 'none':
+        if self.comm_scope != "none":
             comm_lines = [
                 "COMMUNICATION:",
                 "You may send ONE message this round to ANY agent. Messages have no resource cost.",
                 "",
-                "MESSAGE TIMING:",
+                "MESSAGE TIMING (important — easy to miscompute):",
+                "- Messages CROSS: if you and another agent both write to each other this round, neither of you has read the other's yet — you are both responding to their PREVIOUS round state, not their current plan.",
                 "- Messages you RECEIVE this round were sent LAST round (before the sender saw your latest action).",
-                "- Messages you SEND this round will be delivered NEXT round.",
-                "- Messages sent in the same round CROSS — neither sender has read the other's message yet.",
-                "- Implication: a message you send NOW can influence the recipient's action NEXT round, not this round.",
-                "- Your messages are private to the recipient, but the recipient may use your message against you. Revealing your plans or weaknesses carries risk.",
+                "- Messages you SEND this round will be delivered NEXT round — they can influence the recipient's action then, not this round.",
+                "- Messages are private to the recipient, but the recipient may use your message against you.",
             ]
-            if self.comm_scope == 'dm':
-                comm_lines.append("You can send a private message to ONE agent. Only they will see it.")
-            elif self.comm_scope == 'broadcast':
-                comm_lines.append("Your message is sent to ALL agents. Everyone sees it.")
-            elif self.comm_scope == 'choice':
-                comm_lines.append("You choose: send a private message to ONE agent, or broadcast to ALL agents.")
-                comm_lines.append("Set message_to to a specific agent_id for private, or \"all\" for broadcast.")
+            if self.comm_scope == "dm":
+                comm_lines.append(
+                    "You can send a private message to ONE agent. Only they will see it."
+                )
+            elif self.comm_scope == "broadcast":
+                comm_lines.append(
+                    "Your message is sent to ALL agents. Everyone sees it."
+                )
+            elif self.comm_scope == "choice":
+                comm_lines.append(
+                    "You choose: send a private message to ONE agent, or broadcast to ALL agents."
+                )
+                comm_lines.append(
+                    "Set message_to to a specific agent_id for private, or \"all\" for broadcast."
+                )
             parts.append("\n".join(comm_lines))
 
         return "\n\n".join(parts)
 
     def _format_json_template(self) -> str:
-        """Format JSON response template and note-to-self instructions.
-
-        Rewire fields are added whenever rewiring_prob > 0. All other fields
-        follow comm_scope toggles. Per-agent because note_to_self text differs
-        by config; placed AFTER the shared rules prefix.
+        """Build the JSON output schema. Field order: comm → action → target →
+        rewire → memory. Memory last so it reflects on a just-decided action.
         """
-        note_enabled = self.game_params.get('note_to_self', True)
-        note_field = ""
-        note_instruction = ""
-        if note_enabled:
-            note_field = '\n  "note_to_self": "<your strategic notebook — see instructions below>",'
-            note_instruction = """
-note_to_self (REQUIRED): Your private strategic notebook. This is your ONLY memory between rounds — without it, you lose all context. UPDATE it each round (do not rewrite from scratch — carry forward what is still relevant, drop what is outdated). Use these sections:
+        rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
+        has_rewire = rewiring_prob > 0
 
-STRATEGY: Your overall long-term plan (who to ally with, when to pivot to attacks, etc.)
-ALLIES: Who is reliable? Who reciprocates? Trust ratings.
-THREATS: Who is dangerous, growing fast, or has betrayed you?
-PROMISES: Active commitments (made or received) and whether they were kept.
-NEXT: Specific plan for next round.
+        # Assemble fields in the preferred order
+        fields: list[str] = []
+        if self.comm_scope == "dm":
+            fields.append('  "message": "<your message (delivered NEXT round, not this one), or null to stay silent>"')
+            fields.append('  "message_to": "<agent_id of recipient, or null>"')
+        elif self.comm_scope == "broadcast":
+            fields.append('  "message": "<your message to all agents (delivered NEXT round), or empty string to stay silent>"')
+        elif self.comm_scope == "choice":
+            fields.append('  "message": "<your message (delivered NEXT round), or empty string to stay silent>"')
+            fields.append('  "message_to": "<agent_id for private, or \\"all\\" for broadcast>"')
+        fields.append('  "action": "<one of the action names above>"')
+        fields.append('  "target": "<agent_id or null>"')
+        if has_rewire:
+            fields.append('  "rewire_drop": "<neighbour agent_id to disconnect from, or null>"')
+            fields.append('  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>"')
+        fields.append('  "memory": "<brief note for your future self — see below>"')
 
-Max ~1000 characters. Be concise — use abbreviations."""
+        fields_block = ",\n".join(fields)
 
-        rewiring_prob = self.game_params.get('rewiring_prob', 0.0)
-        rewire_fields = ""
-        rewire_instruction = ""
-        if rewiring_prob > 0:
-            rewire_fields = (
-                '\n  "rewire_drop": "<neighbour agent_id to disconnect from, or null>",'
-                '\n  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>",'
+        # Per-field notes
+        notes: list[str] = [
+            'target must be null (not the string "null") when no target is needed.',
+        ]
+        if self.comm_scope == "dm":
+            notes.append(
+                "Messaging is optional. To send no message, set both message and "
+                "message_to to null. To send a message, message_to must be a "
+                "valid agent_id."
             )
-            rewire_instruction = (
-                f"\nREWIRING: Each round with probability {rewiring_prob:.2f} the system will apply your nominations. "
-                "Breaks are resolved first, then connects. Nominations are unilateral — no consent needed. "
-                "If someone drops you but you invite them back the same round, the edge survives (at the cost of your connect-slot). "
-                "Set either field to null to skip. You have at most one drop and one invite per round."
+        elif self.comm_scope == "broadcast":
+            notes.append(
+                "Your message will be seen by all agents next round. Set message "
+                "to \"\" to send no message."
             )
+        elif self.comm_scope == "choice":
+            notes.append(
+                "message_to: use a specific agent_id for a private message, or "
+                "\"all\" to broadcast to all agents. Set message to \"\" to send "
+                "no message."
+            )
+        notes.append(
+            "memory (REQUIRED): a brief note for your future self. Mention what "
+            "stood out this round, anything worth remembering, your current "
+            "plan, and who you trust or distrust right now. Write freely, in "
+            "your own voice. This note will appear alongside future rounds in "
+            "your view, so make it legible to yourself later."
+        )
+        notes.append("Do not include any text outside the JSON.")
 
-        if self.comm_scope == 'none':
-            return f"""Your final output MUST be valid JSON with exactly these fields:
-{{{note_field}
-  "action": "<one of the action names above>",
-  "target": "<agent_id or null>"{rewire_fields}
-}}
-target must be null (not the string "null") when no target is needed.{note_instruction}{rewire_instruction}
-Do not include any text outside the JSON."""
-        elif self.comm_scope == 'dm':
-            return f"""Your final output MUST be valid JSON with exactly these fields:
-{{{note_field}
-  "message": "<your message, or null to stay silent>",
-  "message_to": "<agent_id of recipient, or null>",
-  "action": "<one of the action names above>",
-  "target": "<agent_id or null>"{rewire_fields}
-}}
-target must be null (not the string "null") when no target is needed.
-Messaging is optional. To send no message, set both message and message_to to null.
-To send a message, message_to must be a valid agent_id.{note_instruction}{rewire_instruction}
-Do not include any text outside the JSON."""
-        elif self.comm_scope == 'broadcast':
-            return f"""Your final output MUST be valid JSON with exactly these fields:
-{{{note_field}
-  "message": "<your message to all agents, or empty string to stay silent>",
-  "action": "<one of the action names above>",
-  "target": "<agent_id or null>"{rewire_fields}
-}}
-target must be null (not the string "null") when no target is needed.
-Your message will be seen by all agents next round. Set message to "" to send no message.{note_instruction}{rewire_instruction}
-Do not include any text outside the JSON."""
-        elif self.comm_scope == 'choice':
-            return f"""Your final output MUST be valid JSON with exactly these fields:
-{{{note_field}
-  "message": "<your message, or empty string to stay silent>",
-  "message_to": "<agent_id for private, or \\"all\\" for broadcast>",
-  "action": "<one of the action names above>",
-  "target": "<agent_id or null>"{rewire_fields}
-}}
-target must be null (not the string "null") when no target is needed.
-message_to: use a specific agent_id for a private message, or "all" to broadcast to all agents.
-Set message to "" to send no message.{note_instruction}{rewire_instruction}
-Do not include any text outside the JSON."""
-        else:
-            return ""
+        return (
+            "OUTPUT (JSON):\n"
+            "Your final output MUST be valid JSON with exactly these fields:\n"
+            "{\n"
+            f"{fields_block}\n"
+            "}\n"
+            + "\n".join(notes)
+        )
 
 
-def get_prompt_style(prompt_config: Dict, game_params: Optional[Dict] = None) -> BaselinePrompt:
+def get_prompt_style(prompt_config: Dict,
+                     game_params: Optional[Dict] = None) -> BaselinePrompt:
+    """Create a BaselinePrompt from config dicts.
+
+    prompt_config keys:
+        tom_level: 'level0' | 'level1' | 'level2' | 'level3'  (accepts
+                   legacy alias 'reasoning_level').
+        hide_resources: bool
+    game_params keys (consumed here):
+        comm_scope: 'none' | 'dm' | 'broadcast' | 'choice'
     """
-    Create a BaselinePrompt instance.
-
-    Keeps the same interface as before so llm_agent.py doesn't need changes.
-    prompt_config is accepted but ignored for now (single baseline prompt).
-    """
-    objective_style = prompt_config.get('objective_style', 'maximize_resources')
-    hide_resources = prompt_config.get('hide_resources', False)
-    show_reputation = prompt_config.get('show_reputation', False)
-    framing = prompt_config.get('framing', 'neutral')
-    reasoning_level = prompt_config.get('reasoning_level', 'default')
-    comm_scope = game_params.get('comm_scope', 'none') if game_params else 'none'
-    return BaselinePrompt(game_params=game_params, objective_style=objective_style,
-                          hide_resources=hide_resources, show_reputation=show_reputation,
-                          framing=framing, reasoning_level=reasoning_level,
-                          comm_scope=comm_scope)
+    tom_level = prompt_config.get(
+        "tom_level", prompt_config.get("reasoning_level", "level0")
+    )
+    hide_resources = prompt_config.get("hide_resources", False)
+    gp = game_params or {}
+    comm_scope = gp.get("comm_scope", "none")
+    network_enabled = gp.get("network_enabled", gp.get("spatial_enabled", False))
+    return BaselinePrompt(
+        game_params=game_params,
+        tom_level=tom_level,
+        hide_resources=hide_resources,
+        comm_scope=comm_scope,
+        network_enabled=network_enabled,
+    )

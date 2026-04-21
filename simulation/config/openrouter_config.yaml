@@ -12,4 +12,4 @@ retry_attempts: 3
 retry_delay: 2
 
 prompt_config:
-  reasoning_level: "level2"
+  tom_level: "level2"

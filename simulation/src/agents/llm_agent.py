@@ -107,7 +107,7 @@ class LLMAgent:
         self.reasoning_traces = []
         self._visible_agents = None
         self._last_message = None  # Last message extracted from LLM response
-        self._last_note = None     # Last note-to-self extracted from LLM response
+        self._last_memory = None   # Last free-form memory entry extracted from LLM response
         self._last_rewire_nom = None  # {'drop': id_or_None, 'invite': id_or_None}
     
     def _format_observation(self, observation: Dict) -> str:
@@ -172,9 +172,9 @@ class LLMAgent:
                     if parsed.get('message'):
                         result['message'] = parsed['message']
                         result['message_to'] = parsed.get('message_to')
-                    # Extract note-to-self if present
-                    if parsed.get('note_to_self'):
-                        result['note_to_self'] = parsed['note_to_self']
+                    # Extract free-form memory entry if present
+                    if parsed.get('memory'):
+                        result['memory'] = parsed['memory']
                     # Extract rewire nomination if present
                     drop = parsed.get('rewire_drop')
                     invite = parsed.get('rewire_invite')
@@ -272,13 +272,13 @@ class LLMAgent:
                 'message_to': msg_to,
             }
 
-    def _store_note(self, action_dict: Dict):
-        """Store note-to-self from LLM response."""
-        note = action_dict.get('note_to_self')
-        if note and isinstance(note, str) and note.strip():
-            self._last_note = note.strip()
+    def _store_memory(self, action_dict: Dict):
+        """Store free-form memory entry from LLM response."""
+        mem = action_dict.get('memory')
+        if mem and isinstance(mem, str) and mem.strip():
+            self._last_memory = mem.strip()
         else:
-            self._last_note = None
+            self._last_memory = None
 
     def _store_rewire(self, action_dict: Dict):
         """Store rewire nomination ({drop, invite}) from LLM response."""
@@ -323,6 +323,7 @@ class LLMAgent:
         # Store visible agents for network target validation
         self._visible_agents = observation.get('visible_agents', None)
         self._last_message = None  # Reset each round
+        self._last_memory = None   # Reset each round
         self._last_rewire_nom = None  # Reset each round
 
         prompt = self._format_observation(observation)
@@ -399,7 +400,7 @@ class LLMAgent:
                     action = self._action_dict_to_action(action_dict)
                     if action:
                         self._store_message(action_dict)
-                        self._store_note(action_dict)
+                        self._store_memory(action_dict)
                         self._store_rewire(action_dict)
                         return action
 
@@ -435,7 +436,7 @@ class LLMAgent:
                             action = self._action_dict_to_action(action_dict)
                             if action:
                                 self._store_message(action_dict)
-                                self._store_note(action_dict)
+                                self._store_memory(action_dict)
                                 self._store_rewire(action_dict)
                                 # Log the retry trace
                                 self.reasoning_traces.append({
@@ -620,34 +621,42 @@ class LLMAgent:
 
     def update_memory(self, round_num: int, action_str: str, target: Optional[str],
                       outcome: Optional[Dict], visible_agents: Optional[list],
-                      round_actions: list, resource_changes: Dict,
-                      combat_results: list, all_resources: Dict,
-                      received_messages: Optional[list] = None):
+                      round_actions: list,
+                      all_resources: Optional[Dict] = None,
+                      received_messages: Optional[list] = None,
+                      rewire: Optional[Dict] = None):
         """Update agent memory after a round resolves.
 
         Args:
-            round_num: Round number.
+            round_num: Round number just resolved.
             action_str: This agent's action type string.
             target: Target agent ID or None.
-            outcome: Dict with outcome details for this agent's action.
+            outcome: Dict with outcome details (e.g. resource_change, combat_won).
             visible_agents: List of visible agent IDs (None = all).
             round_actions: All actions from the round log.
-            resource_changes: Per-agent resource changes.
-            combat_results: Combat result dicts from the round.
-            all_resources: Current resources for all agents (post-round).
+            all_resources: Post-round resources for all agents. Memory stores
+                           only self + visible in the per-round snapshot.
             received_messages: Messages received this round (list of dicts).
+            rewire: Agent's rewiring nomination + outcome for this round, or None.
         """
         if not self.memory_enabled or self.memory is None:
             return
-        self.memory.record_action(round_num, action_str, target, outcome)
-        self.memory.update_observations(
-            round_num, visible_agents, round_actions,
-            resource_changes, combat_results, all_resources
+        own_action = {
+            'action': action_str,
+            'target': target,
+            'outcome': outcome or {},
+        }
+        self.memory.record_round(
+            round_num=round_num,
+            own_action=own_action,
+            round_actions=round_actions,
+            visible_agents=visible_agents,
+            all_resources=all_resources,
+            sent_message=self._last_message,
+            received_messages=received_messages or [],
+            rewire=rewire,
         )
-        # Record communication (always call to log sent messages even without received)
-        self.memory.record_messages(self._last_message, received_messages or [], round_num)
-        # Record note-to-self (persists to next round's prompt)
-        self.memory.record_note(self._last_note)
+        self.memory.record_memory(round_num, self._last_memory)
 
     def get_reasoning_traces(self, include_retries=False) -> list:
         """Get reasoning traces for analysis.

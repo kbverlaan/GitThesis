@@ -339,6 +339,8 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
   padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0;
   font-size: 12px; line-height: 1.5;
 }
+.mem-entry { margin-bottom: 4px; }
+.mem-round { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 .msg-item { padding: 4px 0; font-size: 12px; line-height: 1.4; }
 .msg-item .sender { font-weight: 600; }
 .msg-item .msg-text { color: var(--text2); }
@@ -476,7 +478,7 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
       <div class="section-title">Experiment Config</div>
       <div class="config-grid">
         <div class="config-item">
-          <div class="config-label">Reasoning</div>
+          <div class="config-label">ToM level</div>
           <div class="config-value reasoning" id="cfg-reasoning">--</div>
         </div>
         <div class="config-item">
@@ -599,9 +601,103 @@ function agentShort(aid) {
 }
 
 // ═══ PARSE & LOAD ═══
+// Compute per-round metrics from raw round data (runner no longer writes them).
+function computeMetrics(rd, prevRd) {
+  const agents = rd.agents || {};
+  const actions = Object.values(agents).map(a => a.action || 'no_action');
+  const activeActions = actions.filter(a => a && a !== 'no_action');
+  const coopCount = activeActions.filter(a => a === 'invest_other' || a === 'arm_other').length;
+  const cooperation_ratio = activeActions.length ? coopCount / activeActions.length : 0;
+
+  // Action distribution
+  const action_distribution = {};
+  actions.forEach(a => { action_distribution[a] = (action_distribution[a] || 0) + 1; });
+
+  // Gini coefficient of resources
+  const resources = Object.values(agents).map(a => Math.max(a.resources || 0, 0)).sort((a,b) => a-b);
+  const n = resources.length;
+  const total = resources.reduce((s,v) => s+v, 0);
+  let gini = 0;
+  if (total > 0 && n > 0) {
+    const cumsum = resources.reduce((acc, v, i) => { acc.push((acc[i-1] || 0) + v); return acc; }, []);
+    const L = cumsum.reduce((s,v) => s+v, 0) / total;
+    gini = (n + 1 - 2*L) / n;
+  }
+
+  // Palma ratio: top 10% share / bottom 40% share
+  let palma = null;
+  if (n >= 5 && total > 0) {
+    const top10n = Math.max(1, Math.floor(n * 0.1));
+    const bottom40n = Math.max(1, Math.floor(n * 0.4));
+    const topShare = resources.slice(-top10n).reduce((s,v)=>s+v, 0) / total;
+    const bottomShare = resources.slice(0, bottom40n).reduce((s,v)=>s+v, 0) / total;
+    palma = bottomShare > 0 ? topShare / bottomShare : Infinity;
+  }
+
+  // Modularity — simple greedy on current edges
+  const edges = rd.network?.edges || [];
+  const modularity = computeModularity(edges, Object.keys(agents));
+
+  // Action stability — fraction of agents with same action as previous round
+  let action_stability = null;
+  if (prevRd) {
+    const prevAgents = prevRd.agents || {};
+    const ids = Object.keys(agents);
+    const match = ids.filter(aid => agents[aid].action === prevAgents[aid]?.action).length;
+    action_stability = ids.length ? match / ids.length : 0;
+  }
+
+  return {
+    primary: { cooperation_ratio, gini, modularity },
+    secondary: { action_stability, palma, action_distribution },
+  };
+}
+
+// Very simple modularity approximation using connected components as communities.
+function computeModularity(edges, nodes) {
+  if (!edges.length || nodes.length < 3) return 0;
+  const adj = {};
+  nodes.forEach(n => { adj[n] = new Set(); });
+  edges.forEach(([a,b]) => { adj[a]?.add(b); adj[b]?.add(a); });
+  // BFS components
+  const seen = new Set();
+  const comps = [];
+  nodes.forEach(n => {
+    if (seen.has(n)) return;
+    const comp = [];
+    const stack = [n];
+    while (stack.length) {
+      const x = stack.pop();
+      if (seen.has(x)) continue;
+      seen.add(x); comp.push(x);
+      adj[x]?.forEach(y => { if (!seen.has(y)) stack.push(y); });
+    }
+    comps.push(comp);
+  });
+  // Q = sum_c [ Lc/L - (Dc/2L)^2 ]
+  const L = edges.length;
+  if (L === 0) return 0;
+  const compOf = {};
+  comps.forEach((c, i) => c.forEach(n => { compOf[n] = i; }));
+  let Q = 0;
+  comps.forEach((c, i) => {
+    let Lc = 0, Dc = 0;
+    c.forEach(n => { Dc += adj[n].size; });
+    edges.forEach(([a,b]) => { if (compOf[a] === i && compOf[b] === i) Lc++; });
+    Q += (Lc / L) - Math.pow(Dc / (2*L), 2);
+  });
+  return Q;
+}
+
 function loadData(text) {
   rounds = text.trim().split('\n').filter(l=>l).map(l => JSON.parse(l));
   if (!rounds.length) return;
+  // Attach computed metrics (runner no longer writes primary/secondary blocks)
+  rounds.forEach((rd, i) => {
+    if (!rd.primary || !rd.secondary) {
+      Object.assign(rd, computeMetrics(rd, i > 0 ? rounds[i-1] : null));
+    }
+  });
   // Assign stable colors from first round's agent order
   agentColorMap = {};
   Object.keys(rounds[0].agents).forEach((aid, i) => { agentColorMap[aid] = i; });
@@ -624,10 +720,10 @@ function inferConfig() {
   const n = Object.keys(r.agents).length;
   document.getElementById('cfg-agents').textContent = n;
 
-  // Pretty reasoning level labels
-  const REASONING_LABELS = {
-    'level0': 'L0 (instinct)', 'level1': 'L1 (best response)',
-    'level2': 'L2 (opponent model)', 'level3': 'L3 (recursive)',
+  // Pretty ToM level labels (aligned with §3.3.1)
+  const TOM_LABELS = {
+    'level0': 'L0 (zero-order)', 'level1': 'L1 (first-order)',
+    'level2': 'L2 (second-order)', 'level3': 'L3 (third-order)',
     'default': 'default',
   };
 
@@ -635,10 +731,12 @@ function inferConfig() {
   const configRound = rounds.find(rd => rd.config);
   if (configRound) {
     const cfg = configRound.config;
-    const rl = cfg.reasoning_level || '--';
-    document.getElementById('cfg-reasoning').textContent = REASONING_LABELS[rl] || rl;
-    document.getElementById('cfg-rewiring').textContent = cfg.rewiring_prob ?? '--';
-    document.getElementById('cfg-comm').textContent = cfg.comm_scope || '--';
+    const gp = cfg.game_params || {};
+    const pc = cfg.prompt_config || {};
+    const tom = pc.tom_level || pc.reasoning_level || cfg.reasoning_level || '--';
+    document.getElementById('cfg-reasoning').textContent = TOM_LABELS[tom] || tom;
+    document.getElementById('cfg-rewiring').textContent = gp.rewiring_prob ?? cfg.rewiring_prob ?? '--';
+    document.getElementById('cfg-comm').textContent = gp.comm_scope || cfg.comm_scope || '--';
     if (cfg.model) {
       const runName = document.getElementById('run-name');
       if (runName && !runName.textContent) runName.textContent = cfg.model;
@@ -678,7 +776,7 @@ function inferConfig() {
   const avgThinkLen = rounds.slice(0, 3).flatMap(rd =>
     Object.values(rd.agents).map(a => (a.thinking || a.reasoning || '').length)
   ).reduce((s,v,i,a) => s + v / a.length, 0);
-  if (avgThinkLen < 50) document.getElementById('cfg-reasoning').textContent = 'L0 (inferred)';
+  if (avgThinkLen < 50) document.getElementById('cfg-reasoning').textContent = 'L0? (inferred)';
   else document.getElementById('cfg-reasoning').textContent = '? (no config)';
 }
 
@@ -727,6 +825,12 @@ document.getElementById('live-watch').onchange = e => {
         const lines = text.trim().split('\n').filter(l => l);
         if (lines.length > rounds.length) {
           const newRounds = lines.slice(rounds.length).map(l => JSON.parse(l));
+          newRounds.forEach((rd, j) => {
+            if (!rd.primary || !rd.secondary) {
+              const idx = rounds.length + j;
+              Object.assign(rd, computeMetrics(rd, idx > 0 ? (rounds[idx-1] || newRounds[j-1]) : null));
+            }
+          });
           rounds.push(...newRounds);
           document.getElementById('round-slider').max = rounds.length - 1;
           // Jump to latest
@@ -1239,16 +1343,29 @@ function renderRound() {
       let outcome = '';
       const transfer = c.total_transfer;
       if (transfer != null) {
-        // Show actual combat-only transfer
-        const loser = won ? defId : atkIds[0];
-        const winners = won ? atkIds : [defId];
-        outcome += `<span style="color:${agentColor(loser)}">${agentShort(loser)}</span> -${transfer.toFixed(1)}`;
-        winners.forEach(a => {
-          const share = won
-            ? (c.attacker_powers?.[a] || 1) / (c.coalition_power || 1) * transfer
-            : transfer;
-          outcome += ` &nbsp;<span style="color:${agentColor(a)}">${agentShort(a)}</span> +${share.toFixed(1)}`;
+        // Per-agent combat_transfer is the ground truth; fall back to derived shares.
+        const atkLosses = {};
+        atkIds.forEach(a => {
+          const bd = agents[a]?.breakdown;
+          const ct = bd?.combat_transfer;
+          if (ct != null) atkLosses[a] = -ct; // positive = loss
         });
+
+        if (won) {
+          // Coalition wins: defender loses `transfer`, attackers split by combat_power.
+          outcome += `<span style="color:${agentColor(defId)}">${agentShort(defId)}</span> -${transfer.toFixed(1)}`;
+          atkIds.forEach(a => {
+            const gain = (c.attacker_powers?.[a] || 1) / (c.coalition_power || 1) * transfer;
+            outcome += ` &nbsp;<span style="color:${agentColor(a)}">${agentShort(a)}</span> +${gain.toFixed(1)}`;
+          });
+        } else {
+          // Defender wins: EACH attacker loses alpha% of their own resources.
+          atkIds.forEach(a => {
+            const loss = atkLosses[a] != null ? atkLosses[a] : (transfer / atkIds.length);
+            outcome += `<span style="color:${agentColor(a)}">${agentShort(a)}</span> -${loss.toFixed(1)} &nbsp;`;
+          });
+          outcome += `<span style="color:${agentColor(defId)}">${agentShort(defId)}</span> +${transfer.toFixed(1)}`;
+        }
       } else if (prev) {
         // Fallback: use breakdown if available
         const defBd = agents[defId]?.breakdown;
@@ -1548,9 +1665,17 @@ function renderCard(aid) {
   const body = document.getElementById('card-body');
   let html = '';
 
-  // Note to self (first, collapsed by default)
-  if (info.note_to_self) {
-    html += `<details class="card-section" open><summary>Note to Self</summary><div class="content"><div class="note-box">${escHtml(info.note_to_self)}</div></div></details>`;
+  // Memory Stream (this round's note highlighted, plus all prior rounds)
+  const memStream = rounds
+    .map((rd, i) => ({ round: rd.round ?? (i + 1), text: (rd.agents?.[aid]?.memory || rd.agents?.[aid]?.note_to_self || '').trim() }))
+    .filter(m => m.text);
+  if (memStream.length > 0) {
+    const streamHtml = memStream.map(m => {
+      const current = m.round === rounds[currentRound].round;
+      const styleCurrent = current ? ' style="background:rgba(52,211,153,0.08);border-left:2px solid var(--coop);padding-left:8px;"' : '';
+      return `<div class="mem-entry"${styleCurrent}><div class="mem-round">Round ${m.round}${current ? ' (now)' : ''}</div><div class="note-box" style="margin-top:4px;">${escHtml(m.text)}</div></div>`;
+    }).join('<div style="height:6px"></div>');
+    html += `<details class="card-section" open><summary>Memory Stream</summary><div class="content">${streamHtml}</div></details>`;
   }
 
   // Reasoning (collapsed by default)
