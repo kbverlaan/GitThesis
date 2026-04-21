@@ -29,7 +29,9 @@ At the end of this journey, Koen must be able to confidently say: "I wrote this 
 
 **Timeline**: Feb 2026 - Jul 15 2026 (submission), defence late July.
 **Meetings**: Biweekly Fridays 14:00 with Debraj (next: Feb 27).
-**Ambition**: Publishable thesis — see `notes/publishable_checklist.md` for full quality checklist.
+**Ambition**: Publishable thesis — see Obsidian `Thesis/Referentie/Publishable Checklist.md` for full quality checklist.
+
+**All project notes live in Obsidian** (`~/Obsidian/Sente/Projecten/Thesis/`), not in this repo. This repo holds code (`simulation/`), LaTeX frame (`text/main/`), proposal (`text/proposal/`), and reference PDFs (`docs/`).
 
 **Current phase**: Phase 1 → Phase 2 transition. System characterization (parameter sweeps) running. Reasoning depth pilot complete with strong results. Next: full factorial (reasoning depth × spatial radius).
 
@@ -56,16 +58,18 @@ When Koen feels lost about what to do next or how to structure experiments, refe
 
 | Document | Location | Purpose |
 |----------|----------|---------|
-| Roadmap | `notes/roadmap.md` | Phases, sprint log, decision log, risk register |
-| Current sprint | `notes/sprint_2_feb13-27.md` | Active sprint tasks, daily log, deliverables |
-| Experiment log | `notes/experiment_log.md` | All 142 runs documented with observations |
-| Meeting prep | `notes/meeting_prep_[date].md` | Agenda and notes per supervisor meeting |
+| Status + Roadmap | Obsidian `Thesis/1 Status.md`, `Thesis/3 Roadmap.md` | Current state, phases, sprint log |
+| Sprint log | Obsidian `Thesis/Archief/Sprints/` | Per-sprint tasks and outcomes |
+| Experiment log | Obsidian `Thesis/Research/Experiment Log.md` | All runs documented with observations |
+| Meeting prep | Obsidian `Thesis/Meetings/YYYY-MM-DD.md` | Agenda and notes per supervisor meeting |
+| Draft TODOs | Obsidian `Thesis/drafts/Sufficient Draft TODOs.md` | Methodology gaps + codebase-revamp items |
+| Method sections | Obsidian `Thesis/drafts/sections/3 Methodology/` | Live §3.1-§3.5 drafts |
 | Proposal (submitted) | `text/proposal/` | LaTeX proposal, submitted Jan 30 |
 | Research question | `text/proposal/research_question.txt` | Current RQ framing and experimental design |
 | Thought log | `text/proposal/thought_log.md` | Research question evolution, conceptual review |
 | Simulation | `simulation/src/` | Game engine, LLM agent, prompts, analysis |
-| Ideas | `notes/ideas.txt` | Parking lot for future directions |
-| Quality checklist | `notes/publishable_checklist.md` | Full publishable standard checklist |
+| Reading list | Obsidian `Thesis/Referentie/Reading List.md` | Literature queue |
+| Quality checklist | Obsidian `Thesis/Referentie/Publishable Checklist.md` | Full publishable standard checklist |
 
 ### Publishable Thesis Standard
 
@@ -79,20 +83,20 @@ This thesis aims for publication quality. Claude must actively enforce these sta
 
 **Claims calibration**: Match claim strength to evidence. Strong evidence → "We find", moderate → "suggests", weak → "preliminary evidence". Never claim causality without faithfulness caveat. The novel claims are: (1) reasoning depth produces qualitatively different emergent structures, (2) the effect is non-monotonic and conditional on game structure, (3) extension of Hobbesian Trap from 2-agent RL to 30-agent LLM.
 
-**When Claude reviews experimental design or analysis code**: actively check against `notes/publishable_checklist.md` and flag gaps. Do not let methodological shortcuts slide because "it's just a master thesis."
+**When Claude reviews experimental design or analysis code**: actively check against Obsidian `Thesis/Referentie/Publishable Checklist.md` and flag gaps. Do not let methodological shortcuts slide because "it's just a master thesis."
 
 ### Working Process: Weekly Sprints
 
 We work in **weekly sprints**, each ending at the Friday supervisor meeting.
 
 **Sprint rhythm:**
-1. **After meeting (Fri)**: Update sprint log in `roadmap.md` with outcomes, set next sprint goals
+1. **After meeting (Fri)**: Update sprint log in Obsidian `Thesis/3 Roadmap.md` with outcomes, set next sprint goals
 2. **During week (Mon-Thu)**: Work on sprint goals -- literature, code, experiments, writing
-3. **Before meeting (Thu)**: Prepare meeting agenda in `notes/meeting_prep_[date].md`
+3. **Before meeting (Thu)**: Prepare meeting agenda in Obsidian `Thesis/Meetings/YYYY-MM-DD.md`
 4. **Meeting (Fri)**: Present progress, discuss, get feedback, agree on next steps
 
 **Claude's role in sprints:**
-- At conversation start: check `roadmap.md` for current sprint and phase
+- At conversation start: check Obsidian `Thesis/1 Status.md` and `Thesis/3 Roadmap.md` for current sprint and phase
 - Help Koen stay focused on sprint goals, push back on scope creep
 - Help prepare meeting agendas with concrete deliverables
 - Help organize results and observations into discussion points
