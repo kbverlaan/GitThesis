@@ -1,0 +1,36 @@
+# Abundance-Open: G=+0.05, c_atk=0.01
+# EV-ordering: C > D > A  |  B3+B4 open
+# Predicted: flat coop; potential late power-grab as wealth diverges
+num_agents: 30
+initial_resources: 100.0
+
+c_inv: 0.08
+g_inv: 0.13
+
+gamma_sat: 1.0
+tau_sat: 5
+
+c_arm: 0.10
+mu_arm: 0.0
+delta_B: 0.8
+
+alpha: 0.40
+c_atk: 0.01
+eta_atk: 1.0
+tau_atk: 5
+
+delta_R: 0.97
+
+max_rounds: 30
+history_length: 10
+
+network_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.5
+
+comm_scope: choice
+symmetric_stakes: true
+
+memory:
+  enabled: true
+  window_size: 10

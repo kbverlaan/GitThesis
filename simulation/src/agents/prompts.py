@@ -268,6 +268,8 @@ class BaselinePrompt:
         conflict_cost_pct = round(c_atk * 100, 2)
         resource_decay_pct = round((1.0 - delta_R) * 100.0, 2)
 
+        symmetric_stakes = self.game_params.get("symmetric_stakes", False)
+
         actions = []
         saturation_decay = self.game_params.get("gamma_sat", 1.0)
         saturation_window = self.game_params.get("tau_sat", 5)
@@ -289,25 +291,27 @@ class BaselinePrompt:
             )
         actions.append(invest_desc)
 
-        arm_cost_ex = 25.0 * arm_cost_pct / 100
-        arm_bonus_ex = arm_cost_ex * arm_multiplier
-        actions.append(
-            f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat "
-            f"bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay "
-            f"{arm_cost_ex:.1f}, bonus = {arm_bonus_ex:.1f}. Combat strength: "
-            f"{25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = "
-            f"{25.0 - arm_cost_ex + arm_bonus_ex:.1f}"
-        )
-        actions.append(
-            f"- arm_other: you pay {arm_other_cost_pct}% of your resources, "
-            f"TARGET (must be a connected neighbor) gains combat bonus = cost x "
-            f"{arm_multiplier}. TARGET's resources do NOT increase — only their "
-            f"fighting power."
-        )
+        if mu_arm > 0:
+            arm_cost_ex = 25.0 * arm_cost_pct / 100
+            arm_bonus_ex = arm_cost_ex * arm_multiplier
+            actions.append(
+                f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat "
+                f"bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay "
+                f"{arm_cost_ex:.1f}, bonus = {arm_bonus_ex:.1f}. Combat strength: "
+                f"{25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = "
+                f"{25.0 - arm_cost_ex + arm_bonus_ex:.1f}"
+            )
+            actions.append(
+                f"- arm_other: you pay {arm_other_cost_pct}% of your resources, "
+                f"TARGET (must be a connected neighbor) gains combat bonus = cost x "
+                f"{arm_multiplier}. TARGET's resources do NOT increase — only their "
+                f"fighting power."
+            )
+
         actions.append(
             f"- attack: TARGET must be a connected neighbor. Both sides pay "
-            f"{conflict_cost_pct}% conflict cost (scaled up by recent attack "
-            f"history). Winner takes {attack_take_pct}% of the loser's resources."
+            f"{conflict_cost_pct}% conflict cost. "
+            f"Win probability = your combat strength / (your strength + target's strength)."
         )
         actions.append("- do_nothing: no cost, no effect")
 
@@ -328,41 +332,79 @@ AVAILABLE ACTIONS:
 - Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}.
 - Doing nothing causes you to shrink. You NEED income (from others investing in you, or from winning attacks) to sustain yourself.
 - After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}.
-- Agents CANNOT be eliminated. At very low resources you become too weak to act meaningfully."""
+- BANKRUPTCY: if you lose a combat and cannot cover your loss, you forfeit ALL your remaining resources and are eliminated. You can no longer take actions or send messages. Bankruptcy is permanent — you have lost the game."""
             )
 
-        # Conflict cost scaling example: compute cost at N=0, 1, 2 attacks in window
-        cc_at_0 = conflict_cost_pct
-        cc_at_1 = round(c_atk * eta_atk * 100, 2)
-        cc_at_2 = round(c_atk * (eta_atk ** 2) * 100, 2)
+        cs_label = "resources + arm bonus" if mu_arm > 0 else "resources"
+
+        if symmetric_stakes:
+            combat_spoils = (
+                f"THE POT is always {attack_take_pct}% of the DEFENDER's resources, regardless of who wins.\n"
+                f"- Attackers win → defender loses the pot; each attacker gains pot × (their strength / total attacker strength).\n"
+                f"- Defender wins → each attacker loses an equal share of the pot (pot / number of attackers). "
+                f"If an attacker cannot cover their share, they go bankrupt (see above).\n"
+                f"- Example (1 vs 1): you attack an agent with 50 resources. "
+                f"Pot = {attack_take_pct}% × 50 = {50 * attack_take_pct / 100:.1f}. "
+                f"If you win → you gain {50 * attack_take_pct / 100:.1f} (defender loses it). "
+                f"If you lose → you lose {50 * attack_take_pct / 100:.1f} (defender gains it).\n"
+                f"- Example (3 vs 1): three agents each with 30 attack a target with 100 resources. "
+                f"Pot = {attack_take_pct}% × 100 = {100 * attack_take_pct / 100:.1f}. "
+                f"If coalition wins → each attacker gains {100 * attack_take_pct / 100 / 3:.1f}. "
+                f"If defender wins → each attacker loses {100 * attack_take_pct / 100 / 3:.1f}."
+            )
+        else:
+            combat_spoils = (
+                f"Winner takes {attack_take_pct}% of the LOSER's resources.\n"
+                f"- Example: you have 10, defender has 50. "
+                f"If you win → you gain {50 * attack_take_pct / 100:.1f} (defender loses it). "
+                f"If you lose → you lose {10 * attack_take_pct / 100:.1f} (defender gains it)."
+            )
+
+        if eta_atk != 1.0:
+            cc_at_0 = conflict_cost_pct
+            cc_at_1 = round(c_atk * eta_atk * 100, 2)
+            cc_at_2 = round(c_atk * (eta_atk ** 2) * 100, 2)
+            conflict_cost_line = (
+                f"Both sides pay a conflict cost = {conflict_cost_pct}% × {eta_atk}^N, "
+                f"where N = attacks made in the last {tau_atk} rounds. "
+                f"First attack → {cc_at_0}%. Second → {cc_at_1}%. Third → {cc_at_2}%."
+            )
+        else:
+            conflict_cost_line = (
+                f"Both sides pay a flat conflict cost of {conflict_cost_pct}% of their resources."
+            )
+
+        arm_decay_line = (
+            f"\n- All arm bonuses decay at the END of each round (multiply by {arm_decay})."
+            if mu_arm > 0 else ""
+        )
+
+        resolution_invest = "Investments" + (" and arming" if mu_arm > 0 else "")
+        resolution_strength = f"current resources{' + arm bonus' if mu_arm > 0 else ''}"
 
         parts.append(f"""COMBAT RULES:
-- Combat strength = your current resources (after any costs paid this round) + your arm bonus.
-- All arm bonuses decay at the END of each round (multiply by {arm_decay}).
+- Combat strength = {cs_label}.{arm_decay_line}
 - Win probability = attacker_strength / (attacker_strength + defender_strength).
-- Winner takes {attack_take_pct}% of the LOSER's resources.
-- Both sides pay a conflict cost = {conflict_cost_pct}% × {eta_atk}^N, where N = number of attacks that participant made in the last {tau_atk} rounds. Example: first attack in {tau_atk} rounds → {cc_at_0}% cost. Second → {cc_at_1}%. Third → {cc_at_2}%.
-- Example: you have 10, defender has 50. If you win → you gain {attack_take_pct}% of 50 = {50 * attack_take_pct / 100:.1f} (defender loses the same). If you lose → you lose {attack_take_pct}% of 10 = {10 * attack_take_pct / 100:.1f} (defender gains it).
+- {conflict_cost_line}
+- {combat_spoils}
 
 COALITIONS (multi-attacker combat):
 - If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender.
 - This is the ONLY way to share spoils from an attack — you must both choose "attack" with the same target, on the same round.
-- If the coalition wins, the defender loses {attack_take_pct}% of their resources; attackers split the gain proportionally to the combat strength each contributed.
-- If the defender wins, each attacker loses {attack_take_pct}% of their OWN resources; the defender gains the sum.
 - Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.
 
 RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
-1. Investments and arming resolve first (resource transfers and combat-bonus gains are applied).
-2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as current resources + arm bonus.
+1. {resolution_invest} resolve first.
+2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as {resolution_strength}.
 3. Spoils transfer according to the combat outcome.
-4. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources), then arm bonuses decay (×{arm_decay}).""")
+4. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources).{(' Arm bonuses decay (×' + str(arm_decay) + ').') if mu_arm > 0 else ''}""")
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
         if self.network_enabled:
             network_block = [
                 "NETWORK:",
-                "Agents are connected through a network. You can ONLY invest in, attack, or arm agents you are directly connected to. You can message any agent regardless of connection.",
+                f"Agents are connected through a network. You can ONLY invest in{', attack, or arm' if mu_arm > 0 else ' or attack'} agents you are directly connected to. You can message any agent regardless of connection.",
                 "Connections are symmetric: if you are connected to Blue, then Blue is also connected to you. But each agent has its own set of connections — other agents generally see a different set of neighbours than you do.",
                 "Connections can change over time based on how agents interact.",
                 "You cannot verify claims about agents whose resources are hidden from you.",
