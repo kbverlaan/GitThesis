@@ -175,33 +175,30 @@ class BaselinePrompt:
                 f"resources): {', '.join(visible) if visible else 'none'}"
             )
 
-        # Unified agents block with resources, arm bonus, and explicit combat
-        # strength (pre-calculated so models don't have to do arithmetic).
+        show_arm = self.game_params.get("mu_arm", 3.0) > 0
+
         lines.append("")
-        if self.hide_resources:
-            lines.append(
-                "AGENTS (resources + arm bonus = combat strength):"
-            )
-        else:
-            lines.append(
-                "AGENTS (resources + arm bonus = combat strength):"
-            )
+        lines.append(
+            "AGENTS (resources + arm bonus = combat strength):" if show_arm else "AGENTS (resources = combat strength):"
+        )
 
         for aid, r in _shuffled_items(resources):
             if visible is not None and aid != agent_id and aid not in visible:
                 continue
             bonus = arm_bonuses.get(aid, 0.0) or 0.0
             is_self = aid == agent_id
-            suffix = " (you)" if is_self else (" [BROKE]" if aid in broke else "")
+            suffix = " (you)" if is_self else (" [ELIMINATED]" if aid in broke else "")
 
             if self.hide_resources and not is_self:
-                lines.append(f"  {aid}: ??? + ??? = ???{suffix}")
+                line = f"  {aid}: ???{suffix}"
             else:
                 r_f = float(r)
-                b_f = float(bonus)
-                lines.append(
-                    f"  {aid}: {r_f:.1f} + {b_f:.1f} = {r_f + b_f:.1f}{suffix}"
-                )
+                if show_arm:
+                    b_f = float(bonus)
+                    line = f"  {aid}: {r_f:.1f} + {b_f:.1f} = {r_f + b_f:.1f}{suffix}"
+                else:
+                    line = f"  {aid}: {r_f:.1f}{suffix}"
+            lines.append(line)
 
         received_messages = observation.get("received_messages", [])
         if received_messages:

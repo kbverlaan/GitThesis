@@ -42,6 +42,8 @@ def main():
                         help='Consecutive runs per job when --run-index is set')
     parser.add_argument('--resume', type=str, default=None,
                         help='Resume from a checkpoint JSON or a _log.jsonl file')
+    parser.add_argument('--label', type=str, default=None,
+                        help='Cell/condition label — creates data/runs/{label}/ subdirectory')
     args = parser.parse_args()
 
     if args.sweep:
@@ -74,11 +76,21 @@ def main():
     if run_id is None:
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    log_dir_override = None
+    if args.label:
+        log_dir_override = project_root / "data" / "runs" / args.label
+
     state, traces, round_logs, run_metadata = run_simulation(
-        game_params, openrouter_config, run_id, resume_path=args.resume
+        game_params, openrouter_config, run_id, resume_path=args.resume,
+        log_dir_override=log_dir_override,
     )
 
-    output_dir = Path(args.output) if args.output else project_root / "data" / "runs"
+    if args.output:
+        output_dir = Path(args.output)
+    elif log_dir_override:
+        output_dir = log_dir_override
+    else:
+        output_dir = project_root / "data" / "runs"
     save_results(state, traces, round_logs, output_dir, run_id, run_metadata)
 
 

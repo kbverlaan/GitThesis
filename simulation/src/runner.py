@@ -111,7 +111,8 @@ def save_results(game_state: GameState,
 def run_simulation(game_params: dict,
                    openrouter_config: dict,
                    run_id: Optional[str] = None,
-                   resume_path: Optional[str] = None) -> tuple:
+                   resume_path: Optional[str] = None,
+                   log_dir_override: Optional[Path] = None) -> tuple:
     """Run one full simulation from start/checkpoint to max_rounds."""
     if run_id is None:
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -280,7 +281,7 @@ def run_simulation(game_params: dict,
     comm_scope = game_params.get('comm_scope', 'none')
     pending_messages = resumed_pending if resumed_pending else {aid: [] for aid in agent_ids}
 
-    log_dir = Path(__file__).parent.parent / "data" / "runs"
+    log_dir = log_dir_override if log_dir_override else Path(__file__).parent.parent / "data" / "runs"
     log_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir = log_dir / "checkpoints"
     checkpoint_dir.mkdir(exist_ok=True)
