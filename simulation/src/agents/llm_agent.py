@@ -66,12 +66,15 @@ class LLMAgent:
         self.model = model
         self.temperature = temperature
         # Thinking models need more tokens for reasoning + JSON response.
-        # Qwen3/3.5 thinking tokens count toward completion_tokens — 2048 is
-        # far too low (thinking alone uses 4-6K tokens). Default to 16384.
+        # Qwen3/3.5 and Gemma 4 thinking tokens count toward completion_tokens —
+        # 2048 is far too low (thinking alone uses 4-6K tokens). Floor at 4096
+        # so the output budget leaves room for prompt growth in late rounds.
         model_lower = model.lower()
-        self.is_thinking_model = any(t in model_lower for t in ["qwq", "qwen3"])
-        if self.is_thinking_model and max_tokens < 16384:
-            self.max_tokens = 16384
+        self.is_thinking_model = any(
+            t in model_lower for t in ["qwq", "qwen3", "gemma4", "gemma-4"]
+        )
+        if self.is_thinking_model and max_tokens < 4096:
+            self.max_tokens = 4096
         else:
             self.max_tokens = max_tokens
         # Thinking models need longer timeout (long reasoning chains)
@@ -165,7 +168,6 @@ class LLMAgent:
                     result = {
                         'action': action,
                         'target': parsed.get('target'),
-                        'reasoning': parsed.get('reasoning', ''),
                         'thinking': thinking_content,
                     }
                     # Extract communication fields if present
@@ -343,8 +345,10 @@ class LLMAgent:
                     max_tokens=self.max_tokens,
                     timeout=self.timeout,
                 )
-                # Qwen3: enable thinking via chat template
-                if "qwen3" in self.model.lower():
+                # Qwen3 / Gemma 4: enable thinking via chat template kwarg.
+                # vLLM exposes the chain-of-thought through reasoning_content
+                # when the matching --reasoning-parser is enabled server-side.
+                if self.is_thinking_model:
                     api_kwargs["extra_body"] = {
                         "chat_template_kwargs": {"enable_thinking": True}
                     }

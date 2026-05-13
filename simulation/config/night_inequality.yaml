@@ -1,0 +1,42 @@
+# Gated-opportunity society — everyone can grow (positive-sum pair-coop),
+# but low-w network locks in initial degree asymmetry. Hubs accelerate;
+# have-nots grow slowly. Attack-take high enough to make whale-hunts
+# a credible threat; attack-cost high enough that violence isn't default.
+
+num_agents: 30
+initial_resources: 100.0
+
+# Invest — thin positive-sum (+7pp margin)
+# pair-coop: +7pp gain, -4% decay = +3%/round floor for any partnered agent
+c_inv: 0.05
+g_inv: 0.12
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming
+c_arm: 0.10
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat — costly but credible threat
+alpha: 0.40        # 2× baseline: successful whale-hunt meaningfully redistributes
+c_atk: 0.03        # 3× baseline: failed attack is brutal
+eta_atk: 1.2
+tau_atk: 5
+
+# Economy — 4% decay
+delta_R: 0.96
+
+max_rounds: 30
+history_length: 10
+
+# Network — STICKY: initial degree asymmetry crystallises into class structure
+network_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.15     # rewire-invite lands only 15% of the time
+
+comm_scope: "choice"
+
+memory:
+  enabled: true
+  window_size: 10

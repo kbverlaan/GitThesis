@@ -384,28 +384,28 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         if self.comm_scope != "none":
             comm_lines = [
                 "COMMUNICATION:",
-                "You may send ONE message this round to ANY agent. Messages have no resource cost.",
+                "You may send ONE message this round. Messages reach only your current network neighbours (the agents listed under CONNECTED AGENTS) — you cannot message agents you cannot see. Messages have no resource cost.",
                 "",
                 "MESSAGE TIMING (important — easy to miscompute):",
                 "- Messages CROSS: if you and another agent both write to each other this round, neither of you has read the other's yet — you are both responding to their PREVIOUS round state, not their current plan.",
                 "- Messages you RECEIVE this round were sent LAST round (before the sender saw your latest action).",
                 "- Messages you SEND this round will be delivered NEXT round — they can influence the recipient's action then, not this round.",
-                "- Messages are private to the recipient, but the recipient may use your message against you.",
+                "- Recipients see whether a message was sent privately (to them only) or broadcast (to all of the sender's neighbours).",
             ]
             if self.comm_scope == "dm":
                 comm_lines.append(
-                    "You can send a private message to ONE agent. Only they will see it."
+                    "You can send a private message to ONE of your neighbours. Only they will see it."
                 )
             elif self.comm_scope == "broadcast":
                 comm_lines.append(
-                    "Your message is sent to ALL agents. Everyone sees it."
+                    "Your message is sent to all of your current neighbours. Each of them sees it, labelled as broadcast."
                 )
             elif self.comm_scope == "choice":
                 comm_lines.append(
-                    "You choose: send a private message to ONE agent, or broadcast to ALL agents."
+                    "You choose: send a private message to ONE neighbour, or broadcast to ALL of your current neighbours."
                 )
                 comm_lines.append(
-                    "Set message_to to a specific agent_id for private, or \"all\" for broadcast."
+                    "Set message_to to a specific neighbour agent_id for private, or \"all\" to broadcast to all your neighbours."
                 )
             parts.append("\n".join(comm_lines))
 
@@ -422,12 +422,12 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         fields: list[str] = []
         if self.comm_scope == "dm":
             fields.append('  "message": "<your message (delivered NEXT round, not this one), or null to stay silent>"')
-            fields.append('  "message_to": "<agent_id of recipient, or null>"')
+            fields.append('  "message_to": "<neighbour agent_id, or null>"')
         elif self.comm_scope == "broadcast":
-            fields.append('  "message": "<your message to all agents (delivered NEXT round), or empty string to stay silent>"')
+            fields.append('  "message": "<your message to all your neighbours (delivered NEXT round), or empty string to stay silent>"')
         elif self.comm_scope == "choice":
             fields.append('  "message": "<your message (delivered NEXT round), or empty string to stay silent>"')
-            fields.append('  "message_to": "<agent_id for private, or \\"all\\" for broadcast>"')
+            fields.append('  "message_to": "<neighbour agent_id for private, or \\"all\\" to broadcast to all your neighbours>"')
         fields.append('  "action": "<one of the action names above>"')
         fields.append('  "target": "<agent_id or null>"')
         if has_rewire:
@@ -444,19 +444,20 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         if self.comm_scope == "dm":
             notes.append(
                 "Messaging is optional. To send no message, set both message and "
-                "message_to to null. To send a message, message_to must be a "
-                "valid agent_id."
+                "message_to to null. To send a message, message_to must be the "
+                "agent_id of one of your current neighbours."
             )
         elif self.comm_scope == "broadcast":
             notes.append(
-                "Your message will be seen by all agents next round. Set message "
-                "to \"\" to send no message."
+                "Your message will be seen next round by all of your current "
+                "neighbours, labelled as broadcast. Set message to \"\" to send "
+                "no message."
             )
         elif self.comm_scope == "choice":
             notes.append(
-                "message_to: use a specific agent_id for a private message, or "
-                "\"all\" to broadcast to all agents. Set message to \"\" to send "
-                "no message."
+                "message_to: use a neighbour's agent_id for a private message, "
+                "or \"all\" to broadcast to every one of your current "
+                "neighbours. Set message to \"\" to send no message."
             )
         notes.append(
             "memory (REQUIRED): a brief note for your future self. Mention what "

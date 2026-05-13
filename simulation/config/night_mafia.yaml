@@ -1,0 +1,41 @@
+# Balanced phase-probe designed for emergent protection-racket / Mafia dynamics.
+# Decay 6% makes Hub-roles attractive, break-even-ish invest lets cooperation
+# persist slowly. Attack is costly enough that enforcement is a credible threat
+# rather than a weekly event. Stable network (w=0.3) rewards loyalty — but
+# not so static that betrayal has no cost.
+
+num_agents: 30
+initial_resources: 100.0
+
+# Invest — thin +1pp margin on 1:1; Hub rotation clearly beats do_nothing
+c_inv: 0.08
+g_inv: 0.09
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming — Hub-as-bodyguard via arm_other
+c_arm: 0.10
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat — 1.5x baseline predation, 2x baseline attack cost
+alpha: 0.30
+c_atk: 0.02
+eta_atk: 1.2
+tau_atk: 5
+
+# Economy — 6% decay (persistent pressure, survivable)
+delta_R: 0.94
+
+max_rounds: 30
+history_length: 10
+
+network_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.3
+
+comm_scope: "choice"
+
+memory:
+  enabled: true
+  window_size: 10

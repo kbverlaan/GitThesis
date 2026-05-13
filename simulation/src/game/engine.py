@@ -89,7 +89,8 @@ class GameEngine:
                  delta_R: float = 1.0,
                  gamma_sat: float = 1.0,
                  tau_sat: int = 5,
-                 max_rounds: int = None):
+                 max_rounds: int = None,
+                 symmetric_stakes: bool = False):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -112,6 +113,7 @@ class GameEngine:
             "delta_R": delta_R,
             "gamma_sat": gamma_sat,
             "tau_sat": tau_sat,
+            "symmetric_stakes": symmetric_stakes,
         }
 
         if isinstance(initial_resources, dict):
@@ -429,15 +431,29 @@ class GameEngine:
                 round_log["resource_breakdown"][aid]["combat_transfer"] += aid_share
                 round_log["bilateral_flows"][(defender_id, aid)] += aid_share
         else:
-            for aid in attacker_ids:
-                aid_effective = max(0, self.state.resources[aid] + round_log["resource_changes"][aid])
-                aid_loss = aid_effective * alpha
-                round_log["resource_changes"][aid] -= aid_loss
-                round_log["resource_breakdown"][aid]["combat_transfer"] -= aid_loss
-                round_log["resource_changes"][defender_id] += aid_loss
-                round_log["resource_breakdown"][defender_id]["combat_transfer"] += aid_loss
-                round_log["bilateral_flows"][(aid, defender_id)] += aid_loss
-                total_transfer += aid_loss
+            if self.params.get("symmetric_stakes", False):
+                defender_effective = max(0, self.state.resources[defender_id] + round_log["resource_changes"][defender_id])
+                pot = defender_effective * alpha
+                per_attacker = pot / len(attacker_ids) if attacker_ids else 0.0
+                for aid in attacker_ids:
+                    aid_effective = max(0, self.state.resources[aid] + round_log["resource_changes"][aid])
+                    actual_loss = min(per_attacker, aid_effective)
+                    round_log["resource_changes"][aid] -= actual_loss
+                    round_log["resource_breakdown"][aid]["combat_transfer"] -= actual_loss
+                    round_log["resource_changes"][defender_id] += actual_loss
+                    round_log["resource_breakdown"][defender_id]["combat_transfer"] += actual_loss
+                    round_log["bilateral_flows"][(aid, defender_id)] += actual_loss
+                    total_transfer += actual_loss
+            else:
+                for aid in attacker_ids:
+                    aid_effective = max(0, self.state.resources[aid] + round_log["resource_changes"][aid])
+                    aid_loss = aid_effective * alpha
+                    round_log["resource_changes"][aid] -= aid_loss
+                    round_log["resource_breakdown"][aid]["combat_transfer"] -= aid_loss
+                    round_log["resource_changes"][defender_id] += aid_loss
+                    round_log["resource_breakdown"][defender_id]["combat_transfer"] += aid_loss
+                    round_log["bilateral_flows"][(aid, defender_id)] += aid_loss
+                    total_transfer += aid_loss
 
         round_log["combat_results"].append({
             "attackers": attacker_ids,

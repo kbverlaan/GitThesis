@@ -1,6 +1,4 @@
-# Overnight solo-run: 30 agents × 30 rounds, maximaal interessant cell
-# voor emergence (L2 ToM + DM + fluid rewiring).
-# Estimated: 60-120 min wallclock on OpenRouter, ~$1.50-3 in tokens.
+# Overnight solo-run: 30 agents × 30 rounds, L3 ToM + choice scope + fluid rewiring.
 
 # Agents
 num_agents: 30
@@ -35,8 +33,8 @@ network_enabled: true
 mean_degree: 5.0
 rewiring_prob: 0.3
 
-# Communication — DM enables coordination
-comm_scope: "dm"
+# Communication — agent-choice between DM and broadcast per round
+comm_scope: "choice"
 
 # Memory
 memory:

@@ -1,0 +1,15 @@
+# vLLM on Snellius — Gemma 4 31B dense variant.
+
+api_key_env_var: ""
+base_url: "http://localhost:8000/v1"
+
+model: "/scratch-shared/kverlaan/origins_models/Gemma4-31B"
+
+temperature: 0.3
+max_tokens: 8000
+timeout: 600
+retry_attempts: 3
+retry_delay: 5
+
+prompt_config:
+  tom_level: "level3"

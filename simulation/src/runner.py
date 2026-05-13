@@ -129,7 +129,9 @@ def run_simulation(game_params: dict,
 
     api_key_env = openrouter_config.get('api_key_env_var', '')
     api_key = os.getenv(api_key_env) if api_key_env else None
-    base_url = openrouter_config.get('base_url', 'https://openrouter.ai/api/v1')
+    base_url = os.getenv('VLLM_BASE_URL') or openrouter_config.get(
+        'base_url', 'https://openrouter.ai/api/v1'
+    )
     if not api_key and 'openrouter.ai' in base_url:
         raise ValueError(f"API key not found in environment variable: {api_key_env}")
     if not api_key:
@@ -160,6 +162,21 @@ def run_simulation(game_params: dict,
 
     initial_resources = game_params['initial_resources']
 
+    if isinstance(initial_resources, dict) and 'type' in initial_resources:
+        import random as _random
+        dtype = initial_resources['type']
+        shuffled = list(agent_ids)
+        _random.shuffle(shuffled)
+        if dtype == 'bimodal':
+            n_high = initial_resources.get('n_high', len(shuffled) // 2)
+            high = initial_resources['high']
+            low = initial_resources['low']
+            initial_resources = {n: (high if i < n_high else low) for i, n in enumerate(shuffled)}
+        elif dtype == 'linear':
+            lo = initial_resources['min']; hi = initial_resources['max']
+            n = len(shuffled)
+            initial_resources = {n_: lo + (hi - lo) * i / max(1, n - 1) for i, n_ in enumerate(shuffled)}
+
     engine = GameEngine(
         agent_ids=agent_ids,
         initial_resources=initial_resources,
@@ -176,6 +193,7 @@ def run_simulation(game_params: dict,
         gamma_sat=game_params.get('gamma_sat', 1.0),
         tau_sat=game_params.get('tau_sat', 5),
         max_rounds=game_params['max_rounds'],
+        symmetric_stakes=game_params.get('symmetric_stakes', False),
     )
 
     network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))
@@ -346,25 +364,35 @@ def run_simulation(game_params: dict,
         d.print_agent_round_summary(display_action_map, round_notes, agent_ids)
         d.print_combat_results(round_result.get('combat_results', []))
 
-        # Collect + route messages
+        # Collect + route messages. Both DM and broadcast are restricted
+        # to the sender's 1-hop network neighbourhood — you cannot reach
+        # agents you cannot see.
         if comm_scope != 'none':
             next_messages = {aid: [] for aid in agent_ids}
-            other_agents = {aid: [x for x in agent_ids if x != aid] for aid in agent_ids}
             round_messages = []
             for aid in agent_ids:
+                current_resources = engine.get_state().resources[aid]
+                if current_resources <= 0.01:
+                    agents[aid]._last_message = None
+                    continue
                 msg = agents[aid].get_last_message()
-                if msg and msg.get('message'):
-                    msg_to = msg.get('message_to')
-                    if msg_to == 'all' or comm_scope == 'broadcast':
-                        for target in other_agents[aid]:
-                            next_messages[target].append({
-                                'from': aid, 'message': msg['message'], 'channel': 'broadcast',
-                            })
-                    elif msg_to and msg_to in other_agents[aid]:
-                        next_messages[msg_to].append({
-                            'from': aid, 'message': msg['message'], 'channel': 'dm',
+                if not (msg and msg.get('message')):
+                    continue
+                if network is not None:
+                    reachable = set(network.get_neighbors(aid))
+                else:
+                    reachable = {x for x in agent_ids if x != aid}
+                msg_to = msg.get('message_to')
+                if msg_to == 'all' or comm_scope == 'broadcast':
+                    for target in reachable:
+                        next_messages[target].append({
+                            'from': aid, 'message': msg['message'], 'channel': 'broadcast',
                         })
-                    round_messages.append(msg)
+                elif msg_to and msg_to in reachable:
+                    next_messages[msg_to].append({
+                        'from': aid, 'message': msg['message'], 'channel': 'dm',
+                    })
+                round_messages.append(msg)
             pending_messages = next_messages
             if round_messages:
                 round_result['messages'] = round_messages
@@ -400,16 +428,8 @@ def run_simulation(game_params: dict,
 
             thinking = last.get('thinking', '') or ''
             response = last.get('response', '') or ''
-            if thinking:
-                reasoning_text = thinking
-            elif response:
-                brace = response.find('{')
-                reasoning_text = response[:brace].strip() if brace > 0 else ''
-            else:
-                reasoning_text = ''
 
             agent_traces[aid] = {
-                'reasoning': reasoning_text,
                 'thinking': thinking or None,
                 'memory': getattr(agents[aid], '_last_memory', None),
                 'tokens': last.get('usage', {}).get('total_tokens', 0),

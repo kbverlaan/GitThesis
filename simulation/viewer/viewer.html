@@ -959,6 +959,7 @@ function closeCard() {
   selectedAgent = null;
   if (gNodes) d3.selectAll('.node-ring').attr('opacity', 0);
   document.querySelectorAll('.standing-entry').forEach(e => e.classList.remove('selected'));
+  applyEdgeHighlight();
 }
 
 // ═══ D3 GRAPH ═══
@@ -1052,10 +1053,10 @@ function detectActionCommunities(agents, roundIdx, windowSize) {
       }
     });
 
-    // Messages as cooperation signal
+    // Messages as cooperation signal — skip broadcasts ('all' is not a node).
     if (rd.messages) {
       rd.messages.forEach(m => {
-        if (m.from && m.to) {
+        if (m.from && m.to && m.to !== 'all') {
           const key = [m.from, m.to].sort().join('-');
           msgWeight[key] = (msgWeight[key] || 0) + recency * 0.3;
         }
@@ -1189,6 +1190,38 @@ function initGraph() {
 function nodePos(id) {
   const n = typeof id === 'object' ? id : nodeMap[id];
   return n ? {x: n.x, y: n.y} : {x: 0, y: 0};
+}
+
+function edgeEndId(end) { return typeof end === 'object' ? end.id : end; }
+
+function captureEdgeBaseline() {
+  if (!gLinks) return;
+  gLinks.selectAll('line').each(function() {
+    const sel = d3.select(this);
+    sel.attr('data-base-opacity', sel.attr('stroke-opacity') ?? '1');
+    sel.attr('data-base-width', sel.attr('stroke-width') ?? '1');
+    sel.attr('data-base-stroke', sel.attr('stroke') ?? '#fff');
+  });
+}
+
+function applyEdgeHighlight() {
+  if (!gLinks) return;
+  gLinks.selectAll('line').each(function(d) {
+    const sel = d3.select(this);
+    const baseOp = parseFloat(sel.attr('data-base-opacity') ?? sel.attr('stroke-opacity') ?? '1');
+    const baseW = parseFloat(sel.attr('data-base-width') ?? sel.attr('stroke-width') ?? '1');
+    const baseStroke = sel.attr('data-base-stroke') ?? sel.attr('stroke') ?? '#fff';
+    if (!selectedAgent) {
+      sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
+      return;
+    }
+    const incident = edgeEndId(d.source) === selectedAgent || edgeEndId(d.target) === selectedAgent;
+    if (incident) {
+      sel.attr('stroke-opacity', 1).attr('stroke-width', baseW + 2).attr('stroke', '#facc15');
+    } else {
+      sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
+    }
+  });
 }
 
 function ticked() {
@@ -1483,6 +1516,9 @@ function updateGraph(r) {
       .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 1);
   }
 
+  captureEdgeBaseline();
+  applyEdgeHighlight();
+
   // Message lines (shown in both modes)
   const msgEdges = [];
   if (showMsgs && r.messages) {
@@ -1550,9 +1586,11 @@ function updateGraph(r) {
           coopPairs.add([aid, info.target].sort().join('-'));
         }
       });
-      // Messages also pull together
+      // Messages also pull together — skip broadcasts ('all' is not a node).
       if (rd.messages) rd.messages.forEach(m => {
-        if (m.from && m.to) coopPairs.add([m.from, m.to].sort().join('-'));
+        if (m.from && m.to && m.to !== 'all' && nodeMap[m.to]) {
+          coopPairs.add([m.from, m.to].sort().join('-'));
+        }
       });
     }
     simEdges = [...coopPairs].map(key => {
@@ -1603,6 +1641,7 @@ function selectAgent(aid) {
   document.querySelectorAll('.standing-entry').forEach((e,i) => {
     e.classList.toggle('selected', e.querySelector('.standing-agent')?.textContent === agentShort(aid));
   });
+  applyEdgeHighlight();
   renderCard(aid);
 }
 
@@ -1665,8 +1704,9 @@ function renderCard(aid) {
   const body = document.getElementById('card-body');
   let html = '';
 
-  // Memory Stream (this round's note highlighted, plus all prior rounds)
+  // Memory Stream (this round's note highlighted, plus prior rounds — NO future rounds)
   const memStream = rounds
+    .slice(0, currentRound + 1)
     .map((rd, i) => ({ round: rd.round ?? (i + 1), text: (rd.agents?.[aid]?.memory || rd.agents?.[aid]?.note_to_self || '').trim() }))
     .filter(m => m.text);
   if (memStream.length > 0) {
@@ -1694,12 +1734,25 @@ function renderCard(aid) {
     html += `<details class="card-section"><summary>Raw Output</summary><div class="content"><pre>${escHtml(info.response)}</pre></div></details>`;
   }
 
-  // Inbox
-  const inbox = r.messages?.filter(m => m.to === aid) || [];
+  // Inbox — DMs addressed to `aid` plus broadcasts from 1-hop neighbours.
+  const inboxNeighbourSet = new Set();
+  (r.network?.edges || []).forEach(pair => {
+    if (!Array.isArray(pair) || pair.length < 2) return;
+    if (pair[0] === aid) inboxNeighbourSet.add(pair[1]);
+    else if (pair[1] === aid) inboxNeighbourSet.add(pair[0]);
+  });
+  const inbox = (r.messages || []).filter(m => {
+    if (!m) return false;
+    const isBroadcast = m.to === 'all' || m.to == null;
+    if (isBroadcast) return m.from !== aid && inboxNeighbourSet.has(m.from);
+    return m.to === aid;
+  });
   if (inbox.length > 0) {
     html += `<details class="card-section"><summary>Inbox (${inbox.length})</summary><div class="content">`;
     inbox.forEach(m => {
-      html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span> <span class="msg-text">${escHtml(m.text)}</span></div>`;
+      const isBroadcast = m.to === 'all' || m.to == null;
+      const tag = isBroadcast ? ' <span style="color:var(--dim)">(all)</span>' : '';
+      html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span>${tag} <span class="msg-text">${escHtml(m.text)}</span></div>`;
     });
     html += '</div></details>';
   }
