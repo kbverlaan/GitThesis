@@ -445,9 +445,16 @@ def print_agent_profiles(round_summaries, agent_ids, final_resources):
     p(f"\n{C('Agent profiles:', 'bold')}")
     for aid in agent_ids:
         profile = {}
+        inactive = 0
         for rs in round_summaries:
-            a = rs[aid]['action']
+            entry = rs.get(aid)
+            if entry is None:
+                inactive += 1
+                continue
+            a = entry['action']
             profile[a] = profile.get(a, 0) + 1
+        if inactive > 0:
+            profile['broke'] = inactive
         profile_str = ', '.join(
             f"{C(a, _ACTION_COLORS.get(a, 'white'))}={c}"
             for a, c in sorted(profile.items(), key=lambda x: -x[1])
@@ -467,7 +474,7 @@ def _print_sparklines(all_metrics):
         rng = hi - lo if hi > lo else 1
         return ''.join(sparks[min(int((v - lo) / rng * 7), 7)] for v in values)
 
-    coop_vals = [m.get('cooperation_ratio', 0) for m in all_metrics]
+    coop_vals = [m.get('cooperation_rate', m.get('cooperation_ratio', 0)) for m in all_metrics]
     gini_vals = [m.get('gini', 0) for m in all_metrics]
 
     p()

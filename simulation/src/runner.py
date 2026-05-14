@@ -574,7 +574,11 @@ def run_simulation(game_params: dict,
 
     state = engine.get_state()
     rounds_played = state.round_number - 1
-    d.print_final_summary(state.resources, state.arm_bonuses, agent_ids, elapsed, all_round_logs)
+    metrics_trajectory = [
+        {'cooperation_rate': cooperation_rate(rd), 'gini': gini(rd)}
+        for rd in all_round_logs
+    ]
+    d.print_final_summary(state.resources, state.arm_bonuses, agent_ids, elapsed, metrics_trajectory)
     d.p(f"  Rounds: {rounds_played}  ({elapsed/max(rounds_played,1):.1f}s/round)")
 
     round_summaries = []
@@ -586,8 +590,13 @@ def run_simulation(game_params: dict,
                 'target': action.get('target'),
             }
         round_summaries.append(rs)
-    d.print_action_distribution(round_summaries)
-    d.print_agent_profiles(round_summaries, agent_ids, state.resources)
+    try:
+        d.print_action_distribution(round_summaries)
+        d.print_agent_profiles(round_summaries, agent_ids, state.resources)
+    except Exception as e:
+        import traceback
+        print(f"[warning] post-run display crashed: {e}", flush=True)
+        traceback.print_exc()
 
     run_metadata = {
         "run_id": run_id,
