@@ -38,7 +38,9 @@ DEFAULTS = {
     "window_step": 1,             # step between consecutive windows
     "event_window": 3,            # last-K rounds of window used for predation/violence
                                   # detection only (wealth/struct features use full window)
-    "smoothing": True,            # 3-window majority filter for sub-flip denoising
+    "smoothing": False,           # 3-window majority filter for sub-flip denoising
+                                  # default OFF: raw labels are always derivable from
+                                  # features (AAMAS rigor). --smoothing for visualization.
 }
 
 LABEL_NAMES = {
@@ -844,7 +846,9 @@ def main():
                    help="Rolling window size in rounds (0 = whole-run mode)")
     p.add_argument("--window-step", type=int, default=DEFAULTS["window_step"])
     p.add_argument("--solo-predator-min-strikes", type=int, default=DEFAULTS["solo_predator_min_strikes"])
-    p.add_argument("--no-smoothing", action="store_true", help="Disable 3-window majority-filter smoothing")
+    p.add_argument("--smoothing", action="store_true",
+                   help="Enable 3-window majority-filter smoothing (default OFF for AAMAS rigor — "
+                        "smoothed labels may not be derivable from features alone)")
     p.add_argument("--per-window", action="store_true", help="Print one-glance dashboard per window")
     p.add_argument("--summary", action="store_true", help="Compact one-line summary per run (batch mode)")
     args = p.parse_args()
@@ -860,7 +864,7 @@ def main():
         "window_size": args.window_size,
         "window_step": args.window_step,
         "solo_predator_min_strikes": args.solo_predator_min_strikes,
-        "smoothing": not args.no_smoothing,
+        "smoothing": args.smoothing,
     })
 
     if args.batch:
