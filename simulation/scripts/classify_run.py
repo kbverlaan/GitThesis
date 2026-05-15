@@ -22,7 +22,9 @@ from collections import Counter
 # ─── v0 default thresholds (tuneable; calibrate during coding pass) ─────────
 
 DEFAULTS = {
-    "attempt_threshold": 2,       # PREDATION iff n_coalition_attempts > k (behavioral)
+    "attempt_threshold": 1,       # PREDATION iff n_coalition_attempts > k (behavioral)
+                                  # default 1: ≥2 coalition attempts in event_window=3 rounds
+                                  # = sustained coordination, not a single isolated event
     "strike_threshold": 0,        # used inside predation subs (success vs failed)
     "paralysis_stdev": 5.0,       # 1b iff stdev(final_wealth) < this
     "paralysis_do_nothing": 0.6,  # 1b iff do_nothing_fraction > this
@@ -34,6 +36,8 @@ DEFAULTS = {
     "partial_outcome_ratio": 0.5,  # outcome=partial iff 0 < success_ratio < this
     "window_size": 10,            # rolling window size in rounds (0 = whole run)
     "window_step": 1,             # step between consecutive windows
+    "event_window": 3,            # last-K rounds of window used for predation/violence
+                                  # detection only (wealth/struct features use full window)
     "smoothing": True,            # 3-window majority filter for sub-flip denoising
 }
 
@@ -370,9 +374,19 @@ def extract_features(rounds, params, window=None):
     do_nothing_n = actions.get("no_action", 0) + actions.get("do_nothing", 0)
     do_nothing_frac = do_nothing_n / total_actions if total_actions else 0.0
 
-    successful_strikes = successful_coalition_strikes(rounds)
-    solo_strikes = successful_solo_strikes(rounds)
-    all_strikes = all_strike_events(rounds)
+    # Violence/predation features: count only over the last `event_window` rounds of
+    # the feature window. This avoids "window echo" where a single strike round labels
+    # ~window_size consecutive windows as predation.
+    event_window = params.get("event_window", 0)
+    if event_window and w_end is not None:
+        event_cutoff = w_end - event_window + 1
+        event_rounds = [r for r in rounds if r.get("round", -1) >= event_cutoff]
+    else:
+        event_rounds = rounds
+
+    successful_strikes = successful_coalition_strikes(event_rounds)
+    solo_strikes = successful_solo_strikes(event_rounds)
+    all_strikes = all_strike_events(event_rounds)
     coalition_attempts = [s for s in all_strikes if s["coalition"]]
     solo_attacker_counts = Counter()
     for s in solo_strikes:
