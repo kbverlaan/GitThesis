@@ -29,7 +29,7 @@ tau_atk: 5
 symmetric_stakes: true     # pot = alpha * defender_R, to the winner regardless
 
 # Economy
-delta_R: 0.95
+delta_R: 1.0                # no resource decay → cooperation compounds (growth)
 
 # Game length
 max_rounds: 10

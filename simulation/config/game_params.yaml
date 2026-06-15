@@ -24,7 +24,9 @@ eta_atk: 1.2                         # per-prior-attack multiplier
 tau_atk: 5                           # sliding-window rounds
 
 # Economy
-delta_R: 0.95                        # resource decay factor: R(t+1) = delta_R × (R(t) + ΔR)
+delta_R: 1.0                         # NO resource decay (current design): R(t+1) = R(t) + ΔR.
+                                     # Cooperation is net-positive (+G/round) → growth comes from
+                                     # cooperation, not from decay pressure. (0.95 = legacy PNAS.)
 
 # Game length
 max_rounds: 60

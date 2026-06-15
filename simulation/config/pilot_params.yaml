@@ -25,7 +25,7 @@ eta_atk: 1.2
 tau_atk: 5
 
 # Economy
-delta_R: 0.95
+delta_R: 1.0                         # no resource decay (growth via cooperation)
 
 # Game length — short for bugfix-iteration pilot
 max_rounds: 10
