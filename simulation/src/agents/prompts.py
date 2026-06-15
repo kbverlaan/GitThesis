@@ -1,15 +1,18 @@
 """
 Prompt harness for LLM agents.
 
-A single baseline prompt drives all conditions. The primary IV is ToM depth
-(§3.3.1): four standalone instruction blocks, one per level, each introducing
-its own concepts from scratch. Orthogonal feature flags (communication scope,
-rewiring, hide_resources) are driven by game_params.
+A single baseline prompt drives all conditions. The experimental axis is
+mechanics complexity (the complexity ladder); memory and communication are a
+fixed base substrate. Reasoning style (the ToM blocks below) is held CONSTANT,
+not manipulated — it is part of the substrate, not the IV. Feature flags
+(communication scope, rewiring, hide_resources) are driven by game_params.
 
 Design references:
-- ToM levels L0-L3 per de Weerd et al. (2013, 2017, 2022): depth of
+- ToM blocks L0-L3 per de Weerd et al. (2013, 2017, 2022): depth of
   MENTAL-STATE modelling (beliefs, desires, intentions), not K-level
-  action-forecasting.
+  action-forecasting. Retained as a selectable but fixed reasoning baseline
+  (default level0); earlier work found reasoning-depth effects unreliable, so
+  it is no longer a manipulated axis.
 - Prompt ordering: shared rules first, per-agent state last — lets
   vLLM's automatic prefix caching reuse the KV cache across all agents
   in the same round.
@@ -26,9 +29,10 @@ def _shuffled_items(d: dict) -> list:
     return items
 
 
-# Four standalone ToM blocks. An agent only ever sees its own level — each
-# block must read cleanly without knowledge of the others. Length grows with
-# depth: higher-order ToM requires more explanation.
+# Four standalone ToM blocks (reasoning-style baseline, held CONSTANT — NOT an
+# experimental IV; see module docstring). An agent only ever sees its own level
+# — each block must read cleanly without knowledge of the others. Length grows
+# with depth: higher-order ToM requires more explanation.
 TOM_LEVELS = {
     "level0": (
         "Reason only about the game itself: your resources, the available "
@@ -94,7 +98,9 @@ TOM_LEVELS = {
 
 
 class BaselinePrompt:
-    """Single baseline prompt; ToM level is the primary experimental IV."""
+    """Single baseline prompt. Mechanics complexity is the experimental axis;
+    the ToM/reasoning block is a fixed part of the substrate (default level0),
+    not the IV."""
 
     OBJECTIVE = "Maximize your absolute resource count."
 

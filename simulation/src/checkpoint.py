@@ -89,7 +89,9 @@ def reconstruct_from_jsonl(jsonl_path: str, game_params: dict) -> dict:
     last_round = rounds[-1]
     agent_ids = list(last_round['agents'].keys())
 
-    memories = {aid: AgentMemory(aid, game_params.get('memory', {}).get('window_size', 10))
+    _mem_cfg = game_params.get('memory', {})
+    memories = {aid: AgentMemory(aid, _mem_cfg.get('window_size', 10),
+                                 _mem_cfg.get('notes_persist', True))
                 for aid in agent_ids}
 
     all_round_logs = []

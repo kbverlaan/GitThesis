@@ -38,7 +38,8 @@ rewiring_prob: 0.0                   # w — IV (§3.3.2)
 # Communication
 comm_scope: "none"                   # IV (§3.3.3): none | dm | broadcast | choice
 
-# Memory
+# Memory (two layers: raw events on a recency window + agent notes)
 memory:
   enabled: true
-  window_size: 10
+  window_size: 10          # raw events (actions, messages, network, resources): last k rounds
+  notes_persist: true      # agent's own notes kept for the WHOLE game (false = windowed, legacy)

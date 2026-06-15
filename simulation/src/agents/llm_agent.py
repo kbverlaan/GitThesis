@@ -60,7 +60,8 @@ class LLMAgent:
             retry_attempts: Number of retry attempts on failure
             retry_delay: Delay between retries in seconds
             base_url: API base URL (OpenRouter, vLLM local, etc.)
-            memory_config: Memory settings dict with 'enabled', 'window_size', etc.
+            memory_config: Memory settings dict with 'enabled', 'window_size',
+                'notes_persist' (notes kept whole game vs windowed), etc.
         """
         self.agent_id = agent_id
         self.model = model
@@ -97,7 +98,9 @@ class LLMAgent:
         self.memory_enabled = mem_cfg.get('enabled', True)
         if self.memory_enabled:
             window_size = mem_cfg.get('window_size', 10)
-            self.memory = AgentMemory(agent_id, window_size=window_size)
+            notes_persist = mem_cfg.get('notes_persist', True)
+            self.memory = AgentMemory(agent_id, window_size=window_size,
+                                      notes_persist=notes_persist)
         else:
             self.memory = None
 

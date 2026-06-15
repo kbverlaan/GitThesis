@@ -39,7 +39,8 @@ rewiring_prob: 0.3
 # Communication — DM enables private coordination, coalition-building
 comm_scope: "dm"
 
-# Memory
+# Memory (two layers: raw events on a recency window + agent notes)
 memory:
   enabled: true
-  window_size: 10
+  window_size: 10          # raw events: last k rounds
+  notes_persist: true      # agent notes kept for the WHOLE game (false = windowed, legacy)

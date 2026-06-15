@@ -81,9 +81,14 @@ class MemoryEntry:
 class AgentMemory:
     """Per-agent memory: integrated per-round event log + memory stream."""
 
-    def __init__(self, agent_id: str, window_size: int = 10):
+    def __init__(self, agent_id: str, window_size: int = 10,
+                 notes_persist: bool = True):
         self.agent_id = agent_id
         self.window_size = window_size
+        # When True, the agent's own notes are never windowed (kept for the
+        # whole game); raw events still use the recency window. When False,
+        # notes fall back to the same window as events (legacy behaviour).
+        self.notes_persist = notes_persist
         self.event_log: List[RoundEvents] = []
         self.memory_stream: List[MemoryEntry] = []
 
@@ -199,13 +204,17 @@ class AgentMemory:
 
         recent_events = self.event_log[-self.window_size:]
         recent_rounds = {ev.round for ev in recent_events}
-        notes_by_round = {m.round: m.text for m in self.memory_stream}
+        notes_src = (
+            self.memory_stream if self.notes_persist
+            else self.memory_stream[-self.window_size:]
+        )
+        notes_by_round = {m.round: m.text for m in notes_src}
 
         out: List[str] = []
 
         # ── Layer 1: persistent note history (rounds before the window) ──
         earlier_notes = [
-            m for m in self.memory_stream if m.round not in recent_rounds
+            m for m in notes_src if m.round not in recent_rounds
         ]
         if earlier_notes:
             nlines = [
@@ -371,13 +380,15 @@ class AgentMemory:
         return {
             "agent_id": self.agent_id,
             "window_size": self.window_size,
+            "notes_persist": self.notes_persist,
             "event_log": [e.to_dict() for e in self.event_log],
             "memory_stream": [m.to_dict() for m in self.memory_stream],
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "AgentMemory":
-        mem = cls(d["agent_id"], d.get("window_size", 10))
+        mem = cls(d["agent_id"], d.get("window_size", 10),
+                  d.get("notes_persist", True))
         mem.event_log = [RoundEvents.from_dict(e) for e in d.get("event_log", [])]
         mem.memory_stream = [
             MemoryEntry.from_dict(m) for m in d.get("memory_stream", [])
