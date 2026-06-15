@@ -296,17 +296,12 @@ class BaselinePrompt:
             arm_cost_ex = 25.0 * arm_cost_pct / 100
             arm_bonus_ex = arm_cost_ex * arm_multiplier
             actions.append(
-                f"- arm_self: pay {arm_cost_pct}% of your resources, gain combat "
-                f"bonus = cost x {arm_multiplier}. Example: 25.0 resources → pay "
-                f"{arm_cost_ex:.1f}, bonus = {arm_bonus_ex:.1f}. Combat strength: "
-                f"{25.0 - arm_cost_ex:.1f} + {arm_bonus_ex:.1f} = "
-                f"{25.0 - arm_cost_ex + arm_bonus_ex:.1f}"
-            )
-            actions.append(
                 f"- arm_other: you pay {arm_other_cost_pct}% of your resources, "
                 f"TARGET (must be a connected neighbor) gains combat bonus = cost x "
                 f"{arm_multiplier}. TARGET's resources do NOT increase — only their "
-                f"fighting power."
+                f"fighting power. Example: you have 25.0 → you pay {arm_cost_ex:.1f}, "
+                f"target gains {arm_bonus_ex:.1f} combat bonus. You CANNOT arm "
+                f"yourself — combat strength can only be raised by others arming you."
             )
 
         actions.append(

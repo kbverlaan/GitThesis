@@ -194,7 +194,7 @@ class LLMAgent:
 
     # Valid action names for fuzzy matching
     _VALID_ACTIONS = {
-        'invest_other', 'arm_self', 'arm_other', 'attack', 'do_nothing'
+        'invest_other', 'arm_other', 'attack', 'do_nothing'
     }
 
     def _normalize_action(self, action_raw: str) -> Optional[str]:
@@ -219,8 +219,7 @@ class LLMAgent:
             'donothing': 'do_nothing',
             'do_nothing': 'do_nothing',
             'invest': 'invest_other',
-            'arm': 'arm_self',
-            'self_arm': 'arm_self',
+            'arm': 'arm_other',
         }
         if action in aliases:
             return aliases[action]
@@ -235,7 +234,6 @@ class LLMAgent:
         # Map action string to ActionType
         action_map = {
             'invest_other': ActionType.INVEST_OTHER,
-            'arm_self': ActionType.ARM_SELF,
             'arm_other': ActionType.ARM_OTHER,
             'attack': ActionType.ATTACK,
             'do_nothing': ActionType.DO_NOTHING
@@ -561,8 +559,7 @@ class LLMAgent:
                 return None
             action_map = {
                 'invest_other': ActionType.INVEST_OTHER,
-                'arm_self': ActionType.ARM_SELF,
-                'arm_other': ActionType.ARM_OTHER,
+                    'arm_other': ActionType.ARM_OTHER,
                 'attack': ActionType.ATTACK,
                 'do_nothing': ActionType.DO_NOTHING,
             }
@@ -626,7 +623,6 @@ class LLMAgent:
             (rf'(attack)\s+({agent_pattern})', 'attack'),
             (rf'(invest(?:[_ ]?(?:other|in))?)\s+({agent_pattern})', 'invest_other'),
             (rf'(arm[_ ]?other)\s+({agent_pattern})', 'arm_other'),
-            (rf'(arm[_ ]?self)', 'arm_self'),
             (rf'(do[_ ]?nothing)', 'do_nothing'),
         ]
         best_match = None
