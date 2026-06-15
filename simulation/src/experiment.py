@@ -92,10 +92,10 @@ def _run_cooperation_rate(round_logs):
     for rd in round_logs:
         for a in rd.get('agents', {}).values():
             act = a.get('action', '')
-            if act in ('', 'no_action', 'do_nothing'):
+            if act in ('', 'no_action', 'hold', 'do_nothing'):
                 continue
             meaningful += 1
-            if act in ('invest_other', 'arm_other'):
+            if act in ('transfer', 'strengthen', 'invest_other', 'arm_other'):
                 pos += 1
     return pos / meaningful if meaningful > 0 else 0.0
 

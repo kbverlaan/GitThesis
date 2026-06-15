@@ -77,7 +77,7 @@ def reconstruct_from_jsonl(jsonl_path: str, game_params: dict) -> dict:
         last = rounds[-1]
         agents_data = last['agents']
         do_nothing_count = sum(
-            1 for a in agents_data.values() if a.get('action') in ('do_nothing', None, '')
+            1 for a in agents_data.values() if a.get('action') in ('hold', 'do_nothing', None, '')
         )
         if do_nothing_count / len(agents_data) > 0.8:
             print(f"  Skipping round {last['round']} "

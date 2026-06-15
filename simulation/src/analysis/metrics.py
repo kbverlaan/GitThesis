@@ -30,8 +30,8 @@ import json
 import numpy as np
 
 
-POSITIVE_SUM_ACTIONS = ('invest_other', 'arm_other')
-MEANINGFUL_EXCLUDE = ('no_action', 'do_nothing', '')
+POSITIVE_SUM_ACTIONS = ('transfer', 'strengthen', 'invest_other', 'arm_other')
+MEANINGFUL_EXCLUDE = ('no_action', 'hold', 'do_nothing', '')
 
 
 # ─── loaders ────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ def network_churn(round_log: Dict) -> int:
 def first_attack_round(run_rounds: Iterable[Dict]) -> Optional[int]:
     for r in run_rounds:
         for a in _actions(r):
-            if a['action'] == 'attack':
+            if a['action'] in ('take', 'attack'):
                 return r.get('round')
     return None
 

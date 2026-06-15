@@ -192,56 +192,51 @@ class LLMAgent:
 
         return None
 
-    # Valid action names for fuzzy matching
+    # Canonical action vocabulary
     _VALID_ACTIONS = {
-        'invest_other', 'arm_other', 'attack', 'do_nothing'
+        'transfer', 'strengthen', 'take', 'hold'
+    }
+
+    # Legacy names + shorthands → canonical (input backward compatibility)
+    _ACTION_ALIASES = {
+        'invest_other': 'transfer', 'invest': 'transfer', 'transfer_other': 'transfer',
+        'arm_other': 'strengthen', 'arm': 'strengthen', 'strengthen_other': 'strengthen',
+        'attack': 'take',
+        'do_nothing': 'hold', 'donothing': 'hold', 'nothing': 'hold',
     }
 
     def _normalize_action(self, action_raw: str) -> Optional[str]:
-        """Normalize action string with fuzzy matching.
-
-        Handles common LLM errors: extra whitespace, wrong case, trailing 's',
-        underscores vs spaces, close misspellings.
+        """Normalize an action string to the canonical vocabulary
+        (transfer / strengthen / take / hold). Accepts legacy names
+        (invest_other / arm_other / attack / do_nothing), case, spaces,
+        hyphens, and a trailing 's'.
         """
-        action = action_raw.strip().lower().replace(' ', '_').replace('-', '_')
+        action = (action_raw or '').strip().lower().replace(' ', '_').replace('-', '_')
 
-        # Exact match
         if action in self._VALID_ACTIONS:
             return action
-
-        # Strip trailing 's' (e.g. "invest_others" → "invest_other")
         if action.endswith('s') and action[:-1] in self._VALID_ACTIONS:
             return action[:-1]
-
-        # Common misspellings
-        aliases = {
-            'nothing': 'do_nothing',
-            'donothing': 'do_nothing',
-            'do_nothing': 'do_nothing',
-            'invest': 'invest_other',
-            'arm': 'arm_other',
-        }
-        if action in aliases:
-            return aliases[action]
-
+        if action in self._ACTION_ALIASES:
+            return self._ACTION_ALIASES[action]
         return None
-    
+
     def _action_dict_to_action(self, action_dict: Dict) -> Optional[Action]:
         """Convert parsed action dictionary to Action object."""
-        action_str = action_dict['action'].lower()
+        action_str = self._normalize_action(action_dict.get('action', ''))
         target = action_dict['target']
-        
-        # Map action string to ActionType
+
+        # Map canonical action string to ActionType
         action_map = {
-            'invest_other': ActionType.INVEST_OTHER,
-            'arm_other': ActionType.ARM_OTHER,
-            'attack': ActionType.ATTACK,
-            'do_nothing': ActionType.DO_NOTHING
+            'transfer': ActionType.INVEST_OTHER,
+            'strengthen': ActionType.ARM_OTHER,
+            'take': ActionType.ATTACK,
+            'hold': ActionType.DO_NOTHING,
         }
-        
-        if action_str not in action_map:
+
+        if not action_str or action_str not in action_map:
             return None
-        
+
         action_type = action_map[action_str]
         
         # Validate target requirements
@@ -558,10 +553,10 @@ class LLMAgent:
             if not action_str:
                 return None
             action_map = {
-                'invest_other': ActionType.INVEST_OTHER,
-                    'arm_other': ActionType.ARM_OTHER,
-                'attack': ActionType.ATTACK,
-                'do_nothing': ActionType.DO_NOTHING,
+                'transfer': ActionType.INVEST_OTHER,
+                'strengthen': ActionType.ARM_OTHER,
+                'take': ActionType.ATTACK,
+                'hold': ActionType.DO_NOTHING,
             }
             action_type = action_map.get(action_str)
             if not action_type:
@@ -620,10 +615,10 @@ class LLMAgent:
         # Scan for the LAST occurrence of "attack <Agent>" etc. in the tail
         agent_pattern = '|'.join(re.escape(a) for a in agent_lookup.keys())
         last_action_patterns = [
-            (rf'(attack)\s+({agent_pattern})', 'attack'),
-            (rf'(invest(?:[_ ]?(?:other|in))?)\s+({agent_pattern})', 'invest_other'),
-            (rf'(arm[_ ]?other)\s+({agent_pattern})', 'arm_other'),
-            (rf'(do[_ ]?nothing)', 'do_nothing'),
+            (rf'(take|attack)\s+({agent_pattern})', 'take'),
+            (rf'(transfer|invest(?:[_ ]?(?:other|in))?)\s+({agent_pattern})', 'transfer'),
+            (rf'(strengthen|arm[_ ]?other)\s+({agent_pattern})', 'strengthen'),
+            (rf'(hold|do[_ ]?nothing)', 'hold'),
         ]
         best_match = None
         best_pos = -1

@@ -30,11 +30,13 @@ from enum import Enum
 
 
 class ActionType(Enum):
-    INVEST_OTHER = "invest_other"
-    ARM_SELF = "arm_self"
-    ARM_OTHER = "arm_other"
-    ATTACK = "attack"
-    DO_NOTHING = "do_nothing"
+    # Member names kept stable internally; the .value strings are the canonical
+    # action vocabulary used in prompts and logs (renamed 2026-06-15).
+    INVEST_OTHER = "transfer"     # give resources to another
+    ARM_SELF = "arm_self"         # legacy/removed from the action set (dead path)
+    ARM_OTHER = "strengthen"      # give a combat bonus to another
+    ATTACK = "take"               # take resources by force
+    DO_NOTHING = "hold"           # do nothing
 
 
 @dataclass
@@ -231,7 +233,7 @@ class GameEngine:
         for rd in recent:
             for act in rd.get("actions", []):
                 if (act.get("agent") == investor and
-                    act.get("action") == "invest_other" and
+                    act.get("action") == ActionType.INVEST_OTHER.value and
                     act.get("target") == target):
                     count += 1
         return count
@@ -243,7 +245,7 @@ class GameEngine:
         count = 0
         for rd in recent:
             for act in rd.get("actions", []):
-                if act.get("agent") == aggressor and act.get("action") == "attack":
+                if act.get("agent") == aggressor and act.get("action") == ActionType.ATTACK.value:
                     count += 1
         return count
 

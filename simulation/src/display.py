@@ -30,24 +30,22 @@ _COLORS = {
 # 6 distinct agent colors, cycled by agent index
 _AGENT_COLORS = ['cyan', 'magenta', 'yellow', 'green', 'blue', 'red']
 
-# Action type → color
+# Action type → color (canonical new names + legacy aliases)
 _ACTION_COLORS = {
-    'invest_other': 'green',
-    'invest_self': 'dim',
-    'arm_self': 'yellow',
-    'arm_other': 'yellow',
-    'attack': 'red',
-    'do_nothing': 'gray',
+    'transfer': 'green',   'invest_other': 'green',
+    'strengthen': 'yellow', 'arm_other': 'yellow',
+    'take': 'red',         'attack': 'red',
+    'hold': 'gray',        'do_nothing': 'gray',
+    'invest_self': 'dim',  'arm_self': 'yellow',
 }
 
-# Action type → icon
+# Action type → icon (canonical new names + legacy aliases)
 _ACTION_ICONS = {
-    'invest_other': '🤝',
-    'invest_self': '  ',
-    'arm_self': '🛡️',
-    'arm_other': '🛡️',
-    'attack': '⚔️',
-    'do_nothing': '💤',
+    'transfer': '🤝',   'invest_other': '🤝',
+    'strengthen': '🛡️', 'arm_other': '🛡️',
+    'take': '⚔️',       'attack': '⚔️',
+    'hold': '💤',       'do_nothing': '💤',
+    'invest_self': '  ', 'arm_self': '🛡️',
 }
 
 
@@ -175,7 +173,7 @@ _BORING_CONTEXTS = [
 ]
 
 # Actions that are always "interesting" (not just invest_self)
-_INTERESTING_ACTIONS = {'attack', 'arm_self', 'arm_other', 'invest_other'}
+_INTERESTING_ACTIONS = {'take', 'attack', 'strengthen', 'arm_self', 'arm_other', 'transfer', 'invest_other'}
 
 
 def _is_interesting(action, note):
@@ -186,7 +184,7 @@ def _is_interesting(action, note):
     """
     if action in _INTERESTING_ACTIONS:
         return True
-    if action in ('invest_self', 'do_nothing') and note:
+    if action in ('invest_self', 'do_nothing', 'hold') and note:
         note_lower = note.lower()
         # Check for boring contexts first — these negate keywords
         if any(ctx in note_lower for ctx in _BORING_CONTEXTS):

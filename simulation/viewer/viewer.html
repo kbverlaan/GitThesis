@@ -574,7 +574,7 @@ const AGENT_COLORS = [
   '#a8a29e','#cbd5e1','#94a3b8','#d8b4fe','#86efac','#93c5fd'
 ];
 const ACTION_ICONS = {invest_other:'&#10230;',invest_self:'&#9651;',arm_self:'&#9670;',arm_other:'&#9670;',attack:'&#9876;',do_nothing:'&#183;'};
-const ACTION_LABELS = {invest_other:'invest other',invest_self:'invest self',arm_self:'arm self',arm_other:'arm other',attack:'attack',do_nothing:'do nothing'};
+const ACTION_LABELS = {invest_other:'transfer',invest_self:'invest self',arm_self:'arm self',arm_other:'strengthen',attack:'take',do_nothing:'hold'};
 const ACTION_COLORS_MAP = {invest_other:'#34d399',invest_self:'#94a3b8',arm_self:'#fbbf24',arm_other:'#fbbf24',attack:'#f87171',do_nothing:'#64748b'};
 const ACTION_ORDER = ['invest_other','invest_self','arm_self','arm_other','attack','do_nothing'];
 const ACTION_CSS = a => `action-${a}`;
@@ -588,6 +588,17 @@ function msgTargets(m){
   if (Array.isArray(m.to)) return m.to;
   if (typeof m.to === 'string' && m.to !== 'all') return [m.to];
   return [];
+}
+
+// Action vocabulary — map the new canonical names to the viewer's internal
+// (legacy) keys so all existing logic + CSS keep working. Old logs pass through
+// unchanged; display labels (new names) come from ACTION_LABELS.
+const _ACTION_TO_INTERNAL = {transfer:'invest_other', strengthen:'arm_other', take:'attack', hold:'do_nothing'};
+function normRoundActions(rd){
+  if (rd && rd.agents) for (const a of Object.values(rd.agents)) {
+    if (a && _ACTION_TO_INTERNAL[a.action]) a.action = _ACTION_TO_INTERNAL[a.action];
+  }
+  return rd;
 }
 
 let rounds = [];
@@ -701,7 +712,7 @@ function computeModularity(edges, nodes) {
 }
 
 function loadData(text) {
-  rounds = text.trim().split('\n').filter(l=>l).map(l => JSON.parse(l));
+  rounds = text.trim().split('\n').filter(l=>l).map(l => normRoundActions(JSON.parse(l)));
   if (!rounds.length) return;
   // Attach computed metrics (runner no longer writes primary/secondary blocks)
   rounds.forEach((rd, i) => {
@@ -840,7 +851,7 @@ document.getElementById('live-watch').onchange = e => {
         const text = await file.text();
         const lines = text.trim().split('\n').filter(l => l);
         if (lines.length > rounds.length) {
-          const newRounds = lines.slice(rounds.length).map(l => JSON.parse(l));
+          const newRounds = lines.slice(rounds.length).map(l => normRoundActions(JSON.parse(l)));
           newRounds.forEach((rd, j) => {
             if (!rd.primary || !rd.secondary) {
               const idx = rounds.length + j;
@@ -1670,7 +1681,7 @@ function renderCard(aid) {
   document.getElementById('card-name').innerHTML = `<span style="color:${color}">${aid}</span>`;
 
   const tgtHtml = info.target ? ` &rarr; <span style="color:${agentColor(info.target)}">${agentShort(info.target)}</span>` : '';
-  document.getElementById('card-action').innerHTML = `<span class="${ACTION_CSS(info.action)}">${info.action}</span>${tgtHtml}`;
+  document.getElementById('card-action').innerHTML = `<span class="${ACTION_CSS(info.action)}">${ACTION_LABELS[info.action]||info.action}</span>${tgtHtml}`;
 
   const armStr = info.arm_bonus > 0.1 ? ` + ${info.arm_bonus.toFixed(1)} arm = ${(info.resources + info.arm_bonus).toFixed(1)} strength` : '';
   document.getElementById('card-res').textContent = `${info.resources.toFixed(1)} resources${armStr}`;
@@ -1794,7 +1805,7 @@ function renderCard(aid) {
     const a = rd.agents[aid]; if (!a) return;
     const tgt = a.target ? agentShort(a.target) : '';
     const cls = i === currentRound ? 'history-item current' : 'history-item';
-    html += `<div class="${cls}"><span class="round-num">R${rd.round}</span><span class="hist-action ${ACTION_CSS(a.action)}">${a.action}</span><span class="hist-target">${tgt}</span><span class="hist-res">${a.resources.toFixed(0)}</span></div>`;
+    html += `<div class="${cls}"><span class="round-num">R${rd.round}</span><span class="hist-action ${ACTION_CSS(a.action)}">${ACTION_LABELS[a.action]||a.action}</span><span class="hist-target">${tgt}</span><span class="hist-res">${a.resources.toFixed(0)}</span></div>`;
   });
   html += '</div></div></details>';
 

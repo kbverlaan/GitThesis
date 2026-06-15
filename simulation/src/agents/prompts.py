@@ -275,7 +275,7 @@ class BaselinePrompt:
         saturation_decay = self.game_params.get("gamma_sat", 1.0)
         saturation_window = self.game_params.get("tau_sat", 5)
         invest_desc = (
-            f"- invest_other: you pay {invest_other_cost_pct}% of your resources, "
+            f"- transfer: you pay {invest_other_cost_pct}% of your resources, "
             f"TARGET (must be a connected neighbor) receives {invest_other_return_pct}% "
             f"of your resources. Example: you have 25.0 → you pay "
             f"{25.0 * invest_other_cost_pct / 100:.1f} (left: "
@@ -296,7 +296,7 @@ class BaselinePrompt:
             arm_cost_ex = 25.0 * arm_cost_pct / 100
             arm_bonus_ex = arm_cost_ex * arm_multiplier
             actions.append(
-                f"- arm_other: you pay {arm_other_cost_pct}% of your resources, "
+                f"- strengthen: you pay {arm_other_cost_pct}% of your resources, "
                 f"TARGET (must be a connected neighbor) gains combat bonus = cost x "
                 f"{arm_multiplier}. TARGET's resources do NOT increase — only their "
                 f"fighting power. Example: you have 25.0 → you pay {arm_cost_ex:.1f}, "
@@ -305,11 +305,11 @@ class BaselinePrompt:
             )
 
         actions.append(
-            f"- attack: TARGET must be a connected neighbor. Both sides pay "
+            f"- take: TARGET must be a connected neighbor. Both sides pay "
             f"{conflict_cost_pct}% conflict cost. "
             f"Win probability = your combat strength / (your strength + target's strength)."
         )
-        actions.append("- do_nothing: no cost, no effect")
+        actions.append("- hold: no cost, no effect")
 
         actions_text = "\n".join(actions)
 
@@ -339,11 +339,11 @@ AVAILABLE ACTIONS:
                 f"- Attackers win → defender loses the pot; each attacker gains pot × (their strength / total attacker strength).\n"
                 f"- Defender wins → each attacker loses an equal share of the pot (pot / number of attackers). "
                 f"If an attacker cannot cover their share, they go bankrupt (see above).\n"
-                f"- Example (1 vs 1): you attack an agent with 50 resources. "
+                f"- Example (1 vs 1): you take from an agent with 50 resources. "
                 f"Pot = {attack_take_pct}% × 50 = {50 * attack_take_pct / 100:.1f}. "
                 f"If you win → you gain {50 * attack_take_pct / 100:.1f} (defender loses it). "
                 f"If you lose → you lose {50 * attack_take_pct / 100:.1f} (defender gains it).\n"
-                f"- Example (3 vs 1): three agents each with 30 attack a target with 100 resources. "
+                f"- Example (3 vs 1): three agents each with 30 take from a target with 100 resources. "
                 f"Pot = {attack_take_pct}% × 100 = {100 * attack_take_pct / 100:.1f}. "
                 f"If coalition wins → each attacker gains {100 * attack_take_pct / 100 / 3:.1f}. "
                 f"If defender wins → each attacker loses {100 * attack_take_pct / 100 / 3:.1f}."
@@ -386,7 +386,7 @@ AVAILABLE ACTIONS:
 
 COALITIONS (multi-attacker combat):
 - If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender.
-- This is the ONLY way to share spoils from an attack — you must both choose "attack" with the same target, on the same round.
+- This is the ONLY way to share spoils from a take — you must both choose "take" with the same target, on the same round.
 - Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.
 
 RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
@@ -400,7 +400,7 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         if self.network_enabled:
             network_block = [
                 "NETWORK:",
-                f"Agents are connected through a network. You can ONLY invest in{', attack, or arm' if mu_arm > 0 else ' or attack'} agents you are directly connected to. You can message any agent regardless of connection.",
+                f"Agents are connected through a network. You can ONLY transfer to{', take from, or strengthen' if mu_arm > 0 else ' or take from'} agents you are directly connected to. You can message any agent regardless of connection.",
                 "Connections are symmetric: if you are connected to Blue, then Blue is also connected to you. But each agent has its own set of connections — other agents generally see a different set of neighbours than you do.",
                 "Connections can change over time based on how agents interact.",
                 "You cannot verify claims about agents whose resources are hidden from you.",
