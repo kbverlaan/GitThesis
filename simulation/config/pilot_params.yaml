@@ -37,7 +37,7 @@ mean_degree: 5.0
 rewiring_prob: 0.3
 
 # Communication — DM enables private coordination, coalition-building
-comm_scope: "dm"
+comm_scope: "on"                     # on = message a LIST of target ids (no broadcast channel)
 
 # Memory (two layers: raw events on a recency window + agent notes)
 memory:

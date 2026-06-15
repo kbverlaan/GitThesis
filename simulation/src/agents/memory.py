@@ -35,7 +35,7 @@ class RoundEvents:
     observed: List[dict] = field(default_factory=list)      # [{actor, action, target}]
     resources_snapshot: Dict[str, float] = field(default_factory=dict)  # {aid: resources} self + visible
     sent_message: Optional[dict] = None             # {'to': str|'all', 'text': str}
-    received_messages: List[dict] = field(default_factory=list)  # [{'from', 'text', 'channel'}]
+    received_messages: List[dict] = field(default_factory=list)  # [{'from', 'text', 'n_recipients'}]
     rewire: Optional[dict] = None                   # {'drop', 'invite', 'drop_outcome', 'invite_outcome'}
 
     def to_dict(self) -> dict:
@@ -115,8 +115,8 @@ class AgentMemory:
             sent_message: {'to': agent_id|'all', 'text': str} for this agent's
                           outgoing message this round, or None.
             received_messages: List of {'from': agent_id, 'text': str,
-                                        'channel': 'dm'|'broadcast'} received
-                               this round (sent by others in the previous round).
+                                        'n_recipients': int} received this round
+                               (sent by others in the previous round).
             rewire: {'drop': agent_id|None, 'invite': agent_id|None,
                     'drop_outcome': str|None, 'invite_outcome': str|None} — the
                     agent's rewiring nomination + engine outcome for this round.
@@ -257,16 +257,18 @@ class AgentMemory:
                     lines.append(f"  Resources: {', '.join(snap_parts)}")
 
                 if ev.sent_message:
+                    to = ev.sent_message.get("to") or []
+                    to_str = ", ".join(to) if isinstance(to, list) else str(to)
                     lines.append(
-                        f"  You sent (to {ev.sent_message.get('to', '?')}): "
+                        f"  You sent (to {to_str or '?'}): "
                         f"\"{ev.sent_message.get('text', '')}\""
                     )
 
                 if ev.received_messages:
                     for m in ev.received_messages:
                         sender = m.get("from", "?")
-                        channel = m.get("channel", "dm")
-                        label = "to all" if channel == "broadcast" else "to you"
+                        n = int(m.get("n_recipients", 1) or 1)
+                        label = "to you only" if n <= 1 else f"to you + {n - 1} others"
                         lines.append(
                             f"  {sender} → {label}: \"{m.get('text', '')}\""
                         )
@@ -335,8 +337,12 @@ class AgentMemory:
         text = (sent.get("message") or sent.get("text") or "").strip()
         if not text:
             return None
-        to = sent.get("message_to") or sent.get("to") or "?"
-        return {"to": to, "text": text[:200]}
+        to = sent.get("message_to")
+        if to is None:
+            to = sent.get("to")
+        if isinstance(to, str):
+            to = [to]
+        return {"to": list(to) if to else [], "text": text[:200]}
 
     @staticmethod
     def _clean_received(received: List[dict]) -> List[dict]:
@@ -348,7 +354,7 @@ class AgentMemory:
             cleaned.append({
                 "from": m.get("from", "?"),
                 "text": text[:200],
-                "channel": m.get("channel", "dm"),
+                "n_recipients": int(m.get("n_recipients", 1) or 1),
             })
         return cleaned
 

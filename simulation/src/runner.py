@@ -365,35 +365,33 @@ def run_simulation(game_params: dict,
         d.print_agent_round_summary(display_action_map, round_notes, agent_ids)
         d.print_combat_results(round_result.get('combat_results', []))
 
-        # Collect + route messages. Both DM and broadcast are restricted
-        # to the sender's 1-hop network neighbourhood — you cannot reach
-        # agents you cannot see.
+        # Collect + route messages. Language is decoupled from the 1-hop
+        # action graph: a message carries an explicit LIST of target ids and
+        # is delivered to each named target that is currently alive — no
+        # neighbour restriction, no broadcast channel. Agents only know ids
+        # they have encountered (neighbours, prior senders, observed actors),
+        # so there is no global directory.
         if comm_scope != 'none':
             next_messages = {aid: [] for aid in agent_ids}
             round_messages = []
+            resources_now = engine.get_state().resources
+            living = {a for a in agent_ids if resources_now[a] > 0.01}
             for aid in agent_ids:
-                current_resources = engine.get_state().resources[aid]
-                if current_resources <= 0.01:
+                if aid not in living:
                     agents[aid]._last_message = None
                     continue
                 msg = agents[aid].get_last_message()
                 if not (msg and msg.get('message')):
                     continue
-                if network is not None:
-                    reachable = set(network.get_neighbors(aid))
-                else:
-                    reachable = {x for x in agent_ids if x != aid}
-                msg_to = msg.get('message_to')
-                if msg_to == 'all' or comm_scope == 'broadcast':
-                    for target in reachable:
-                        next_messages[target].append({
-                            'from': aid, 'message': msg['message'], 'channel': 'broadcast',
-                        })
-                elif msg_to and msg_to in reachable:
-                    next_messages[msg_to].append({
-                        'from': aid, 'message': msg['message'], 'channel': 'dm',
+                targets = msg.get('message_to') or []
+                recipients = [t for t in targets if t in living and t != aid]
+                n = len(recipients)
+                for target in recipients:
+                    next_messages[target].append({
+                        'from': aid, 'message': msg['message'], 'n_recipients': n,
                     })
-                round_messages.append(msg)
+                if recipients:
+                    round_messages.append(msg)
             pending_messages = next_messages
             if round_messages:
                 round_result['messages'] = round_messages

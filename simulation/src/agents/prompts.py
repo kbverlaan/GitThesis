@@ -213,11 +213,9 @@ class BaselinePrompt:
             for msg in received_messages:
                 sender = msg.get("from", "?")
                 text = msg.get("message", "")
-                channel = msg.get("channel", "dm")
-                if channel == "broadcast":
-                    lines.append(f"  {sender} (to all): {text}")
-                else:
-                    lines.append(f"  {sender} (private): {text}")
+                n = int(msg.get("n_recipients", 1) or 1)
+                scope = "to you only" if n <= 1 else f"to you + {n - 1} others"
+                lines.append(f"  {sender} ({scope}): {text}")
 
         return "\n".join(lines)
 
@@ -425,33 +423,20 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
                 )
             parts.append("\n".join(network_block))
 
-        # Communication rules (if enabled)
+        # Communication rules (if enabled). Language is decoupled from the
+        # 1-hop action graph: address anyone you know of, by listing their ids.
         if self.comm_scope != "none":
             comm_lines = [
                 "COMMUNICATION:",
-                "You may send ONE message this round. Messages reach only your current network neighbours (the agents listed under CONNECTED AGENTS) — you cannot message agents you cannot see. Messages have no resource cost.",
+                "You may send ONE message this round, addressed to one or more agents. List the recipients' agent_ids in message_to. Messages have no resource cost.",
+                "You can message any agent you KNOW OF — not only your network neighbours. You come to know an agent by being connected to them, by receiving a message from them, or by seeing them act. There is NO global directory: you can only reach agents whose id you have learned. To reach several agents at once, list several ids.",
                 "",
                 "MESSAGE TIMING (important — easy to miscompute):",
                 "- Messages CROSS: if you and another agent both write to each other this round, neither of you has read the other's yet — you are both responding to their PREVIOUS round state, not their current plan.",
                 "- Messages you RECEIVE this round were sent LAST round (before the sender saw your latest action).",
                 "- Messages you SEND this round will be delivered NEXT round — they can influence the recipient's action then, not this round.",
-                "- Recipients see whether a message was sent privately (to them only) or broadcast (to all of the sender's neighbours).",
+                "- Each recipient sees how many others also received the message (whether it was for them only, or sent more widely) — but not the full recipient list.",
             ]
-            if self.comm_scope == "dm":
-                comm_lines.append(
-                    "You can send a private message to ONE of your neighbours. Only they will see it."
-                )
-            elif self.comm_scope == "broadcast":
-                comm_lines.append(
-                    "Your message is sent to all of your current neighbours. Each of them sees it, labelled as broadcast."
-                )
-            elif self.comm_scope == "choice":
-                comm_lines.append(
-                    "You choose: send a private message to ONE neighbour, or broadcast to ALL of your current neighbours."
-                )
-                comm_lines.append(
-                    "Set message_to to a specific neighbour agent_id for private, or \"all\" to broadcast to all your neighbours."
-                )
             parts.append("\n".join(comm_lines))
 
         return "\n\n".join(parts)
@@ -465,14 +450,9 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
 
         # Assemble fields in the preferred order
         fields: list[str] = []
-        if self.comm_scope == "dm":
+        if self.comm_scope != "none":
             fields.append('  "message": "<your message (delivered NEXT round, not this one), or null to stay silent>"')
-            fields.append('  "message_to": "<neighbour agent_id, or null>"')
-        elif self.comm_scope == "broadcast":
-            fields.append('  "message": "<your message to all your neighbours (delivered NEXT round), or empty string to stay silent>"')
-        elif self.comm_scope == "choice":
-            fields.append('  "message": "<your message (delivered NEXT round), or empty string to stay silent>"')
-            fields.append('  "message_to": "<neighbour agent_id for private, or \\"all\\" to broadcast to all your neighbours>"')
+            fields.append('  "message_to": "<list of recipient agent_ids you know of, e.g. [\\"Red\\", \\"Blue\\"]; or null to stay silent>"')
         fields.append('  "action": "<one of the action names above>"')
         fields.append('  "target": "<agent_id or null>"')
         if has_rewire:
@@ -486,23 +466,13 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         notes: list[str] = [
             'target must be null (not the string "null") when no target is needed.',
         ]
-        if self.comm_scope == "dm":
+        if self.comm_scope != "none":
             notes.append(
-                "Messaging is optional. To send no message, set both message and "
-                "message_to to null. To send a message, message_to must be the "
-                "agent_id of one of your current neighbours."
-            )
-        elif self.comm_scope == "broadcast":
-            notes.append(
-                "Your message will be seen next round by all of your current "
-                "neighbours, labelled as broadcast. Set message to \"\" to send "
-                "no message."
-            )
-        elif self.comm_scope == "choice":
-            notes.append(
-                "message_to: use a neighbour's agent_id for a private message, "
-                "or \"all\" to broadcast to every one of your current "
-                "neighbours. Set message to \"\" to send no message."
+                "message_to: a list of the agent_ids you are sending to (one or "
+                "more). You can only name agents you know of — your neighbours, "
+                "anyone who has messaged you, or anyone you have seen act. There "
+                "is no \"all\" shortcut: to reach many agents, list their ids. "
+                "Messaging is optional — set message to null to stay silent."
             )
         notes.append(
             "memory (REQUIRED): a note for your future self. Your detailed view "
@@ -535,7 +505,10 @@ def get_prompt_style(prompt_config: Dict,
                    legacy alias 'reasoning_level').
         hide_resources: bool
     game_params keys (consumed here):
-        comm_scope: 'none' | 'dm' | 'broadcast' | 'choice'
+        comm_scope: 'none' (off) | any other value (on). Communication uses a
+            single mechanism: a message with an explicit list of target ids
+            (no broadcast channel). Legacy values dm/broadcast/choice all map
+            to "on".
     """
     tom_level = prompt_config.get(
         "tom_level", prompt_config.get("reasoning_level", "level0")

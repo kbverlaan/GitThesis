@@ -36,7 +36,10 @@ mean_degree: 5.0
 rewiring_prob: 0.0                   # w — IV (§3.3.2)
 
 # Communication
-comm_scope: "none"                   # IV (§3.3.3): none | dm | broadcast | choice
+comm_scope: "none"                   # "none" = off; any other value = on.
+                                     # When on: one message/round to a LIST of target ids
+                                     # (message_to), free addressing to agents you know of,
+                                     # no broadcast channel. Legacy dm/broadcast/choice → on.
 
 # Memory (two layers: raw events on a recency window + agent notes)
 memory:

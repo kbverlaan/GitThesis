@@ -284,12 +284,13 @@ def print_messages(messages):
         return
     for msg in messages:
         sender = msg.get('from', '?')
-        target = msg.get('to') or msg.get('message_to') or '?'
+        targets = msg.get('message_to') or msg.get('to') or []
+        if isinstance(targets, str):
+            targets = [targets]
         text = msg.get('message', '')
-        channel = msg.get('channel', 'dm')
 
-        icon = '📢' if target == 'all' or channel == 'broadcast' else '📨'
-        target_str = C('all', 'white') if target == 'all' else _ca(target)
+        icon = '📢' if len(targets) > 1 else '📨'
+        target_str = ", ".join(_ca(t) for t in targets) if targets else C('?', 'white')
 
         # Truncate long messages
         if len(text) > 80:

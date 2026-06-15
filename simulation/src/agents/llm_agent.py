@@ -261,21 +261,38 @@ class LLMAgent:
         )
     
     def _store_message(self, action_dict: Dict):
-        """Store communication message from LLM response."""
+        """Store communication message from LLM response.
+
+        message_to is normalized to a LIST of target agent_ids. There is no
+        broadcast channel and no "all" keyword: to reach many agents the model
+        lists many ids. Self, blanks, and the legacy "all"/"null" tokens are
+        dropped; addressing is otherwise free (delivery is gated to living
+        agents downstream in the runner).
+        """
         msg_text = action_dict.get('message', '')
-        msg_to = action_dict.get('message_to')
-        if msg_text and msg_text.strip():
-            comm_scope = self.game_params.get('comm_scope', 'none')
-            # Enforce scope rules
-            if comm_scope == 'broadcast':
-                msg_to = 'all'
-            elif comm_scope == 'dm' and msg_to == 'all':
-                msg_to = None  # Invalid: DM scope can't broadcast
-            self._last_message = {
-                'from': self.agent_id,
-                'message': msg_text.strip(),
-                'message_to': msg_to,
-            }
+        if not (msg_text and msg_text.strip()):
+            return
+        raw_to = action_dict.get('message_to')
+        if isinstance(raw_to, str):
+            raw_to = [raw_to]
+        targets: list = []
+        if isinstance(raw_to, (list, tuple)):
+            for t in raw_to:
+                if not isinstance(t, str):
+                    continue
+                t = t.strip()
+                if not t or t.lower() in ('all', 'null', 'none'):
+                    continue
+                if t == self.agent_id or t in targets:
+                    continue
+                targets.append(t)
+        if not targets:
+            return
+        self._last_message = {
+            'from': self.agent_id,
+            'message': msg_text.strip(),
+            'message_to': targets,
+        }
 
     def _store_memory(self, action_dict: Dict):
         """Store free-form memory entry from LLM response."""

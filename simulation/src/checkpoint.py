@@ -166,16 +166,26 @@ def reconstruct_from_jsonl(jsonl_path: str, game_params: dict) -> dict:
         next_messages = {aid: [] for aid in agent_ids}
         for msg in msgs:
             sender = msg.get('from') or msg.get('agent_id')
-            msg_to = msg.get('to') or msg.get('message_to')
             text = msg.get('text') or msg.get('message', '')
             if not text:
                 continue
-            if msg_to and msg_to != 'all' and msg_to in agent_ids:
-                next_messages[msg_to].append({'from': sender, 'message': text, 'channel': 'dm'})
-            elif msg_to == 'all':
-                for target in agent_ids:
-                    if target != sender:
-                        next_messages[target].append({'from': sender, 'message': text, 'channel': 'broadcast'})
+            msg_to = msg.get('to')
+            if msg_to is None:
+                msg_to = msg.get('message_to')
+            # Normalize to a recipient list (handle legacy 'all' / single id).
+            if msg_to == 'all':
+                recipients = [t for t in agent_ids if t != sender]
+            elif isinstance(msg_to, str):
+                recipients = [msg_to] if msg_to in agent_ids and msg_to != sender else []
+            elif isinstance(msg_to, (list, tuple)):
+                recipients = [t for t in msg_to if t in agent_ids and t != sender]
+            else:
+                recipients = []
+            n = len(recipients)
+            for target in recipients:
+                next_messages[target].append(
+                    {'from': sender, 'message': text, 'n_recipients': n}
+                )
         pending_messages = next_messages
 
         engine_history.append({'actions': round_actions, 'round': rnd})
