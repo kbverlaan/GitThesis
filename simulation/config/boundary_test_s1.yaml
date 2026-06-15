@@ -1,0 +1,50 @@
+# Boundary test — symmetric (flat) pot, arming on, payoffs on the
+# cooperation/predation edge. alpha=0.36 puts a 2v1 coalition's per-member EV
+# exactly at the mutual-cooperation EV (+0.05 R/round); at equal strength
+# attacking is still -c_atk (symmetry never pays) — asymmetry (coalition /
+# being armed) is the only lever, which is what we want to observe emerging.
+# Small + sparse so decoupled comms (messaging non-neighbours) and the
+# two-layer memory (window_size 5 << max_rounds) are both exercised.
+
+num_agents: 6
+initial_resources: 100.0
+random_seed: 1
+
+# Investment  (cooperation surplus G = g_inv - c_inv = 0.05)
+c_inv: 0.10
+g_inv: 0.15
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming (arm_other only — arm_self removed; armer pays, target gains bonus)
+c_arm: 0.10
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat — symmetric flat pot, calibrated to the boundary
+alpha: 0.36                # 2v1-coalition per-member EV == cooperation EV
+c_atk: 0.01
+eta_atk: 1.2
+tau_atk: 5
+symmetric_stakes: true     # pot = alpha * defender_R, to the winner regardless
+
+# Economy
+delta_R: 0.95
+
+# Game length
+max_rounds: 10
+history_length: 10
+
+# Network — sparse so there ARE non-neighbours to learn about and message
+network_enabled: true
+mean_degree: 3.0
+rewiring_prob: 0.3
+
+# Communication — target-list, decoupled from the 1-hop action graph
+comm_scope: "on"
+
+# Memory — small window so the two layers visibly split within a short run
+memory:
+  enabled: true
+  window_size: 5
+  notes_persist: true

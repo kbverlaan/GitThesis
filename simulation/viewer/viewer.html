@@ -579,6 +579,17 @@ const ACTION_COLORS_MAP = {invest_other:'#34d399',invest_self:'#94a3b8',arm_self
 const ACTION_ORDER = ['invest_other','invest_self','arm_self','arm_other','attack','do_nothing'];
 const ACTION_CSS = a => `action-${a}`;
 
+// Message recipients — backward compatible.
+// New logs: m.to is an array (message_to list). Old logs: a single id string,
+// or 'all'/null for a broadcast. Returns the explicit target ids ([] for a
+// legacy broadcast, which has no enumerable list).
+function msgTargets(m){
+  if (!m) return [];
+  if (Array.isArray(m.to)) return m.to;
+  if (typeof m.to === 'string' && m.to !== 'all') return [m.to];
+  return [];
+}
+
 let rounds = [];
 let currentRound = 0;
 let autoTimer = null;
@@ -749,11 +760,16 @@ function inferConfig() {
   const hasMessages = rounds.some(rd => rd.messages && rd.messages.length > 0);
   if (!hasMessages) document.getElementById('cfg-comm').textContent = 'none';
   else {
-    const hasBroadcast = rounds.some(rd => rd.messages?.some(m => !m.to));
-    const hasDM = rounds.some(rd => rd.messages?.some(m => m.to));
-    if (hasBroadcast && hasDM) document.getElementById('cfg-comm').textContent = 'choice';
-    else if (hasBroadcast) document.getElementById('cfg-comm').textContent = 'broadcast';
-    else document.getElementById('cfg-comm').textContent = 'dm';
+    // New logs: explicit target lists → unified comms ('on'). Old logs: infer
+    // dm/broadcast/choice from single-id vs 'all' message_to.
+    const anyList = rounds.some(rd => rd.messages?.some(m => Array.isArray(m.to)));
+    if (anyList) document.getElementById('cfg-comm').textContent = 'on';
+    else {
+      const hasBroadcast = rounds.some(rd => rd.messages?.some(m => !m.to || m.to === 'all'));
+      const hasDM = rounds.some(rd => rd.messages?.some(m => m.to && m.to !== 'all'));
+      document.getElementById('cfg-comm').textContent =
+        (hasBroadcast && hasDM) ? 'choice' : hasBroadcast ? 'broadcast' : 'dm';
+    }
   }
 
   // Rewiring from edge changes (check all consecutive round pairs)
@@ -1053,13 +1069,14 @@ function detectActionCommunities(agents, roundIdx, windowSize) {
       }
     });
 
-    // Messages as cooperation signal — skip broadcasts ('all' is not a node).
+    // Messages as cooperation signal — one edge per explicit recipient.
     if (rd.messages) {
       rd.messages.forEach(m => {
-        if (m.from && m.to && m.to !== 'all') {
-          const key = [m.from, m.to].sort().join('-');
+        if (!m.from) return;
+        msgTargets(m).forEach(t => {
+          const key = [m.from, t].sort().join('-');
           msgWeight[key] = (msgWeight[key] || 0) + recency * 0.3;
-        }
+        });
       });
     }
   }
@@ -1586,11 +1603,10 @@ function updateGraph(r) {
           coopPairs.add([aid, info.target].sort().join('-'));
         }
       });
-      // Messages also pull together — skip broadcasts ('all' is not a node).
+      // Messages also pull together — one edge per explicit recipient.
       if (rd.messages) rd.messages.forEach(m => {
-        if (m.from && m.to && m.to !== 'all' && nodeMap[m.to]) {
-          coopPairs.add([m.from, m.to].sort().join('-'));
-        }
+        if (!m.from) return;
+        msgTargets(m).forEach(t => { if (nodeMap[t]) coopPairs.add([m.from, t].sort().join('-')); });
       });
     }
     simEdges = [...coopPairs].map(key => {
@@ -1742,16 +1758,17 @@ function renderCard(aid) {
     else if (pair[1] === aid) inboxNeighbourSet.add(pair[0]);
   });
   const inbox = (r.messages || []).filter(m => {
-    if (!m) return false;
-    const isBroadcast = m.to === 'all' || m.to == null;
-    if (isBroadcast) return m.from !== aid && inboxNeighbourSet.has(m.from);
-    return m.to === aid;
+    if (!m || m.from === aid) return false;
+    const tgts = msgTargets(m);
+    if (tgts.length) return tgts.includes(aid);          // new/DM: addressed to you
+    return inboxNeighbourSet.has(m.from);                // legacy broadcast: 1-hop neighbours
   });
   if (inbox.length > 0) {
     html += `<details class="card-section"><summary>Inbox (${inbox.length})</summary><div class="content">`;
     inbox.forEach(m => {
-      const isBroadcast = m.to === 'all' || m.to == null;
-      const tag = isBroadcast ? ' <span style="color:var(--dim)">(all)</span>' : '';
+      const n = msgTargets(m).length;
+      const tag = n > 1 ? ` <span style="color:var(--dim)">(+${n - 1} more)</span>`
+                : n === 0 ? ' <span style="color:var(--dim)">(all)</span>' : '';
       html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span>${tag} <span class="msg-text">${escHtml(m.text)}</span></div>`;
     });
     html += '</div></details>';
@@ -1762,7 +1779,10 @@ function renderCard(aid) {
   if (outbox.length > 0) {
     html += `<details class="card-section"><summary>Outbox (${outbox.length})</summary><div class="content">`;
     outbox.forEach(m => {
-      const to = m.to ? `<span style="color:${agentColor(m.to)}">${agentShort(m.to)}</span>` : '<span style="color:var(--dim)">all</span>';
+      const tgts = msgTargets(m);
+      const to = tgts.length
+        ? tgts.map(t => `<span style="color:${agentColor(t)}">${agentShort(t)}</span>`).join(', ')
+        : '<span style="color:var(--dim)">all</span>';
       html += `<div class="msg-item">&rarr; ${to} <span class="msg-text">${escHtml(m.text)}</span></div>`;
     });
     html += '</div></details>';
