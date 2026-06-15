@@ -235,7 +235,7 @@ class BaselinePrompt:
             f"  1. Game rules — {rules_summary}.\n"
             f"  2. Identity — who you are and your objective.\n"
             f"  3. Approach — how to reason about other agents.\n"
-            f"  4. Recent rounds — what you observed and noted lately.\n"
+            f"  4. Your memory — your own notes (kept across the whole game) plus detailed events from recent rounds.\n"
             f"  5. Current state — who is connected to you, current resources, "
             f"combat strengths.\n"
             f"  6. Output — the JSON format your response must follow.\n"
@@ -499,11 +499,14 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
                 "neighbours. Set message to \"\" to send no message."
             )
         notes.append(
-            "memory (REQUIRED): a brief note for your future self. Mention what "
-            "stood out this round, anything worth remembering, your current "
-            "plan, and who you trust or distrust right now. Write freely, in "
-            "your own voice. This note will appear alongside future rounds in "
-            "your view, so make it legible to yourself later."
+            "memory (REQUIRED): a note for your future self. Your detailed view "
+            "of actions and messages only reaches back a few rounds, but THIS "
+            "note is kept for the rest of the game — so it is your lasting "
+            "record. Capture what mattered this round AND refresh your running "
+            "understanding: any standing agreements or arrangements, recurring "
+            "patterns you have noticed, your current plan, and who you trust or "
+            "distrust right now. Write freely, in your own voice, and make it "
+            "legible to yourself many rounds from now."
         )
         notes.append("Do not include any text outside the JSON.")
 

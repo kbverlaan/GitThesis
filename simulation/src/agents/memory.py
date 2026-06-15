@@ -3,16 +3,18 @@ Per-agent memory: a chronological event log (objective events per round
 — actions, messages, network changes) plus a free-form memory stream
 (the agent's own note about each round).
 
-Each round the agent sees one block per past round combining everything
-that happened from its point of view (own action, incoming/observed
-actions, incoming/outgoing messages, rewiring outcomes) together with
-the note it wrote at the end of that round. Sliding window (default 10).
-Full logs persist to the canonical `_log.jsonl` regardless of what fell
-out of the window.
+The agent's own end-of-round notes persist for the WHOLE game (never
+windowed) so durable regularities — agreements, recurring patterns,
+grudges — survive arbitrarily long. Detailed objective events (own
+action, incoming/observed actions, incoming/outgoing messages, rewiring
+outcomes, resources) are shown only for the last `window_size` rounds
+(default 10). Full logs persist to the canonical `_log.jsonl` regardless
+of what fell out of the event window.
 
 Design references:
 - Memory stream inspired by Generative Agents (Park et al., 2023),
-  simplified: sliding window only — no retrieval scoring.
+  simplified: persistent agent-authored notes + a recency window for raw
+  events; no embedding retrieval scoring.
 - Local information follows Harsanyi (1967-68) incomplete-information
   framing: actions targeting the agent are always known; third-party
   actions only if actor or target is within the agent's visibility.
@@ -183,70 +185,93 @@ class AgentMemory:
     # ── reads (prompt-facing formatter) ────────────────────────────────
 
     def format_recent_rounds(self) -> str:
-        """Format the last N rounds as per-round blocks, combining
-        objective events (actions, messages, network) with the agent's
-        own note from that round.
+        """Format memory for the prompt, in two layers.
+
+        - The agent's OWN notes persist for the whole game (never
+          windowed): notes for rounds older than the event window are
+          shown compactly up front, so durable regularities (agreements,
+          recurring patterns, grudges) survive arbitrarily long.
+        - Detailed objective events (actions, messages, network,
+          resources) are shown only for the last `window_size` rounds.
         """
-        if not self.event_log:
+        if not self.event_log and not self.memory_stream:
             return ""
 
         recent_events = self.event_log[-self.window_size:]
-        notes_by_round = {
-            m.round: m.text for m in self.memory_stream[-self.window_size:]
-        }
+        recent_rounds = {ev.round for ev in recent_events}
+        notes_by_round = {m.round: m.text for m in self.memory_stream}
 
-        lines = [f"RECENT ROUNDS (last {len(recent_events)}):"]
-        for ev in recent_events:
-            lines.append("")
-            lines.append(f"Round {ev.round}:")
+        out: List[str] = []
 
-            if ev.own_action:
-                lines.append(f"  You: {self._format_own_action(ev.own_action)}")
+        # ── Layer 1: persistent note history (rounds before the window) ──
+        earlier_notes = [
+            m for m in self.memory_stream if m.round not in recent_rounds
+        ]
+        if earlier_notes:
+            nlines = [
+                f"YOUR NOTES SO FAR (rounds {earlier_notes[0].round}-"
+                f"{earlier_notes[-1].round}, kept for the whole game):"
+            ]
+            for m in earlier_notes:
+                nlines.append(f"  Round {m.round}: \"{m.text}\"")
+            out.append("\n".join(nlines))
 
-            if ev.incoming:
-                recv = ", ".join(
-                    f"{e['actor']} {e['action'].replace('_', ' ')} you"
-                    for e in ev.incoming
-                )
-                lines.append(f"  Received: {recv}")
-            else:
-                lines.append("  Received: none")
+        # ── Layer 2: recent rounds in full detail (events + that note) ───
+        if recent_events:
+            lines = [f"RECENT ROUNDS (last {len(recent_events)}, full detail):"]
+            for ev in recent_events:
+                lines.append("")
+                lines.append(f"Round {ev.round}:")
 
-            if ev.observed:
-                obs = ", ".join(self._format_observed(e) for e in ev.observed)
-                lines.append(f"  Observed: {obs}")
+                if ev.own_action:
+                    lines.append(f"  You: {self._format_own_action(ev.own_action)}")
 
-            if ev.resources_snapshot:
-                snap_parts = []
-                items = sorted(ev.resources_snapshot.items(),
-                               key=lambda kv: (kv[0] != self.agent_id, kv[0]))
-                for aid, val in items:
-                    snap_parts.append(f"{aid} {val:.1f}")
-                lines.append(f"  Resources: {', '.join(snap_parts)}")
+                if ev.incoming:
+                    recv = ", ".join(
+                        f"{e['actor']} {e['action'].replace('_', ' ')} you"
+                        for e in ev.incoming
+                    )
+                    lines.append(f"  Received: {recv}")
+                else:
+                    lines.append("  Received: none")
 
-            if ev.sent_message:
-                lines.append(
-                    f"  You sent (to {ev.sent_message.get('to', '?')}): "
-                    f"\"{ev.sent_message.get('text', '')}\""
-                )
+                if ev.observed:
+                    obs = ", ".join(self._format_observed(e) for e in ev.observed)
+                    lines.append(f"  Observed: {obs}")
 
-            if ev.received_messages:
-                for m in ev.received_messages:
-                    sender = m.get("from", "?")
-                    channel = m.get("channel", "dm")
-                    label = "to all" if channel == "broadcast" else "to you"
+                if ev.resources_snapshot:
+                    snap_parts = []
+                    items = sorted(ev.resources_snapshot.items(),
+                                   key=lambda kv: (kv[0] != self.agent_id, kv[0]))
+                    for aid, val in items:
+                        snap_parts.append(f"{aid} {val:.1f}")
+                    lines.append(f"  Resources: {', '.join(snap_parts)}")
+
+                if ev.sent_message:
                     lines.append(
-                        f"  {sender} → {label}: \"{m.get('text', '')}\""
+                        f"  You sent (to {ev.sent_message.get('to', '?')}): "
+                        f"\"{ev.sent_message.get('text', '')}\""
                     )
 
-            if ev.rewire:
-                lines.append(f"  Network: {self._format_rewire(ev.rewire)}")
+                if ev.received_messages:
+                    for m in ev.received_messages:
+                        sender = m.get("from", "?")
+                        channel = m.get("channel", "dm")
+                        label = "to all" if channel == "broadcast" else "to you"
+                        lines.append(
+                            f"  {sender} → {label}: \"{m.get('text', '')}\""
+                        )
 
-            note = notes_by_round.get(ev.round)
-            if note:
-                lines.append(f"  Your note: \"{note}\"")
+                if ev.rewire:
+                    lines.append(f"  Network: {self._format_rewire(ev.rewire)}")
 
-        return "\n".join(lines)
+                note = notes_by_round.get(ev.round)
+                if note:
+                    lines.append(f"  Your note: \"{note}\"")
+
+            out.append("\n".join(lines))
+
+        return "\n\n".join(out)
 
     # ── helpers ────────────────────────────────────────────────────────
 
