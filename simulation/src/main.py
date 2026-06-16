@@ -44,6 +44,8 @@ def main():
                         help='Resume from a checkpoint JSON or a _log.jsonl file')
     parser.add_argument('--label', type=str, default=None,
                         help='Cell/condition label — creates data/runs/{label}/ subdirectory')
+    parser.add_argument('--run-id', type=str, default=None,
+                        help='Explicit run id (filename stem); overrides the timestamp default. Used for SLURM batch run labelling.')
     args = parser.parse_args()
 
     if args.sweep:
@@ -66,8 +68,8 @@ def main():
 
     # When resuming, keep the original run_id so logs stay in one file.
     # Pattern: data/runs/<run_id>_log.jsonl  or  <run_id>_reasoning_live.jsonl
-    run_id = None
-    if args.resume:
+    run_id = args.run_id
+    if run_id is None and args.resume:
         stem = Path(args.resume).stem  # e.g. "20260421_221222_log" or "..._reasoning_live"
         for suffix in ('_reasoning_live', '_log', '_checkpoint'):
             if stem.endswith(suffix):
