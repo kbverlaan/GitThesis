@@ -10,6 +10,3 @@ max_tokens: 8000
 timeout: 600
 retry_attempts: 3
 retry_delay: 5
-
-prompt_config:
-  tom_level: "level3"

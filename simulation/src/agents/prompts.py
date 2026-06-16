@@ -33,84 +33,32 @@ def _shuffled_items(d: dict) -> list:
 # experimental IV; see module docstring). An agent only ever sees its own level
 # — each block must read cleanly without knowledge of the others. Length grows
 # with depth: higher-order ToM requires more explanation.
-TOM_LEVELS = {
-    "level0": (
-        "Reason only about the game itself: your resources, the available "
-        "actions, how payoffs work, and how outcomes combine. Do not form "
-        "any model of what other agents think, believe, want, or intend. "
-        "Treat their past actions as observable game-state — data points "
-        "about the environment — not as choices expressing an inner mental "
-        "life. Decide what is best for you based on the game state alone."
-    ),
-    "level1": (
-        "Other agents are minds. Each one has beliefs (what they think is "
-        "true about the game and about others), desires (what outcomes they "
-        "want), and intentions (what they plan to do). When deciding, form "
-        "a model of each relevant agent's mental state based on what you "
-        "have observed them do, the resources they hold, and the position "
-        "they are in. Use those mental models to anticipate their likely "
-        "next action, then choose your best response. Assume the others "
-        "are simpler than you — they do not model what YOU believe or want; "
-        "they simply react to the game as they see it."
-    ),
-    "level2": (
-        "Other agents are minds that model minds. Each one has beliefs, "
-        "desires, and intentions of their own — and each one is also "
-        "modelling the mental states of the OTHER agents they interact "
-        "with, you among them. When they decide, they act on their picture "
-        "of what everyone around them, including you, believes and will "
-        "do. When deciding, work in two layers.\n"
-        "  First, model the mental state of each relevant agent: what they "
-        "want, what they fear, what they plan.\n"
-        "  Second, model the mental models THEY hold of the agents around "
-        "them — the model they hold of you, but also of the others they "
-        "can see. What do they think each of those agents, you among them, "
-        "believes and intends?\n"
-        "Choose your action knowing others will respond to their "
-        "expectations of the whole social field — and that your choice "
-        "helps shape the place YOU occupy in their picture of that field."
-    ),
-    "level3": (
-        "Other agents are minds that model minds that model minds. Everyone "
-        "around you tracks several mental layers at once: their own beliefs "
-        "and plans, a model of the beliefs and plans of every agent they "
-        "interact with (you included, among many), and a model of the "
-        "models those agents in turn hold of everyone else. At this depth "
-        "the group is a web of mutually held mental models.\n"
-        "\n"
-        "When deciding, work in three layers.\n"
-        "  First, model each relevant agent's mental state: beliefs, "
-        "desires, intentions.\n"
-        "  Second, model how they are modelling the OTHER agents they can "
-        "see — their model of you, but also their models of third parties.\n"
-        "  Third, model how they think others are modelling THEM in turn — "
-        "what they believe the web of impressions around them looks like, "
-        "and where YOUR picture of them sits in that web.\n"
-        "\n"
-        "At this depth, your actions and any messages you send are not just "
-        "moves in the game. They are signals that reshape the mental models "
-        "agents hold of each other across the group. This enables strategic "
-        "deception, credible commitment, coordination through mutual "
-        "inference, and long-run trust or distrust. Choose your action with "
-        "all three layers in mind."
-    ),
-}
+SOCIAL_SETTING = (
+    "The other agents are minds, and they reason about minds. Each holds its own "
+    "beliefs, wants, and plans; each also builds a picture of what the agents it "
+    "interacts with — you among them — believe, want, and will do; and each "
+    "tracks how those agents in turn picture everyone else. The group is a web of "
+    "mutually held models of one another.\n"
+    "When you decide, you can reason the same way: what each relevant agent believes, "
+    "wants, and intends; how they model the other agents they can see — their "
+    "picture of you, and of third parties; and how they expect others to be modelling "
+    "them in turn. Your own actions and any messages you send are observable to the "
+    "agents who can see you, and become part of what they model about you."
+)
 
 
 class BaselinePrompt:
     """Single baseline prompt. Mechanics complexity is the experimental axis;
-    the ToM/reasoning block is a fixed part of the substrate (default level0),
-    not the IV."""
+    the recursive theory-of-mind framing (SOCIAL_SETTING) is a fixed, neutral
+    part of the substrate — no outcome priming — not an IV."""
 
     OBJECTIVE = "Maximize your absolute resource count."
 
     def __init__(self, game_params: Optional[Dict] = None,
-                 tom_level: str = "level0",
                  hide_resources: bool = False,
                  comm_scope: str = "none",
                  network_enabled: bool = True):
         self.game_params = game_params or {}
-        self.tom_level = tom_level
         self.hide_resources = hide_resources
         self.comm_scope = comm_scope
         self.network_enabled = network_enabled
@@ -136,12 +84,7 @@ class BaselinePrompt:
         # 1. Identity + objective + repeated-game context
         parts.append(self._format_identity(observation))
 
-        # 2. Approach (ToM — the IV)
-        tom_block = TOM_LEVELS.get(self.tom_level)
-        if tom_block:
-            parts.append(f"APPROACH:\n{tom_block}")
-
-        # 3. Memory (recent rounds)
+        # 2. Memory (recent rounds)
         memory = observation.get("agent_memory")
         if memory is not None:
             recent = memory.format_recent_rounds()
@@ -434,6 +377,7 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
             ]
             parts.append("\n".join(comm_lines))
 
+        parts.append("OTHER AGENTS:\n" + SOCIAL_SETTING)
         return "\n\n".join(parts)
 
     def _format_json_template(self) -> str:
@@ -496,8 +440,6 @@ def get_prompt_style(prompt_config: Dict,
     """Create a BaselinePrompt from config dicts.
 
     prompt_config keys:
-        tom_level: 'level0' | 'level1' | 'level2' | 'level3'  (accepts
-                   legacy alias 'reasoning_level').
         hide_resources: bool
     game_params keys (consumed here):
         comm_scope: 'none' (off) | any other value (on). Communication uses a
@@ -505,16 +447,12 @@ def get_prompt_style(prompt_config: Dict,
             (no broadcast channel). Legacy values dm/broadcast/choice all map
             to "on".
     """
-    tom_level = prompt_config.get(
-        "tom_level", prompt_config.get("reasoning_level", "level0")
-    )
     hide_resources = prompt_config.get("hide_resources", False)
     gp = game_params or {}
     comm_scope = gp.get("comm_scope", "none")
     network_enabled = gp.get("network_enabled", gp.get("spatial_enabled", False))
     return BaselinePrompt(
         game_params=game_params,
-        tom_level=tom_level,
         hide_resources=hide_resources,
         comm_scope=comm_scope,
         network_enabled=network_enabled,
