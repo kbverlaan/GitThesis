@@ -6,7 +6,7 @@ Runs ALL the existing analyses on a single run file OR a whole directory and
 prints one consolidated report. It does NOT reimplement any metric — every
 number comes from the existing modules (YAGNI: reuse, not rebuild):
 
-  - classify_run   : regime classification + named institutions + role-claims
+  - classify_run   : named institutions + role-claims (regime taxonomy dropped — legacy)
   - batch_suite    : the DV fingerprint (gini, takes/predation, consensus,
                      norm-public/private, enforcement, survivors, growth,
                      modularity/cohesion)
@@ -51,19 +51,12 @@ def analyze_run(path, params):
     Never reimplements a metric — only calls the existing module functions."""
     report = {"path": path, "name": os.path.basename(path)}
 
-    # (a) regime classification (classify_run, whole-run mode for a single label)
-    whole_params = dict(params)
-    whole_params["window_size"] = 0
-    cls = classify_run.classify_file(path, whole_params)
-    report["classify"] = cls
-    feats = cls.get("features", {})
-
-    # (b) named institutions + role-claims (reuse classify_run detectors)
+    # (a) named institutions + role-claims (reuse classify_run detectors only)
+    # NB the classify_run pilot-5 regime taxonomy ("1a ...") is LEGACY (g-transect era)
+    # and deliberately dropped from this suite; only the structure detectors are reused.
     rounds = classify_run.load_log(path)
     named, _named_raw = classify_run.detect_named_structures(rounds)
-    top_agent = feats.get("top_agent")
-    role_claims = classify_run.detect_role_claims(
-        rounds, top_agents={top_agent} if top_agent else None)
+    role_claims = classify_run.detect_role_claims(rounds)
     report["named_structures"] = named
     report["role_claims"] = role_claims
 
@@ -96,17 +89,7 @@ def print_run(report):
     name = report["name"]
     print(f"\n{'='*74}\n{name}\n{'='*74}")
 
-    # (a) regime
-    cls = report["classify"]
-    print("\n[REGIME — classify_run]")
-    print(f"  label: {cls.get('label')} ({cls.get('label_name')})")
-    l2 = cls.get("layer2", {})
-    if l2:
-        print(f"  layer2: coordination={l2.get('coordination')} / outcome={l2.get('outcome')}")
-    if cls.get("flags"):
-        print(f"  flags: {cls['flags']}")
-
-    # (b) named institutions + role-claims
+    # named institutions + role-claims
     print("\n[NAMED INSTITUTIONS — detect_named_structures]")
     if report["named_structures"]:
         for n, c in report["named_structures"].most_common():
