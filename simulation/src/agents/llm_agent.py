@@ -186,6 +186,9 @@ class LLMAgent:
                     if drop is not None or invite is not None:
                         result['rewire_drop'] = drop
                         result['rewire_invite'] = invite
+                    # Extract commons harvest claim if present
+                    if parsed.get('harvest') is not None:
+                        result['harvest'] = parsed.get('harvest')
                     return result
         except json.JSONDecodeError:
             pass
@@ -250,8 +253,24 @@ class LLMAgent:
         return Action(
             agent_id=self.agent_id,
             action_type=action_type,
-            target_id=target if target else None
+            target_id=target if target else None,
+            harvest=self._snap_harvest(action_dict.get('harvest', 0)),
         )
+
+    def _snap_harvest(self, raw) -> float:
+        """Snap the model's harvest claim to the nearest allowed category (% of K).
+        Categories from game_params['commons_harvest_pct'] (default {0,1,2,4,8}).
+        Returns 0.0 if commons is off or the value is unusable."""
+        if not self.game_params.get('commons_enabled', False):
+            return 0.0
+        cats = self.game_params.get('commons_harvest_pct', [0, 1, 2, 4, 8])
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+        if v <= 0:
+            return 0.0
+        return float(min(cats, key=lambda c: abs(c - v)))
     
     def _store_message(self, action_dict: Dict):
         """Store communication message from LLM response.

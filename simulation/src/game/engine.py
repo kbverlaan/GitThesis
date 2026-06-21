@@ -45,6 +45,7 @@ class Action:
     agent_id: str
     action_type: ActionType
     target_id: Optional[str] = None  # None for self-actions, agent_id for other-actions
+    harvest: float = 0.0  # commons: harvest claim as % of carrying capacity K (0 = none / commons off)
 
 
 @dataclass
@@ -56,10 +57,13 @@ class GameState:
     max_rounds: Optional[int] = None
     history: List[Dict] = field(default_factory=list)
     arm_bonuses: Dict[str, float] = field(default_factory=dict)  # agent_id -> combat bonus (decays each round)
+    commons_stock: float = 0.0     # shared common-pool resource level (absolute units); 0 if commons off
+    commons_K: float = 0.0         # carrying capacity (absolute); >0 signals commons is active
+    commons_collapsed: bool = False  # absorbing state once stock falls below the collapse threshold
 
     def get_observation(self, agent_id: str, history_length: int = 10) -> Dict:
         """Get complete information observation for an agent."""
-        return {
+        obs = {
             "agent_id": agent_id,
             "round": self.round_number,
             "max_rounds": self.max_rounds,
@@ -67,6 +71,20 @@ class GameState:
             "arm_bonuses": self.arm_bonuses.copy(),
             "recent_history": self.history[-history_length:] if len(self.history) > history_length else self.history.copy()
         }
+        if self.commons_K > 0:
+            # Agents see the stock as a PERCENTAGE of capacity (K stays hidden), plus
+            # everyone's harvest from the previous round (Ostrom-style monitoring).
+            last_harvests = {}
+            if self.history:
+                lc = self.history[-1].get("commons")
+                if lc:
+                    last_harvests = lc.get("grants_pct", {})
+            obs["commons"] = {
+                "stock_pct": 100.0 * self.commons_stock / self.commons_K,
+                "collapsed": self.commons_collapsed,
+                "last_harvests_pct": last_harvests,
+            }
+        return obs
 
 
 class GameEngine:
@@ -93,7 +111,11 @@ class GameEngine:
                  tau_sat: int = 5,
                  max_rounds: int = None,
                  symmetric_stakes: bool = False,
-                 lethal_pot: bool = False):
+                 lethal_pot: bool = False,
+                 commons_enabled: bool = False,
+                 commons_K: float = 600.0,
+                 commons_init: Optional[float] = None,
+                 commons_collapse_frac: float = 0.05):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -118,6 +140,9 @@ class GameEngine:
             "tau_sat": tau_sat,
             "symmetric_stakes": symmetric_stakes,
             "lethal_pot": lethal_pot,
+            "commons_enabled": commons_enabled,
+            "commons_K": commons_K,
+            "commons_collapse_frac": commons_collapse_frac,
         }
 
         if isinstance(initial_resources, dict):
@@ -130,6 +155,9 @@ class GameEngine:
             resources=resources,
             max_rounds=max_rounds
         )
+        if commons_enabled:
+            self.state.commons_K = commons_K
+            self.state.commons_stock = commons_init if commons_init is not None else commons_K
         self._valid_targets: Optional[Dict[str, List[str]]] = None
 
     def set_valid_targets(self, valid_targets: Optional[Dict[str, List[str]]]):
@@ -187,7 +215,8 @@ class GameEngine:
             round_log["resource_changes"][agent_id] = 0.0
             round_log["resource_breakdown"][agent_id] = {
                 "invest_received": 0.0, "invest_cost": 0.0,
-                "arm_cost": 0.0, "conflict_cost": 0.0, "combat_transfer": 0.0, "decay": 0.0,
+                "arm_cost": 0.0, "conflict_cost": 0.0, "combat_transfer": 0.0,
+                "harvest": 0.0, "decay": 0.0,
             }
 
         # Process non-attack actions first
@@ -206,6 +235,9 @@ class GameEngine:
         if attack_actions:
             self._resolve_attacks_grouped(attack_actions, round_log)
 
+        # Commons harvest (adds harvested units to resource_changes, draws down the stock)
+        self._resolve_commons(valid_actions, round_log)
+
         # Resource transition: R(t+1) = max(0, delta_R * (R(t) + ΔR))
         delta_R = self.params["delta_R"]
         for agent_id in self.state.agents:
@@ -221,11 +253,81 @@ class GameEngine:
         # Decay arm bonuses
         self._decay_arms()
 
+        # Commons regeneration (GovSim doubling, capped at K; collapse is absorbing)
+        self._regenerate_commons(round_log)
+
         # Add to history and increment round
         self.state.history.append(round_log)
         self.state.round_number += 1
 
         return round_log
+
+    def _resolve_commons(self, valid_actions: List[Action], round_log: Dict):
+        """Harvest the shared stock. Claims are % of K (absolute units); if total
+        claims exceed the stock, allocate in random order until depleted (GovSim
+        rationing). Harvested units are added to each agent's resources."""
+        if not self.params.get("commons_enabled", False):
+            return
+        K = self.params["commons_K"]
+        S = self.state.commons_stock
+        round_log["commons"] = {"stock_before": S, "K": K,
+                                "collapsed": self.state.commons_collapsed}
+        if self.state.commons_collapsed or S <= 0:
+            round_log["commons"]["grants_pct"] = {}
+            round_log["commons"]["harvested"] = 0.0
+            return
+        claims = {}
+        for a in valid_actions:
+            pct = max(0.0, float(getattr(a, "harvest", 0.0) or 0.0))
+            if pct > 0:
+                claims[a.agent_id] = K * pct / 100.0
+        grants = self._ration_commons(claims, S) if claims else {}
+        harvested = 0.0
+        for aid, amt in grants.items():
+            round_log["resource_changes"][aid] += amt
+            round_log["resource_breakdown"][aid]["harvest"] += amt
+            harvested += amt
+        self.state.commons_stock = max(0.0, S - harvested)
+        round_log["commons"]["grants_pct"] = {aid: 100.0 * amt / K for aid, amt in grants.items()}
+        round_log["commons"]["harvested"] = harvested
+        round_log["commons"]["stock_after_harvest"] = self.state.commons_stock
+
+    def _ration_commons(self, claims: Dict[str, float], stock: float) -> Dict[str, float]:
+        """Grant all claims if the stock covers them; otherwise allocate in random
+        order until the stock is depleted (the last grantee may get a partial)."""
+        if sum(claims.values()) <= stock:
+            return dict(claims)
+        order = list(claims.keys())
+        np.random.shuffle(order)
+        grants, remaining = {}, stock
+        for aid in order:
+            amt = min(claims[aid], remaining)
+            grants[aid] = amt
+            remaining -= amt
+            if remaining <= 0:
+                break
+        return grants
+
+    def _regenerate_commons(self, round_log: Dict):
+        """End-of-round stock dynamics: if the remaining stock is below the collapse
+        threshold it collapses permanently (absorbing 0); otherwise it doubles,
+        capped at K (GovSim)."""
+        if not self.params.get("commons_enabled", False):
+            return
+        S = self.state.commons_stock
+        K = self.params["commons_K"]
+        C = K * self.params["commons_collapse_frac"]
+        if self.state.commons_collapsed:
+            new_S = 0.0
+        elif S < C:
+            new_S = 0.0
+            self.state.commons_collapsed = True
+        else:
+            new_S = min(K, 2.0 * S)
+        self.state.commons_stock = new_S
+        if "commons" in round_log:
+            round_log["commons"]["stock_after_regen"] = new_S
+            round_log["commons"]["collapsed"] = self.state.commons_collapsed
 
     def _count_recent_investments(self, investor: str, target: str) -> int:
         """Count how many times investor→target occurred in recent history."""

@@ -28,6 +28,14 @@ symmetric_stakes: true               # pot = alpha × defender in BOTH win-branc
 lethal_pot: false                    # capability flag (OFF in prod). If true: phi = min(1, alpha·S_win/S_lose),
                                      # loser-sized → a coalition ≥ (1/alpha)× the defender KILLS. For lethality probes only.
 
+# Commons (T5 rung — tragedy of the commons; OFF by default, flag-gated)
+commons_enabled: false               # turn on the shared-stock rung (GovSim-style doubling)
+commons_K: 600.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K).
+                                     # per-capita sustainable harvest = K/(2n) = 10 units at n=30 (= GovSim's 10/agent)
+commons_init: null                   # initial stock (null = start full at K)
+commons_harvest_pct: [0, 1, 2, 4, 8] # harvest categories as % of K; sustainable p.p. ≈ 1.67% (lands between cat 2 and 4)
+commons_collapse_frac: 0.05          # stock collapses permanently below this fraction of K (GovSim C = 5%)
+
 # Economy
 delta_R: 1.0                         # NO resource decay (current design): R(t+1) = R(t) + ΔR.
                                      # Cooperation is net-positive (+G/round) → growth comes from

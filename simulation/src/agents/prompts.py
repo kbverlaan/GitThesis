@@ -149,6 +149,20 @@ class BaselinePrompt:
                     line = f"  {aid}: {r_f:.1f}{suffix}"
             lines.append(line)
 
+        commons = observation.get("commons")
+        if commons:
+            lines.append("")
+            if commons.get("collapsed"):
+                lines.append("SHARED STOCK: COLLAPSED (0% — permanently depleted, nothing left to harvest).")
+            else:
+                lines.append(f"SHARED STOCK: {commons['stock_pct']:.0f}% of capacity.")
+            last = commons.get("last_harvests_pct") or {}
+            if last:
+                parts_h = ", ".join(
+                    f"{a} {p:.0f}%" for a, p in sorted(last.items(), key=lambda kv: -kv[1])
+                )
+                lines.append(f"  Harvests last round (% of capacity): {parts_h}")
+
         received_messages = observation.get("received_messages", [])
         if received_messages:
             lines.append("")
@@ -398,6 +412,24 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
             ]
             parts.append("\n".join(comm_lines))
 
+        # Commons rules (if enabled). One shared stock all agents draw from; the
+        # level is shown as a % of capacity (the absolute capacity is never stated).
+        if self.game_params.get("commons_enabled", False):
+            cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
+            cat_str = ", ".join(f"{c:g}%" for c in cats)
+            commons_lines = [
+                "SHARED STOCK:",
+                "Beyond your dealings with other agents, there is ONE shared stock that "
+                "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
+                f"- HARVEST: each round you may take one of these amounts from it: {cat_str} of capacity. "
+                "What you take is added to YOUR own resources, in absolute units.",
+                "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
+                "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
+                "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
+                "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
+            ]
+            parts.append("\n".join(commons_lines))
+
         parts.append("OTHER AGENTS:\n" + SOCIAL_SETTING)
         return "\n\n".join(parts)
 
@@ -407,6 +439,9 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         """
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
         has_rewire = rewiring_prob > 0
+        commons_enabled = self.game_params.get("commons_enabled", False)
+        cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
+        cat_str = "/".join(f"{c:g}" for c in cats)
 
         # Assemble fields in the preferred order
         fields: list[str] = []
@@ -418,6 +453,8 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         if has_rewire:
             fields.append('  "rewire_drop": "<neighbour agent_id to disconnect from, or null>"')
             fields.append('  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>"')
+        if commons_enabled:
+            fields.append(f'  "harvest": "<how much of the shared stock to take this round: one of {cat_str} (percent of capacity); 0 for none>"')
         fields.append('  "memory": "<brief note for your future self — see below>"')
 
         fields_block = ",\n".join(fields)
@@ -426,6 +463,12 @@ RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
         notes: list[str] = [
             'target must be null (not the string "null") when no target is needed.',
         ]
+        if commons_enabled:
+            notes.append(
+                "harvest: the percent of the shared stock you take this round — one of "
+                f"the listed values ({cat_str}). Use 0 to take nothing. This is separate "
+                "from your action: you may both act and harvest in the same round."
+            )
         if self.comm_scope != "none":
             notes.append(
                 "message_to: a list of the agent_ids you are sending to (one or "

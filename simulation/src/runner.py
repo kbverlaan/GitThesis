@@ -196,6 +196,10 @@ def run_simulation(game_params: dict,
         max_rounds=game_params['max_rounds'],
         symmetric_stakes=game_params.get('symmetric_stakes', False),
         lethal_pot=game_params.get('lethal_pot', False),
+        commons_enabled=game_params.get('commons_enabled', False),
+        commons_K=game_params.get('commons_K', 600.0),
+        commons_init=game_params.get('commons_init', None),
+        commons_collapse_frac=game_params.get('commons_collapse_frac', 0.05),
     )
 
     network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))
