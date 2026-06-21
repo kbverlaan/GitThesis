@@ -112,6 +112,7 @@ class GameEngine:
                  max_rounds: int = None,
                  symmetric_stakes: bool = False,
                  lethal_pot: bool = False,
+                 take_enabled: bool = True,
                  commons_enabled: bool = False,
                  commons_K: float = 600.0,
                  commons_init: Optional[float] = None,
@@ -140,6 +141,7 @@ class GameEngine:
             "tau_sat": tau_sat,
             "symmetric_stakes": symmetric_stakes,
             "lethal_pot": lethal_pot,
+            "take_enabled": take_enabled,
             "commons_enabled": commons_enabled,
             "commons_K": commons_K,
             "commons_collapse_frac": commons_collapse_frac,
@@ -193,9 +195,14 @@ class GameEngine:
             "resource_breakdown": {},  # agent -> {invest_received, invest_cost, arm_cost, conflict_cost, combat_transfer, decay}
         }
 
-        # Validate actions
+        # Validate actions. When taking is disabled (rung below predation), any
+        # attack is treated as hold — the affordance does not exist on this rung.
+        take_enabled = self.params.get("take_enabled", True)
         valid_actions = []
         for action in actions:
+            if action.action_type == ActionType.ATTACK and not take_enabled:
+                action = Action(action.agent_id, ActionType.DO_NOTHING, None,
+                                harvest=getattr(action, "harvest", 0.0))
             if self.can_afford_action(action.agent_id, action.action_type):
                 valid_actions.append(action)
                 round_log["actions"].append({

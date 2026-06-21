@@ -29,21 +29,15 @@ def _shuffled_items(d: dict) -> list:
     return items
 
 
-# Four standalone ToM blocks (reasoning-style baseline, held CONSTANT — NOT an
-# experimental IV; see module docstring). An agent only ever sees its own level
-# — each block must read cleanly without knowledge of the others. Length grows
-# with depth: higher-order ToM requires more explanation.
+# Minimal recursive-ToM nudge (a chain-of-thought aid), held CONSTANT across all
+# rungs — part of the substrate, NOT an experimental IV. Kept lean and free of
+# outcome priming: it points at reasoning one step ahead about others, without
+# anthropomorphism or any steer toward cooperation/conflict.
 SOCIAL_SETTING = (
-    "The other agents are minds, and they reason about minds. Each holds its own "
-    "beliefs, wants, and plans; each also builds a picture of what the agents it "
-    "interacts with — you among them — believe, want, and will do; and each "
-    "tracks how those agents in turn picture everyone else. The group is a web of "
-    "mutually held models of one another.\n"
-    "When you decide, you can reason the same way: what each relevant agent believes, "
-    "wants, and intends; how they model the other agents they can see — their "
-    "picture of you, and of third parties; and how they expect others to be modelling "
-    "them in turn. Your own actions and any messages you send are observable to the "
-    "agents who can see you, and become part of what they model about you."
+    "The other agents decide on their own and can observe what you do. When you "
+    "choose, it can help to think a step ahead: what each relevant agent is likely "
+    "to want and do, that they are reasoning about you in the same way, and that "
+    "your own actions and messages become information they will act on."
 )
 
 
@@ -125,11 +119,15 @@ class BaselinePrompt:
             )
 
         show_arm = self.game_params.get("mu_arm", 3.0) > 0
+        take_on = self.game_params.get("take_enabled", True)
 
         lines.append("")
-        lines.append(
-            "AGENTS (resources + arm bonus = combat strength):" if show_arm else "AGENTS (resources = combat strength):"
-        )
+        if not take_on:
+            lines.append("AGENTS (resources):")
+        elif show_arm:
+            lines.append("AGENTS (resources + arm bonus = combat strength):")
+        else:
+            lines.append("AGENTS (resources = combat strength):")
 
         for aid, r in _shuffled_items(resources):
             if visible is not None and aid != agent_id and aid not in visible:
@@ -235,6 +233,7 @@ class BaselinePrompt:
         resource_decay_pct = round((1.0 - delta_R) * 100.0, 2)
 
         symmetric_stakes = self.game_params.get("symmetric_stakes", False)
+        take_enabled = self.game_params.get("take_enabled", True)
 
         actions = []
         saturation_decay = self.game_params.get("gamma_sat", 1.0)
@@ -269,11 +268,12 @@ class BaselinePrompt:
                 f"yourself — combat strength can only be raised by others arming you."
             )
 
-        actions.append(
-            f"- take: TARGET must be a connected neighbor. Both sides pay "
-            f"{conflict_cost_pct}% conflict cost. "
-            f"Win probability = your combat strength / (your strength + target's strength)."
-        )
+        if take_enabled:
+            actions.append(
+                f"- take: TARGET must be a connected neighbor. Both sides pay "
+                f"{conflict_cost_pct}% conflict cost. "
+                f"Win probability = your combat strength / (your strength + target's strength)."
+            )
         actions.append("- hold: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -295,9 +295,7 @@ AVAILABLE ACTIONS:
             parts.append(
                 f"""RESOURCE DECAY:
 - Every agent loses {resource_decay_pct}% of their resources at the END of each round.
-- Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}.
-- Doing nothing causes you to shrink. Income (from others investing in you, or from winning attacks) offsets it.
-- After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}."""
+- Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}."""
             )
 
         cs_label = "resources + arm bonus" if mu_arm > 0 else "resources"
@@ -368,23 +366,9 @@ AVAILABLE ACTIONS:
         resolution_invest = "Investments" + (" and arming" if mu_arm > 0 else "")
         resolution_strength = f"current resources{' + arm bonus' if mu_arm > 0 else ''}"
 
-        # Resolution order — insert harvest + regeneration steps when commons is on.
-        steps = [
-            f"1. {resolution_invest} resolve first.",
-            f"2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as {resolution_strength}.",
-            "3. Spoils transfer according to the combat outcome.",
-        ]
-        if commons_on:
-            steps.append(f"{len(steps) + 1}. Harvests from the shared stock are taken and added to your resources.")
-        eor = f"{len(steps) + 1}. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources)."
-        if mu_arm > 0:
-            eor += f" Arm bonuses decay (×{arm_decay})."
-        if commons_on:
-            eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
-        steps.append(eor)
-        resolution_steps = "\n".join(steps)
-
-        parts.append(f"""COMBAT RULES:
+        # Combat rules only exist when taking is available (rung ≥ predation).
+        if take_enabled:
+            parts.append(f"""COMBAT RULES:
 - Combat strength = {cs_label}.{arm_decay_line}
 - Win probability = attacker_strength / (attacker_strength + defender_strength).
 - {conflict_cost_line}
@@ -394,17 +378,41 @@ AVAILABLE ACTIONS:
 COALITIONS (multi-attacker combat):
 - If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender.
 - This is the ONLY way to share spoils from a take — you must both choose "take" with the same target, on the same round.
-- Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.
+- Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.""")
 
-RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
-{resolution_steps}""")
+        # Resolution order — always shown; attack/spoils steps only when taking
+        # is available, harvest/regeneration steps only when the commons is on.
+        steps = [f"{1}. {resolution_invest} resolve first."]
+        if take_enabled:
+            steps.append(f"{len(steps) + 1}. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as {resolution_strength}.")
+            steps.append(f"{len(steps) + 1}. Spoils transfer according to the combat outcome.")
+        if commons_on:
+            steps.append(f"{len(steps) + 1}. Harvests from the shared stock are taken and added to your resources.")
+        eor = f"{len(steps) + 1}. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources)."
+        if mu_arm > 0:
+            eor += f" Arm bonuses decay (×{arm_decay})."
+        if commons_on:
+            eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
+        steps.append(eor)
+        parts.append("RESOLUTION ORDER (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
         if self.network_enabled:
+            nb_verbs = ["transfer to"]
+            if take_enabled:
+                nb_verbs.append("take from")
+            if mu_arm > 0:
+                nb_verbs.append("strengthen")
+            if len(nb_verbs) == 1:
+                nb_phrase = nb_verbs[0]
+            elif len(nb_verbs) == 2:
+                nb_phrase = f"{nb_verbs[0]} or {nb_verbs[1]}"
+            else:
+                nb_phrase = ", ".join(nb_verbs[:-1]) + ", or " + nb_verbs[-1]
             network_block = [
                 "NETWORK:",
-                f"Agents are connected through a network. You can ONLY transfer to{', take from, or strengthen' if mu_arm > 0 else ' or take from'} agents you are directly connected to. You can message any agent regardless of connection.",
+                f"Agents are connected through a network. You can ONLY {nb_phrase} agents you are directly connected to. You can message any agent regardless of connection.",
                 "Connections are symmetric: if you are connected to Blue, then Blue is also connected to you. But each agent has its own set of connections — other agents generally see a different set of neighbours than you do.",
                 "Connections can change over time based on how agents interact.",
                 "You cannot verify claims about agents whose resources are hidden from you.",
