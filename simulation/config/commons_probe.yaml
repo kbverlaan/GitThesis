@@ -13,15 +13,13 @@ gamma_sat: 0.80
 tau_sat: 5
 
 # Arming
-c_arm: 0.10
+c_arm: 0.05
 mu_arm: 3.0
 delta_B: 0.50
 
-# Combat (prod: symmetric capped stakes, no one-shot kill)
+# Combat (prod: symmetric capped stakes, no one-shot kill; flat conflict cost)
 alpha: 0.35
-c_atk: 0.01
-eta_atk: 1.2
-tau_atk: 5
+c_atk: 0.02
 symmetric_stakes: true
 lethal_pot: false
 

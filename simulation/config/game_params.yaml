@@ -13,15 +13,15 @@ gamma_sat: 0.80                      # saturation factor per repeat in window
 tau_sat: 5                           # saturation window (rounds)
 
 # Arming
-c_arm: 0.10                          # arm cost (fraction of actor's R)
+c_arm: 0.05                          # arm cost (fraction of actor's R) — Koen 2026-06-21: 5%
 mu_arm: 3.0                          # arm multiplier (bonus = cost × mu_arm)
 delta_B: 0.50                        # arm decay factor
 
 # Combat
 alpha: 0.35                          # spoils = alpha × loser's R (Koen 2026-06-21: fixed at 0.35, as VSC run)
-c_atk: 0.01                          # base conflict cost (fraction of own R)
-eta_atk: 1.2                         # per-prior-attack multiplier
-tau_atk: 5                           # sliding-window rounds
+c_atk: 0.02                          # FLAT conflict cost (fraction of own R) — Koen 2026-06-21: 2%, no escalation.
+                                     # eta_atk/tau_atk (attack-cost escalation) removed from prod; engine keeps
+                                     # them as default-off capability (eta=1.0 → flat), like lethal_pot.
 symmetric_stakes: true               # pot = alpha × defender in BOTH win-branches (Koen 2026-06-21):
                                      # capped stakes so targets are bled, not one-shot killed → institutions
                                      # get time to form. Avoids premature mutual annihilation.
