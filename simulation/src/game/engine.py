@@ -33,7 +33,6 @@ class ActionType(Enum):
     # Member names kept stable internally; the .value strings are the canonical
     # action vocabulary used in prompts and logs (renamed 2026-06-15).
     INVEST_OTHER = "transfer"     # give resources to another
-    ARM_SELF = "arm_self"         # legacy/removed from the action set (dead path)
     ARM_OTHER = "strengthen"      # give a combat bonus to another
     ATTACK = "take"               # take resources by force
     DO_NOTHING = "hold"           # do nothing
@@ -48,6 +47,8 @@ class Action:
     harvest: float = 0.0  # commons harvest claim. category mode: % of carrying capacity K.
                           # fraction_own mode: fraction (in [0, inf)) of the actor's OWN current
                           # resources. 0 = none / commons off in both modes.
+    harvest_raw: Optional[str] = None  # the model's RAW harvest field, kept verbatim for
+                                       # post-hoc audit of percent→fraction scaling (C2).
 
 
 @dataclass
@@ -213,7 +214,7 @@ class GameEngine:
             if action.action_type == ActionType.ATTACK and not take_enabled:
                 action = Action(action.agent_id, ActionType.DO_NOTHING, None,
                                 harvest=getattr(action, "harvest", 0.0))
-            if action.action_type in (ActionType.ARM_OTHER, ActionType.ARM_SELF) and not arm_enabled:
+            if action.action_type == ActionType.ARM_OTHER and not arm_enabled:
                 action = Action(action.agent_id, ActionType.DO_NOTHING, None,
                                 harvest=getattr(action, "harvest", 0.0))
             if self.can_afford_action(action.agent_id, action.action_type):
@@ -245,8 +246,6 @@ class GameEngine:
                 pass
             elif action.action_type == ActionType.INVEST_OTHER:
                 self._resolve_invest_other(action, round_log)
-            elif action.action_type == ActionType.ARM_SELF:
-                self._resolve_arm_self(action, round_log)
             elif action.action_type == ActionType.ARM_OTHER:
                 self._resolve_arm_other(action, round_log)
 
@@ -306,10 +305,15 @@ class GameEngine:
             return
         claims = {}
         chosen_frac = {}  # agent_id -> chosen fraction of own resources (fraction_own mode)
+        harvest_raw = {}  # agent_id -> the model's RAW harvest string, for scaling audit (C2)
         for a in valid_actions:
             raw = max(0.0, float(getattr(a, "harvest", 0.0) or 0.0))
             if raw <= 0:
                 continue
+            raw_str = getattr(a, "harvest_raw", None)
+            if raw_str is not None:
+                harvest_raw[a.agent_id] = raw_str
+                round_log["resource_breakdown"][a.agent_id]["harvest_raw"] = raw_str
             if mode == "fraction_own":
                 # raw is a fraction (>=0) of the agent's OWN current resources.
                 chosen_frac[a.agent_id] = raw
@@ -328,6 +332,8 @@ class GameEngine:
         round_log["commons"]["grants_pct"] = {aid: 100.0 * amt / K for aid, amt in grants.items()}
         round_log["commons"]["harvested"] = harvested
         round_log["commons"]["stock_after_harvest"] = self.state.commons_stock
+        if harvest_raw:
+            round_log["commons"]["harvest_raw"] = harvest_raw  # raw model strings (C2 audit)
         if mode == "fraction_own":
             # Log the chosen fraction per agent (the decision variable) alongside
             # the realized absolute harvest, for the comeback/inequality analysis.
@@ -425,15 +431,6 @@ class GameEngine:
         round_log["resource_changes"][target_id] += transfer
         round_log["resource_breakdown"][target_id]["invest_received"] += transfer
         round_log["bilateral_flows"][(agent_id, target_id)] += transfer
-
-    def _resolve_arm_self(self, action: Action, round_log: Dict):
-        """Resolve arm-self: pay c_arm · R, gain cost × mu_arm as combat bonus."""
-        agent_id = action.agent_id
-        cost = self._frac(agent_id, self.params["c_arm"])
-        bonus = cost * self.params["mu_arm"]
-        round_log["resource_changes"][agent_id] -= cost
-        round_log["resource_breakdown"][agent_id]["arm_cost"] += cost
-        self.state.arm_bonuses[agent_id] = self.state.arm_bonuses.get(agent_id, 0.0) + bonus
 
     def _resolve_arm_other(self, action: Action, round_log: Dict):
         """Resolve arm-other: pay c_arm · R, target gains cost × mu_arm as combat bonus."""

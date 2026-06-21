@@ -126,6 +126,9 @@ def run_simulation(game_params: dict,
         seed = int(hashlib.sha256(run_id.encode()).hexdigest()[:8], 16)
     np.random.seed(seed)
     random.seed(seed)
+    # Stash the resolved seed so the prompt builder can shuffle deterministically
+    # per (seed, agent_id, round) instead of the thread-shared global RNG (C1).
+    game_params['random_seed'] = seed
 
     print(f"\n{'='*60}")
     print(f"Starting simulation: {run_id}")
