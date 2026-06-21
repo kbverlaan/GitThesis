@@ -92,7 +92,8 @@ class GameEngine:
                  gamma_sat: float = 1.0,
                  tau_sat: int = 5,
                  max_rounds: int = None,
-                 symmetric_stakes: bool = False):
+                 symmetric_stakes: bool = False,
+                 lethal_pot: bool = False):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -116,6 +117,7 @@ class GameEngine:
             "gamma_sat": gamma_sat,
             "tau_sat": tau_sat,
             "symmetric_stakes": symmetric_stakes,
+            "lethal_pot": lethal_pot,
         }
 
         if isinstance(initial_resources, dict):
@@ -414,15 +416,23 @@ class GameEngine:
         round_log["resource_changes"][defender_id] -= def_cc
         round_log["resource_breakdown"][defender_id]["conflict_cost"] += def_cc
 
-        # Spoils: winner takes alpha% of loser's resources (§3.1).
-        # Coalition wins → defender loses alpha% of defender's R, split by attacker strength.
-        # Defender wins → each attacker loses alpha% of their own R, defender gains the sum.
+        # Spoils. phi = fraction of the LOSER's resources the winner takes.
+        #   lethal_pot: phi = min(1, alpha * S_winner / S_loser) — scales with the
+        #     strength ratio and is sized on the loser, so the stronger side can
+        #     fully drain it (phi=1 => loser emptied => bankruptcy). Symmetric: a
+        #     winning defender drains attackers the same way. At the equal-strength
+        #     slice (S_win=S_lose) phi reduces to alpha, so cell placement is unchanged.
+        #   else (flat pot): phi = alpha; symmetric_stakes governs the defender-win branch.
         alpha = self.params["alpha"]
+        lethal = self.params.get("lethal_pot", False)
         total_transfer = 0.0
+        phi = alpha  # logged below
 
         if coalition_wins:
             defender_effective = max(0, self.state.resources[defender_id] + round_log["resource_changes"][defender_id])
-            pot = defender_effective * alpha
+            if lethal:
+                phi = min(1.0, alpha * coalition_power / defender_power) if defender_power > 0 else 1.0
+            pot = defender_effective * phi
             total_transfer = pot
             round_log["resource_changes"][defender_id] -= pot
             round_log["resource_breakdown"][defender_id]["combat_transfer"] -= pot
@@ -433,7 +443,19 @@ class GameEngine:
                 round_log["resource_breakdown"][aid]["combat_transfer"] += aid_share
                 round_log["bilateral_flows"][(defender_id, aid)] += aid_share
         else:
-            if self.params.get("symmetric_stakes", False):
+            if lethal:
+                # Defender wins: each attacker loses phi of its OWN R; defender gains the sum.
+                phi = min(1.0, alpha * defender_power / coalition_power) if coalition_power > 0 else 1.0
+                for aid in attacker_ids:
+                    aid_effective = max(0, self.state.resources[aid] + round_log["resource_changes"][aid])
+                    aid_loss = aid_effective * phi
+                    round_log["resource_changes"][aid] -= aid_loss
+                    round_log["resource_breakdown"][aid]["combat_transfer"] -= aid_loss
+                    round_log["resource_changes"][defender_id] += aid_loss
+                    round_log["resource_breakdown"][defender_id]["combat_transfer"] += aid_loss
+                    round_log["bilateral_flows"][(aid, defender_id)] += aid_loss
+                    total_transfer += aid_loss
+            elif self.params.get("symmetric_stakes", False):
                 defender_effective = max(0, self.state.resources[defender_id] + round_log["resource_changes"][defender_id])
                 pot = defender_effective * alpha
                 per_attacker = pot / len(attacker_ids) if attacker_ids else 0.0
@@ -465,6 +487,8 @@ class GameEngine:
             "defender_power": defender_power,
             "winner": "coalition" if coalition_wins else "defender",
             "attacker_win_prob": attacker_win_prob,
+            "lethal_pot": lethal,
+            "phi": phi,
             "total_transfer": total_transfer,
             "attacker_cost_scales": attacker_cost_scales,
             "defender_cost_scale": {"prior_attacks": def_prior, "scale": def_scale},

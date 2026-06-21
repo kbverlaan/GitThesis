@@ -195,6 +195,7 @@ def run_simulation(game_params: dict,
         tau_sat=game_params.get('tau_sat', 5),
         max_rounds=game_params['max_rounds'],
         symmetric_stakes=game_params.get('symmetric_stakes', False),
+        lethal_pot=game_params.get('lethal_pot', False),
     )
 
     network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))

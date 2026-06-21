@@ -276,7 +276,28 @@ AVAILABLE ACTIONS:
 
         cs_label = "resources + arm bonus" if mu_arm > 0 else "resources"
 
-        if symmetric_stakes:
+        lethal_pot = self.game_params.get("lethal_pot", False)
+        inv_alpha = (1.0 / alpha) if alpha > 0 else 99.0
+        kill_ratio = round(inv_alpha, 1)
+        kill_n = int(inv_alpha) + (0 if inv_alpha == int(inv_alpha) else 1)
+        if lethal_pot:
+            combat_spoils = (
+                f"Winner takes a fraction of the LOSER's resources that SCALES with the strength gap.\n"
+                f"- Fraction taken = min(100%, {attack_take_pct}% × winner_strength ÷ loser_strength). "
+                f"At equal strength it is {attack_take_pct}%; the more you outmatch the loser, the larger your cut.\n"
+                f"- KILL: if the winner's strength is at least {kill_ratio}× the loser's, the fraction reaches 100% — "
+                f"the loser is drained to zero and ELIMINATED (permanent, see bankruptcy).\n"
+                f"- This is SYMMETRIC and also applies to YOU: if you attack and LOSE, the defender takes "
+                f"min(100%, {attack_take_pct}% × defender_strength ÷ your_strength) of your resources. "
+                f"A far stronger defender can wipe you out for attacking.\n"
+                f"- Example (1 vs 1, both 100): win → take {100*alpha:.0f}; lose → give up {100*alpha:.0f}.\n"
+                f"- Example (you 100 vs target 30, ratio 3.3 ≥ {kill_ratio}): you take ALL 30 → target eliminated.\n"
+                f"- Example (you 30 attack a 100 and lose): they take 100% of your 30 → YOU are eliminated.\n"
+                f"- Coalition: attacker strengths ADD; a coalition at least {kill_ratio}× the defender's strength "
+                f"kills it (spoils split by each attacker's strength share). With equal-sized members, "
+                f"{kill_n} of them are enough to kill."
+            )
+        elif symmetric_stakes:
             combat_spoils = (
                 f"THE POT is always {attack_take_pct}% of the DEFENDER's resources, regardless of who wins.\n"
                 f"- Attackers win → defender loses the pot; each attacker gains pot × (their strength / total attacker strength).\n"
