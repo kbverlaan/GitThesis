@@ -18,7 +18,7 @@ mu_arm: 3.0                          # arm multiplier (bonus = cost × mu_arm)
 delta_B: 0.50                        # arm decay factor
 
 # Combat
-alpha: 0.20                          # spoils = alpha × loser's R
+alpha: 0.35                          # spoils = alpha × loser's R (Koen 2026-06-21: fixed at 0.35, as VSC run)
 c_atk: 0.01                          # base conflict cost (fraction of own R)
 eta_atk: 1.2                         # per-prior-attack multiplier
 tau_atk: 5                           # sliding-window rounds
@@ -34,7 +34,9 @@ delta_R: 1.0                         # NO resource decay (current design): R(t+1
                                      # cooperation, not from decay pressure. (0.95 = legacy PNAS.)
 
 # Game length
-max_rounds: 60
+max_rounds: 30                       # BASIS (Koen 2026-06-21: budget is afgestemd op R30).
+                                     # Verlenging voor de top-down-norm long-run-probe: 60 of 100 rondes
+                                     # (vereist langere context — zie max-model-len 65536).
 history_length: 10
 
 # Network
