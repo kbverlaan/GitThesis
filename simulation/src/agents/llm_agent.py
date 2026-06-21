@@ -267,11 +267,31 @@ class LLMAgent:
         )
 
     def _snap_harvest(self, raw) -> float:
-        """Snap the model's harvest claim to the nearest allowed category (% of K).
-        Categories from game_params['commons_harvest_pct'] (default {0,1,2,4,8}).
-        Returns 0.0 if commons is off or the value is unusable."""
+        """Parse the model's harvest claim. Returns 0.0 if commons is off or the
+        value is unusable.
+
+        Two modes (game_params['commons_harvest_mode']):
+        - "category" (default): snap to the nearest allowed category (% of K)
+          from game_params['commons_harvest_pct'] (default {0,1,2,4,8}).
+        - "fraction_own": parse as a continuous, unbounded, non-negative PERCENT
+          of the agent's own resources, returned as a FRACTION. Convention: the
+          field is a percent number, so "5", "5%", and "0.05" are all read as the
+          NUMBER first, then divided by 100 → 0.05 (i.e. "5" → 5% → fraction 0.05).
+          No category snapping, no upper bound; negatives clamp to 0."""
         if not self.game_params.get('commons_enabled', False):
             return 0.0
+
+        if self.game_params.get('commons_harvest_mode', 'category') == 'fraction_own':
+            if isinstance(raw, str):
+                raw = raw.strip().rstrip('%').strip()
+            try:
+                v = float(raw)
+            except (TypeError, ValueError):
+                return 0.0
+            if v <= 0:
+                return 0.0
+            return v / 100.0
+
         cats = self.game_params.get('commons_harvest_pct', [0, 1, 2, 4, 8])
         try:
             v = float(raw)

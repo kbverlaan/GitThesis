@@ -468,19 +468,35 @@ COALITIONS (multi-attacker combat):
         # Commons rules (if enabled). One shared stock all agents draw from; the
         # level is shown as a % of capacity (the absolute capacity is never stated).
         if self.game_params.get("commons_enabled", False):
-            cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
-            cat_str = ", ".join(f"{c:g}%" for c in cats)
-            commons_lines = [
-                "SHARED STOCK:",
-                "Beyond your dealings with other agents, there is ONE shared stock that "
-                "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
-                f"- HARVEST: each round you may take one of these amounts from it: {cat_str} of capacity. "
-                "What you take is added to YOUR own resources, in absolute units.",
-                "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
-                "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
-                "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
-                "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
-            ]
+            mode = self.game_params.get("commons_harvest_mode", "category")
+            if mode == "fraction_own":
+                commons_lines = [
+                    "SHARED STOCK:",
+                    "Beyond your dealings with other agents, there is ONE shared stock that "
+                    "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
+                    "- HARVEST: each round you choose a percent of YOUR OWN current resources to take "
+                    "from the shared stock. What you take is added to your own resources, in absolute units. "
+                    "The percent can be any non-negative number, with no upper limit — a large enough percent "
+                    "can draw out the entire stock.",
+                    "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
+                    "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
+                    "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
+                    "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
+                ]
+            else:
+                cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
+                cat_str = ", ".join(f"{c:g}%" for c in cats)
+                commons_lines = [
+                    "SHARED STOCK:",
+                    "Beyond your dealings with other agents, there is ONE shared stock that "
+                    "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
+                    f"- HARVEST: each round you may take one of these amounts from it: {cat_str} of capacity. "
+                    "What you take is added to YOUR own resources, in absolute units.",
+                    "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
+                    "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
+                    "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
+                    "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
+                ]
             parts.append("\n".join(commons_lines))
 
         parts.append("OTHER AGENTS:\n" + SOCIAL_SETTING)
@@ -492,6 +508,7 @@ COALITIONS (multi-attacker combat):
         """
         has_rewire = self._rewiring_on()
         commons_enabled = self.game_params.get("commons_enabled", False)
+        commons_mode = self.game_params.get("commons_harvest_mode", "category")
         cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
         cat_str = "/".join(f"{c:g}" for c in cats)
 
@@ -506,7 +523,10 @@ COALITIONS (multi-attacker combat):
             fields.append('  "rewire_drop": "<neighbour agent_id to disconnect from, or null>"')
             fields.append('  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>"')
         if commons_enabled:
-            fields.append(f'  "harvest": "<how much of the shared stock to take this round: one of {cat_str} (percent of capacity); 0 for none>"')
+            if commons_mode == "fraction_own":
+                fields.append('  "harvest": "<how much to take from the shared stock this round, as a percent of your own current resources: any number >= 0 (no upper limit); 0 for none>"')
+            else:
+                fields.append(f'  "harvest": "<how much of the shared stock to take this round: one of {cat_str} (percent of capacity); 0 for none>"')
         fields.append('  "memory": "<brief note for your future self — see below>"')
 
         fields_block = ",\n".join(fields)
@@ -516,11 +536,19 @@ COALITIONS (multi-attacker combat):
             'target must be null (not the string "null") when no target is needed.',
         ]
         if commons_enabled:
-            notes.append(
-                "harvest: the percent of the shared stock you take this round — one of "
-                f"the listed values ({cat_str}). Use 0 to take nothing. This is separate "
-                "from your action: you may both act and harvest in the same round."
-            )
+            if commons_mode == "fraction_own":
+                notes.append(
+                    "harvest: a percent of your own current resources to take from the "
+                    "shared stock this round — any number 0 or greater, with no upper limit. "
+                    "Use 0 to take nothing. This is separate from your action: you may both "
+                    "act and harvest in the same round."
+                )
+            else:
+                notes.append(
+                    "harvest: the percent of the shared stock you take this round — one of "
+                    f"the listed values ({cat_str}). Use 0 to take nothing. This is separate "
+                    "from your action: you may both act and harvest in the same round."
+                )
         if self.comm_scope != "none":
             notes.append(
                 "message_to: a list of the agent_ids you are sending to (one or "

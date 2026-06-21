@@ -45,7 +45,9 @@ class Action:
     agent_id: str
     action_type: ActionType
     target_id: Optional[str] = None  # None for self-actions, agent_id for other-actions
-    harvest: float = 0.0  # commons: harvest claim as % of carrying capacity K (0 = none / commons off)
+    harvest: float = 0.0  # commons harvest claim. category mode: % of carrying capacity K.
+                          # fraction_own mode: fraction (in [0, inf)) of the actor's OWN current
+                          # resources. 0 = none / commons off in both modes.
 
 
 @dataclass
@@ -118,7 +120,8 @@ class GameEngine:
                  commons_enabled: bool = False,
                  commons_K: float = 600.0,
                  commons_init: Optional[float] = None,
-                 commons_collapse_frac: float = 0.05):
+                 commons_collapse_frac: float = 0.05,
+                 commons_harvest_mode: str = "category"):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -149,6 +152,7 @@ class GameEngine:
             "commons_enabled": commons_enabled,
             "commons_K": commons_K,
             "commons_collapse_frac": commons_collapse_frac,
+            "commons_harvest_mode": commons_harvest_mode,
         }
 
         if isinstance(initial_resources, dict):
@@ -279,13 +283,21 @@ class GameEngine:
         return round_log
 
     def _resolve_commons(self, valid_actions: List[Action], round_log: Dict):
-        """Harvest the shared stock. Claims are % of K (absolute units); if total
-        claims exceed the stock, allocate in random order until depleted (GovSim
-        rationing). Harvested units are added to each agent's resources."""
+        """Harvest the shared stock. Two modes (commons_harvest_mode):
+
+        - "category" (default): claim is a category % of K (absolute units).
+        - "fraction_own": claim is f_i × (agent's own current resources), where
+          f_i is a continuous, unbounded fraction the agent chose. A large enough
+          fraction can empty the whole pool.
+
+        In both modes, if total claims exceed the stock, allocate in random order
+        until depleted (GovSim rationing); harvested units are added to resources.
+        Regeneration and collapse are identical downstream."""
         if not self.params.get("commons_enabled", False):
             return
         K = self.params["commons_K"]
         S = self.state.commons_stock
+        mode = self.params.get("commons_harvest_mode", "category")
         round_log["commons"] = {"stock_before": S, "K": K,
                                 "collapsed": self.state.commons_collapsed}
         if self.state.commons_collapsed or S <= 0:
@@ -293,10 +305,19 @@ class GameEngine:
             round_log["commons"]["harvested"] = 0.0
             return
         claims = {}
+        chosen_frac = {}  # agent_id -> chosen fraction of own resources (fraction_own mode)
         for a in valid_actions:
-            pct = max(0.0, float(getattr(a, "harvest", 0.0) or 0.0))
-            if pct > 0:
-                claims[a.agent_id] = K * pct / 100.0
+            raw = max(0.0, float(getattr(a, "harvest", 0.0) or 0.0))
+            if raw <= 0:
+                continue
+            if mode == "fraction_own":
+                # raw is a fraction (>=0) of the agent's OWN current resources.
+                chosen_frac[a.agent_id] = raw
+                amt = raw * self.state.resources[a.agent_id]
+                if amt > 0:
+                    claims[a.agent_id] = amt
+            else:
+                claims[a.agent_id] = K * raw / 100.0
         grants = self._ration_commons(claims, S) if claims else {}
         harvested = 0.0
         for aid, amt in grants.items():
@@ -307,6 +328,12 @@ class GameEngine:
         round_log["commons"]["grants_pct"] = {aid: 100.0 * amt / K for aid, amt in grants.items()}
         round_log["commons"]["harvested"] = harvested
         round_log["commons"]["stock_after_harvest"] = self.state.commons_stock
+        if mode == "fraction_own":
+            # Log the chosen fraction per agent (the decision variable) alongside
+            # the realized absolute harvest, for the comeback/inequality analysis.
+            round_log["commons"]["harvest_frac"] = dict(chosen_frac)
+            for aid, f in chosen_frac.items():
+                round_log["resource_breakdown"][aid]["harvest_frac"] = f
 
     def _ration_commons(self, claims: Dict[str, float], stock: float) -> Dict[str, float]:
         """Grant all claims if the stock covers them; otherwise allocate in random

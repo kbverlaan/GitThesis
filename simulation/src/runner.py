@@ -207,6 +207,7 @@ def run_simulation(game_params: dict,
         commons_K=game_params.get('commons_K', 600.0),
         commons_init=game_params.get('commons_init', None),
         commons_collapse_frac=game_params.get('commons_collapse_frac', 0.05),
+        commons_harvest_mode=game_params.get('commons_harvest_mode', 'category'),
     )
 
     network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))

@@ -1,0 +1,55 @@
+# Commons probe — B+C harvest mode (fraction_own).
+# Identical to commons_probe.yaml except the harvest mechanic: instead of GovSim
+# categories (% of K), each agent chooses a CONTINUOUS, UNBOUNDED percent of its
+# OWN resources to draw from the shared stock (harvest = f_i × R_i). Extraction
+# capacity scales with capital; a large enough fraction empties the whole pool.
+# All other prod numeric params kept identical to commons_probe.yaml.
+
+# Agents
+num_agents: 30
+initial_resources: 100.0
+
+# Investment
+c_inv: 0.10
+g_inv: 0.15
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming
+c_arm: 0.05
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat (prod: symmetric capped stakes, no one-shot kill; flat conflict cost)
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Commons (T5 rung — ON; B+C fraction_own harvest mode)
+commons_enabled: true
+commons_K: 600.0                     # hidden capacity
+commons_init: null                   # start full at K
+commons_harvest_mode: "fraction_own" # continuous, unbounded: harvest = chosen % of own resources
+commons_collapse_frac: 0.05          # permanent collapse below 5% of K (GovSim C=5)
+
+# Economy
+delta_R: 1.0
+
+# Game length
+max_rounds: 30
+history_length: 10
+
+# Network
+network_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.0
+
+# Communication — ON (governance must emerge from language)
+comm_scope: "choice"
+
+# Memory
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true

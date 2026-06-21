@@ -41,6 +41,8 @@ commons_K: 600.0                     # carrying capacity (absolute, HIDDEN — a
 commons_init: null                   # initial stock (null = start full at K)
 commons_harvest_pct: [0, 1, 2, 4, 8] # harvest categories as % of K; sustainable p.p. ≈ 1.67% (lands between cat 2 and 4)
 commons_collapse_frac: 0.05          # stock collapses permanently below this fraction of K (GovSim C = 5%)
+commons_harvest_mode: "category"     # "category" = GovSim categories above (default); "fraction_own" =
+                                     # continuous, unbounded harvest = chosen percent of agent's OWN resources
 
 # Economy
 delta_R: 1.0                         # NO resource decay (current design): R(t+1) = R(t) + ΔR.
