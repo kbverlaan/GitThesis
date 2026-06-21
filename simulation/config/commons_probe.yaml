@@ -25,13 +25,13 @@ lethal_pot: false
 
 # Commons (T5 rung — ON for this probe)
 commons_enabled: true
-commons_K: 600.0                     # hidden capacity; per-capita sustainable = K/(2n) = 10 at n=30
+commons_K: 120.0                     # hidden capacity; per-capita sustainable = K/(2n) = 2 = 2% init R (vs 3% decay)
 commons_init: null                   # start full at K
 commons_harvest_pct: [0, 1, 2, 4, 8] # % of K; sustainable p.p. ≈ 1.67% (between cat 2 and 4)
 commons_collapse_frac: 0.05          # permanent collapse below 5% of K (GovSim C=5)
 
 # Economy
-delta_R: 1.0
+delta_R: 0.97
 
 # Game length
 max_rounds: 30

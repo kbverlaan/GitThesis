@@ -28,13 +28,13 @@ lethal_pot: false
 
 # Commons (T5 rung — ON; B+C fraction_own harvest mode)
 commons_enabled: true
-commons_K: 600.0                     # hidden capacity
+commons_K: 120.0                     # hidden capacity
 commons_init: null                   # start full at K
 commons_harvest_mode: "fraction_own" # continuous, unbounded: harvest = chosen % of own resources
 commons_collapse_frac: 0.05          # permanent collapse below 5% of K (GovSim C=5)
 
 # Economy
-delta_R: 1.0
+delta_R: 0.97
 
 # Game length
 max_rounds: 30

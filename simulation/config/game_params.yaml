@@ -36,18 +36,21 @@ lethal_pot: false                    # capability flag (OFF in prod). If true: p
 
 # Commons (T5 rung — tragedy of the commons; OFF by default, flag-gated)
 commons_enabled: false               # turn on the shared-stock rung (GovSim-style doubling)
-commons_K: 600.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K).
-                                     # per-capita sustainable harvest = K/(2n) = 10 units at n=30 (= GovSim's 10/agent)
+commons_K: 120.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K).
+                                     # per-capita sustainable harvest = K/(2n) = 2 units at n=30 = 2% of initial 100 R.
+                                     # Calibrated vs decay: covering 3% decay needs ~3% harvest > 2% sustainable
+                                     # → beating decay shrinks the pot (Ostrom temptation). Gap widens as R grows.
 commons_init: null                   # initial stock (null = start full at K)
-commons_harvest_pct: [0, 1, 2, 4, 8] # harvest categories as % of K; sustainable p.p. ≈ 1.67% (lands between cat 2 and 4)
+commons_harvest_pct: [0, 1, 2, 4, 8] # harvest categories as % of K (scale-invariant); sustainable p.p. ≈ 1.67%
 commons_collapse_frac: 0.05          # stock collapses permanently below this fraction of K (GovSim C = 5%)
 commons_harvest_mode: "category"     # "category" = GovSim categories above (default); "fraction_own" =
                                      # continuous, unbounded harvest = chosen percent of agent's OWN resources
 
 # Economy
-delta_R: 1.0                         # NO resource decay (current design): R(t+1) = R(t) + ΔR.
-                                     # Cooperation is net-positive (+G/round) → growth comes from
-                                     # cooperation, not from decay pressure. (0.95 = legacy PNAS.)
+delta_R: 0.97                        # BASE resource decay (all rungs): R(t+1) = delta_R·(R(t) + ΔR).
+                                     # 3%/round survival pressure → covering it needs ~3.09% harvest.
+                                     # No self-invest → survival forces social action OR the commons
+                                     # (reinforces "order is inherently social"). 1.0 = no-decay legacy.
 
 # Game length
 max_rounds: 30                       # BASIS (Koen 2026-06-21: budget is afgestemd op R30).

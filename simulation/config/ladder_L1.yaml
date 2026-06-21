@@ -33,13 +33,13 @@ lethal_pot: false
 
 # Commons — OFF on L1
 commons_enabled: false
-commons_K: 600.0
+commons_K: 120.0
 commons_init: null
 commons_harvest_pct: [0, 1, 2, 4, 8]
 commons_collapse_frac: 0.05
 
 # Economy
-delta_R: 1.0
+delta_R: 0.97
 
 # Game length
 max_rounds: 30
