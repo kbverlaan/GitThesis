@@ -22,10 +22,15 @@ import random
 from typing import Dict, Optional
 
 
-def _shuffled_items(d: dict) -> list:
-    """Return dict items in random order to avoid positional bias."""
+def _shuffled_items(d: dict, rng: random.Random) -> list:
+    """Return dict items in random order to avoid positional bias.
+
+    Uses a caller-supplied per-call RNG (seeded from run seed + agent + round)
+    so ordering is reproducible from the seed and thread-safe — never the
+    process-global RNG, which is mutated concurrently inside the runner's
+    ThreadPoolExecutor (C1)."""
     items = list(d.items())
-    random.shuffle(items)
+    rng.shuffle(items)
     return items
 
 
@@ -119,6 +124,11 @@ class BaselinePrompt:
         round_num = observation["round"]
         lines = [f"CURRENT STATE (Round {round_num}):"]
 
+        # Per-call deterministic RNG for agent-ordering: reproducible from the run
+        # seed and thread-safe (no shared global state). Falls back to (agent_id,
+        # round) when no seed was stashed (e.g. standalone prompt tests).
+        rng = random.Random(f"{self.game_params.get('random_seed')}|{agent_id}|{round_num}")
+
         visible = observation.get("visible_agents", None)
         resources = observation["resources"]
         arm_bonuses = observation.get("arm_bonuses", observation.get("active_arms", {})) or {}
@@ -141,7 +151,7 @@ class BaselinePrompt:
         else:
             lines.append("AGENTS (resources = combat strength):")
 
-        for aid, r in _shuffled_items(resources):
+        for aid, r in _shuffled_items(resources, rng):
             if visible is not None and aid != agent_id and aid not in visible:
                 continue
             bonus = arm_bonuses.get(aid, 0.0) or 0.0

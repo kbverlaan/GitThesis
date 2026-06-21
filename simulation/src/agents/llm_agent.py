@@ -121,6 +121,24 @@ class LLMAgent:
         Format observation using unified prompt.
         """
         return self.prompt.format_observation(observation, self.agent_id)
+
+    def _retry_schema_fields(self) -> list:
+        """Schema fields the JSON-retry follow-up must request, gated the same way
+        as the main prompt template (I4). Without this, the retry omitted
+        harvest/message/rewire and silently zeroed them on a parse-retry."""
+        gp = self.game_params
+        fields = ['"reasoning": "<think step by step>"',
+                  '"action": "<action_name>"',
+                  '"target": "<agent_id or null>"']
+        if self.prompt.comm_scope != "none":
+            fields.append('"message": "<your message, or null>"')
+            fields.append('"message_to": "<list of recipient agent_ids, or null>"')
+        if gp.get('assoc_enabled', True) and gp.get('rewiring_prob', 0.0) > 0:
+            fields.append('"rewire_drop": "<neighbour to disconnect, or null>"')
+            fields.append('"rewire_invite": "<agent to connect with, or null>"')
+        if gp.get('commons_enabled', False):
+            fields.append('"harvest": "<how much to take from the shared stock, or 0>"')
+        return fields
     
     def _parse_response(self, response_text: str) -> Optional[Dict]:
         """
@@ -259,11 +277,13 @@ class LLMAgent:
             if self._visible_agents is not None and target not in self._visible_agents:
                 return None
 
+        raw_harvest = action_dict.get('harvest', 0)
         return Action(
             agent_id=self.agent_id,
             action_type=action_type,
             target_id=target if target else None,
-            harvest=self._snap_harvest(action_dict.get('harvest', 0)),
+            harvest=self._snap_harvest(raw_harvest),
+            harvest_raw=str(raw_harvest) if raw_harvest not in (None, 0, '0') else None,
         )
 
     def _snap_harvest(self, raw) -> float:
@@ -282,6 +302,7 @@ class LLMAgent:
             return 0.0
 
         if self.game_params.get('commons_harvest_mode', 'category') == 'fraction_own':
+            had_percent = isinstance(raw, str) and '%' in raw
             if isinstance(raw, str):
                 raw = raw.strip().rstrip('%').strip()
             try:
@@ -290,6 +311,13 @@ class LLMAgent:
                 return 0.0
             if v <= 0:
                 return 0.0
+            # Audit flag (C2): a bare decimal < 1 with no '%' is ambiguous — it
+            # could be an intended fraction (0.05) rather than a percent (0.05% →
+            # 0.0005). We DO NOT rescale (percent semantics are fixed); just warn
+            # so any mis-scale is detectable post-hoc.
+            if v < 1 and not had_percent:
+                print(f"WARN: {getattr(self, 'agent_id', '?')} harvest '{raw}' is a "
+                      f"bare decimal < 1 (read as {v}% → fraction {v / 100.0}); verify intent.")
             return v / 100.0
 
         cats = self.game_params.get('commons_harvest_pct', [0, 1, 2, 4, 8])
@@ -480,12 +508,13 @@ class LLMAgent:
                 if attempt < self.retry_attempts - 1:
                     try:
                         t0 = time.time()
+                        retry_format = "{" + ", ".join(self._retry_schema_fields()) + "}"
                         retry_response = self.client.chat.completions.create(
                             model=self.model,
                             messages=[
                                 {"role": "user", "content": prompt},
                                 {"role": "assistant", "content": response_text},
-                                {"role": "user", "content": "Please respond with ONLY a JSON object in this exact format: {\"reasoning\": \"<think step by step>\", \"action\": \"<action_name>\", \"target\": \"<agent_id or null>\"}"}
+                                {"role": "user", "content": f"Please respond with ONLY a JSON object in this exact format: {retry_format}"}
                             ],
                             temperature=self.temperature,
                             max_tokens=512,
@@ -504,6 +533,13 @@ class LLMAgent:
 
                         action_dict = self._parse_response(retry_text)
                         if action_dict:
+                            # Audit (I4): warn if a schema field that the original
+                            # response carried got dropped by the retry → silently zeroed.
+                            for f in ("harvest", "message", "message_to",
+                                      "rewire_drop", "rewire_invite"):
+                                if f in (response_text or "") and f not in action_dict:
+                                    print(f"WARN: {self.agent_id} JSON-retry dropped "
+                                          f"previously-present field '{f}' (zeroed).")
                             action = self._action_dict_to_action(action_dict)
                             if action:
                                 self._store_message(action_dict)

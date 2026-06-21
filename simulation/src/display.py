@@ -36,7 +36,6 @@ _ACTION_COLORS = {
     'strengthen': 'yellow', 'arm_other': 'yellow',
     'take': 'red',         'attack': 'red',
     'hold': 'gray',        'do_nothing': 'gray',
-    'invest_self': 'dim',  'arm_self': 'yellow',
 }
 
 # Action type → icon (canonical new names + legacy aliases)
@@ -45,7 +44,6 @@ _ACTION_ICONS = {
     'strengthen': '🛡️', 'arm_other': '🛡️',
     'take': '⚔️',       'attack': '⚔️',
     'hold': '💤',       'do_nothing': '💤',
-    'invest_self': '  ', 'arm_self': '🛡️',
 }
 
 
@@ -172,19 +170,19 @@ _BORING_CONTEXTS = [
     'avoid attack', 'safe', 'steady', 'continue',
 ]
 
-# Actions that are always "interesting" (not just invest_self)
-_INTERESTING_ACTIONS = {'take', 'attack', 'strengthen', 'arm_self', 'arm_other', 'transfer', 'invest_other'}
+# Actions that are always "interesting"
+_INTERESTING_ACTIONS = {'take', 'attack', 'strengthen', 'arm_other', 'transfer', 'invest_other'}
 
 
 def _is_interesting(action, note):
     """Check if an agent's round is worth highlighting.
 
     Interesting = non-default action OR note with strategic content.
-    invest_self with a boring note is collapsed.
+    A default action (hold) with a boring note is collapsed.
     """
     if action in _INTERESTING_ACTIONS:
         return True
-    if action in ('invest_self', 'do_nothing', 'hold') and note:
+    if action in ('do_nothing', 'hold') and note:
         note_lower = note.lower()
         # Check for boring contexts first — these negate keywords
         if any(ctx in note_lower for ctx in _BORING_CONTEXTS):
@@ -197,7 +195,7 @@ def print_agent_round_summary(action_map, notes, agent_ids):
     """Print smart per-agent summary: highlight interesting, collapse boring.
 
     Combines action + note on one line for interesting agents.
-    Groups boring agents (invest_self, no interesting note) into a compact line.
+    Groups boring agents (hold, no interesting note) into a compact line.
     """
     interesting = []
     boring = []
