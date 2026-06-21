@@ -35,10 +35,11 @@ apptainer exec --nv \
   --trust-remote-code \
   --host 0.0.0.0 \
   --port $PORT \
-  --max-model-len 32768 \
-  --max-num-seqs 32 \
+  --max-model-len 65536 \
+  --max-num-seqs 48 \
   --gpu-memory-utilization 0.95 \
   --dtype bfloat16 \
+  --quantization fp8 \
   --reasoning-parser gemma4 &
 
 VLLM_PID=$!
