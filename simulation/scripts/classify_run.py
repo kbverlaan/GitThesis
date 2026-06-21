@@ -327,12 +327,23 @@ def extract_communication_features(rounds):
             recipient = msg.get("to")
             if sender:
                 senders[sender] += 1
-            if recipient in BROADCAST_TARGETS:
+            # `to` may be a scalar (legacy / fixed-scope) or a LIST of agent names
+            # (comm_scope="choice"). Normalise to a list of concrete recipients,
+            # treating broadcast sentinels ("all", None, ...) as no concrete target.
+            if isinstance(recipient, list):
+                recipients = [t for t in recipient if t not in BROADCAST_TARGETS]
+            elif recipient in BROADCAST_TARGETS:
+                recipients = []
+            else:
+                recipients = [recipient]
+            # A message counts as a broadcast if it has no concrete recipient
+            # (an "all"/None target, or an empty/all-sentinel list).
+            if not recipients:
                 broadcasts += 1
-            elif recipient:
-                receivers[recipient] += 1
+            for rec in recipients:
+                receivers[rec] += 1
                 if sender:
-                    pairs.add((sender, recipient))
+                    pairs.add((sender, rec))
     n_rounds = len(arounds)
     return {
         "total_messages": total_msgs,
