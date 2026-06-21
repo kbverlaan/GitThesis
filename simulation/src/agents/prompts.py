@@ -57,6 +57,18 @@ class BaselinePrompt:
         self.comm_scope = comm_scope
         self.network_enabled = network_enabled
 
+    def _arm_on(self) -> bool:
+        """Arming (L2) is rendered only when the rung flag is on AND it has bite
+        (mu_arm > 0). arm_enabled=False fully removes the affordance."""
+        return (self.game_params.get("arm_enabled", True)
+                and self.game_params.get("mu_arm", 3.0) > 0)
+
+    def _rewiring_on(self) -> bool:
+        """Rewiring (L3 association) is rendered only when the rung flag is on AND
+        w > 0. assoc_enabled=False freezes the topology (no drop/invite)."""
+        return (self.game_params.get("assoc_enabled", True)
+                and self.game_params.get("rewiring_prob", 0.0) > 0)
+
     def format_observation(self, observation: Dict, agent_id: str) -> str:
         """Build the prompt for one agent on one round.
 
@@ -118,7 +130,7 @@ class BaselinePrompt:
                 f"resources): {', '.join(visible) if visible else 'none'}"
             )
 
-        show_arm = self.game_params.get("mu_arm", 3.0) > 0
+        show_arm = self._arm_on()
         take_on = self.game_params.get("take_enabled", True)
 
         lines.append("")
@@ -176,16 +188,18 @@ class BaselinePrompt:
 
     def _format_intro(self) -> str:
         n_agents = self.game_params.get("num_agents", 30)
-        rewiring_on = self.game_params.get("rewiring_prob", 0.0) > 0
+        rewiring_on = self._rewiring_on()
         comm_on = self.comm_scope != "none"
         decay_on = self.game_params.get("delta_R", 1.0) < 1.0
         commons_on = self.game_params.get("commons_enabled", False)
+        take_on = self.game_params.get("take_enabled", True)
 
         # List only the rule-blocks that are actually rendered for this config.
         rules_items = ["available actions"]
         if decay_on:
             rules_items.append("resource decay")
-        rules_items.append("combat (incl. coalitions)")
+        if take_on:
+            rules_items.append("combat (incl. coalitions)")
         if self.network_enabled:
             rules_items.append("network and rewiring" if rewiring_on else "the network")
         if comm_on:
@@ -193,6 +207,7 @@ class BaselinePrompt:
         if commons_on:
             rules_items.append("the shared stock")
         rules_summary = ", ".join(rules_items)
+        state_tail = "current resources, combat strengths" if take_on else "current resources"
 
         return (
             f"INTRODUCTION:\n"
@@ -203,8 +218,7 @@ class BaselinePrompt:
             f"  2. The other agents — how to reason about them.\n"
             f"  3. Identity — who you are and your objective.\n"
             f"  4. Your memory — your own notes (kept across the whole game) plus detailed events from recent rounds.\n"
-            f"  5. Current state — who is connected to you, current resources, "
-            f"combat strengths.\n"
+            f"  5. Current state — who is connected to you, {state_tail}.\n"
             f"  6. Output — the JSON format your response must follow.\n"
             f"Read everything carefully, then submit your decision as valid JSON."
         )
@@ -234,6 +248,7 @@ class BaselinePrompt:
 
         symmetric_stakes = self.game_params.get("symmetric_stakes", False)
         take_enabled = self.game_params.get("take_enabled", True)
+        arm_on = self._arm_on()
 
         actions = []
         saturation_decay = self.game_params.get("gamma_sat", 1.0)
@@ -256,7 +271,7 @@ class BaselinePrompt:
             )
         actions.append(invest_desc)
 
-        if mu_arm > 0:
+        if arm_on:
             arm_cost_ex = 25.0 * arm_cost_pct / 100
             arm_bonus_ex = arm_cost_ex * arm_multiplier
             actions.append(
@@ -298,7 +313,7 @@ AVAILABLE ACTIONS:
 - Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}."""
             )
 
-        cs_label = "resources + arm bonus" if mu_arm > 0 else "resources"
+        cs_label = "resources + arm bonus" if arm_on else "resources"
 
         lethal_pot = self.game_params.get("lethal_pot", False)
         inv_alpha = (1.0 / alpha) if alpha > 0 else 99.0
@@ -360,11 +375,11 @@ AVAILABLE ACTIONS:
 
         arm_decay_line = (
             f"\n- All arm bonuses decay at the END of each round (multiply by {arm_decay})."
-            if mu_arm > 0 else ""
+            if arm_on else ""
         )
 
-        resolution_invest = "Investments" + (" and arming" if mu_arm > 0 else "")
-        resolution_strength = f"current resources{' + arm bonus' if mu_arm > 0 else ''}"
+        resolution_invest = "Investments" + (" and arming" if arm_on else "")
+        resolution_strength = f"current resources{' + arm bonus' if arm_on else ''}"
 
         # Combat rules only exist when taking is available (rung ≥ predation).
         if take_enabled:
@@ -389,7 +404,7 @@ COALITIONS (multi-attacker combat):
         if commons_on:
             steps.append(f"{len(steps) + 1}. Harvests from the shared stock are taken and added to your resources.")
         eor = f"{len(steps) + 1}. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources)."
-        if mu_arm > 0:
+        if arm_on:
             eor += f" Arm bonuses decay (×{arm_decay})."
         if commons_on:
             eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
@@ -398,11 +413,12 @@ COALITIONS (multi-attacker combat):
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
+        rewiring_on = self._rewiring_on()
         if self.network_enabled:
             nb_verbs = ["transfer to"]
             if take_enabled:
                 nb_verbs.append("take from")
-            if mu_arm > 0:
+            if arm_on:
                 nb_verbs.append("strengthen")
             if len(nb_verbs) == 1:
                 nb_phrase = nb_verbs[0]
@@ -414,10 +430,13 @@ COALITIONS (multi-attacker combat):
                 "NETWORK:",
                 f"Agents are connected through a network. You can ONLY {nb_phrase} agents you are directly connected to. You can message any agent regardless of connection.",
                 "Connections are symmetric: if you are connected to Blue, then Blue is also connected to you. But each agent has its own set of connections — other agents generally see a different set of neighbours than you do.",
-                "Connections can change over time based on how agents interact.",
-                "You cannot verify claims about agents whose resources are hidden from you.",
             ]
-            if rewiring_prob > 0:
+            # Below the association rung the topology is frozen — drop the
+            # "connections change" line that hints at rewiring.
+            if rewiring_on:
+                network_block.append("Connections can change over time based on how agents interact.")
+            network_block.append("You cannot verify claims about agents whose resources are hidden from you.")
+            if rewiring_on:
                 network_block.append("")
                 network_block.append(
                     f"REWIRING: each round, with probability {rewiring_prob:.2f}, the system applies your rewiring nominations. You may nominate at most one neighbour to disconnect from (drop) and at most one agent — neighbour or not — to connect with (invite). Nominations are unilateral: no consent is required from the counterparty."
@@ -471,8 +490,7 @@ COALITIONS (multi-attacker combat):
         """Build the JSON output schema. Field order: comm → action → target →
         rewire → memory. Memory last so it reflects on a just-decided action.
         """
-        rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
-        has_rewire = rewiring_prob > 0
+        has_rewire = self._rewiring_on()
         commons_enabled = self.game_params.get("commons_enabled", False)
         cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
         cat_str = "/".join(f"{c:g}" for c in cats)

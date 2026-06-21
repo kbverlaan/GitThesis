@@ -112,7 +112,9 @@ class GameEngine:
                  max_rounds: int = None,
                  symmetric_stakes: bool = False,
                  lethal_pot: bool = False,
+                 arm_enabled: bool = True,
                  take_enabled: bool = True,
+                 assoc_enabled: bool = True,
                  commons_enabled: bool = False,
                  commons_K: float = 600.0,
                  commons_init: Optional[float] = None,
@@ -141,7 +143,9 @@ class GameEngine:
             "tau_sat": tau_sat,
             "symmetric_stakes": symmetric_stakes,
             "lethal_pot": lethal_pot,
+            "arm_enabled": arm_enabled,
             "take_enabled": take_enabled,
+            "assoc_enabled": assoc_enabled,
             "commons_enabled": commons_enabled,
             "commons_K": commons_K,
             "commons_collapse_frac": commons_collapse_frac,
@@ -197,10 +201,15 @@ class GameEngine:
 
         # Validate actions. When taking is disabled (rung below predation), any
         # attack is treated as hold — the affordance does not exist on this rung.
+        # Same for arming/strengthen when arm_enabled is off.
         take_enabled = self.params.get("take_enabled", True)
+        arm_enabled = self.params.get("arm_enabled", True)
         valid_actions = []
         for action in actions:
             if action.action_type == ActionType.ATTACK and not take_enabled:
+                action = Action(action.agent_id, ActionType.DO_NOTHING, None,
+                                harvest=getattr(action, "harvest", 0.0))
+            if action.action_type in (ActionType.ARM_OTHER, ActionType.ARM_SELF) and not arm_enabled:
                 action = Action(action.agent_id, ActionType.DO_NOTHING, None,
                                 harvest=getattr(action, "harvest", 0.0))
             if self.can_afford_action(action.agent_id, action.action_type):

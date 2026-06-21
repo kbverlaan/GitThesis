@@ -241,7 +241,16 @@ class LLMAgent:
             return None
 
         action_type = action_map[action_str]
-        
+
+        # Disabled affordances snap to hold — consistent with how the engine
+        # neutralises them and how harvest snaps to 0 when commons is off.
+        if action_type == ActionType.ARM_OTHER and not self.game_params.get('arm_enabled', True):
+            action_type = ActionType.DO_NOTHING
+            target = None
+        if action_type == ActionType.ATTACK and not self.game_params.get('take_enabled', True):
+            action_type = ActionType.DO_NOTHING
+            target = None
+
         # Validate target requirements
         if action_type in [ActionType.INVEST_OTHER, ActionType.ARM_OTHER, ActionType.ATTACK]:
             if not target or target == self.agent_id:
@@ -315,7 +324,13 @@ class LLMAgent:
             self._last_memory = None
 
     def _store_rewire(self, action_dict: Dict):
-        """Store rewire nomination ({drop, invite}) from LLM response."""
+        """Store rewire nomination ({drop, invite}) from LLM response.
+
+        Below the association rung (assoc_enabled=False) the topology is frozen,
+        so any drop/invite the model emits is ignored."""
+        if not self.game_params.get('assoc_enabled', True):
+            self._last_rewire_nom = None
+            return
         drop = action_dict.get('rewire_drop')
         invite = action_dict.get('rewire_invite')
 

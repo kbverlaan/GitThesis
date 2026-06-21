@@ -13,11 +13,17 @@ gamma_sat: 0.80                      # saturation factor per repeat in window
 tau_sat: 5                           # saturation window (rounds)
 
 # Arming
+arm_enabled: true                    # L2 rung flag: strengthen/arming affordance. When false,
+                                     # strengthen is a no-op and the prompt drops every arm reference
+                                     # (combat strength = resources only). Default true = legacy behaviour
+                                     # (arming keyed off mu_arm>0).
 c_arm: 0.05                          # arm cost (fraction of actor's R) — Koen 2026-06-21: 5%
 mu_arm: 3.0                          # arm multiplier (bonus = cost × mu_arm)
 delta_B: 0.50                        # arm decay factor
 
 # Combat
+take_enabled: true                   # L2 rung flag: take/combat affordance. When false, any attack is
+                                     # neutralised to a no-op and the prompt drops the COMBAT block.
 alpha: 0.35                          # spoils = alpha × loser's R (Koen 2026-06-21: fixed at 0.35, as VSC run)
 c_atk: 0.02                          # FLAT conflict cost (fraction of own R) — Koen 2026-06-21: 2%, no escalation.
                                      # eta_atk/tau_atk (attack-cost escalation) removed from prod; engine keeps
@@ -48,7 +54,12 @@ max_rounds: 30                       # BASIS (Koen 2026-06-21: budget is afgeste
 history_length: 10
 
 # Network
-network_enabled: true
+network_enabled: true                # static topology = always-on substrate (transfer/take/strengthen
+                                     # are 1-hop). Present on EVERY rung; do not gate it by a rung flag.
+assoc_enabled: true                  # L3 rung flag: association = drop/invite rewiring. When false, no
+                                     # rewiring happens and the prompt drops every drop/invite reference
+                                     # (the topology is frozen). Default true = legacy behaviour
+                                     # (rewiring keyed off rewiring_prob>0).
 mean_degree: 5.0
 rewiring_prob: 0.0                   # w — IV (§3.3.2)
 

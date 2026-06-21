@@ -200,7 +200,9 @@ def run_simulation(game_params: dict,
         max_rounds=game_params['max_rounds'],
         symmetric_stakes=game_params.get('symmetric_stakes', False),
         lethal_pot=game_params.get('lethal_pot', False),
+        arm_enabled=game_params.get('arm_enabled', True),
         take_enabled=game_params.get('take_enabled', True),
+        assoc_enabled=game_params.get('assoc_enabled', True),
         commons_enabled=game_params.get('commons_enabled', False),
         commons_K=game_params.get('commons_K', 600.0),
         commons_init=game_params.get('commons_init', None),
@@ -409,9 +411,10 @@ def run_simulation(game_params: dict,
 
         updated_state = engine.get_state()
 
-        # Rewiring (§3.1 step 7)
+        # Rewiring (§3.1 step 7). Gated by assoc_enabled (L3 rung): below the
+        # association rung the topology is frozen — no drop/invite is applied.
         rewire_stats = None
-        if network:
+        if network and game_params.get('assoc_enabled', True):
             bf = dict(round_result.get('bilateral_flows', {}))
             bilateral_flows_history.append(bf)
             nominations = {}

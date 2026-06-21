@@ -1,0 +1,56 @@
+# Complexity ladder — RUNG 4: Commons.
+# Affordances: L3 + harvest (shared logistic stock). Full ladder.
+# Comms + memory ON (always-on base substrate). Prod numeric params unchanged.
+#
+# Flag matrix (see ladder_L1.yaml header).
+
+num_agents: 30
+initial_resources: 100.0
+
+# Investment
+c_inv: 0.10
+g_inv: 0.15
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming — ON
+arm_enabled: true
+c_arm: 0.05
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat — ON
+take_enabled: true
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Commons — ON from L4
+commons_enabled: true
+commons_K: 600.0
+commons_init: null
+commons_harvest_pct: [0, 1, 2, 4, 8]
+commons_collapse_frac: 0.05
+
+# Economy
+delta_R: 1.0
+
+# Game length
+max_rounds: 30
+history_length: 10
+
+# Network — association (rewiring) ON; w>0 gives it bite
+network_enabled: true
+assoc_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.5
+
+# Communication — ON (base substrate)
+comm_scope: "choice"
+
+# Memory — ON (base substrate)
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true
