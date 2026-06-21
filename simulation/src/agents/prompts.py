@@ -180,12 +180,20 @@ class BaselinePrompt:
         n_agents = self.game_params.get("num_agents", 30)
         rewiring_on = self.game_params.get("rewiring_prob", 0.0) > 0
         comm_on = self.comm_scope != "none"
+        decay_on = self.game_params.get("delta_R", 1.0) < 1.0
+        commons_on = self.game_params.get("commons_enabled", False)
 
-        rules_items = ["available actions", "resource decay", "combat (incl. coalitions)"]
+        # List only the rule-blocks that are actually rendered for this config.
+        rules_items = ["available actions"]
+        if decay_on:
+            rules_items.append("resource decay")
+        rules_items.append("combat (incl. coalitions)")
         if self.network_enabled:
             rules_items.append("network and rewiring" if rewiring_on else "the network")
         if comm_on:
             rules_items.append("communication")
+        if commons_on:
+            rules_items.append("the shared stock")
         rules_summary = ", ".join(rules_items)
 
         return (
@@ -194,8 +202,8 @@ class BaselinePrompt:
             f"game. You will receive a new prompt like this every round. The "
             f"sections below appear in this order:\n"
             f"  1. Game rules — {rules_summary}.\n"
-            f"  2. Identity — who you are and your objective.\n"
-            f"  3. Approach — how to reason about other agents.\n"
+            f"  2. The other agents — how to reason about them.\n"
+            f"  3. Identity — who you are and your objective.\n"
             f"  4. Your memory — your own notes (kept across the whole game) plus detailed events from recent rounds.\n"
             f"  5. Current state — who is connected to you, current resources, "
             f"combat strengths.\n"
@@ -270,7 +278,12 @@ class BaselinePrompt:
 
         actions_text = "\n".join(actions)
 
-        parts = [f"""Choose exactly ONE action this round.
+        commons_on = self.game_params.get("commons_enabled", False)
+        harvest_aside = (
+            " (Harvesting from the shared stock is separate and does NOT use up "
+            "your action — see SHARED STOCK below.)" if commons_on else ""
+        )
+        parts = [f"""Choose exactly ONE action this round.{harvest_aside}
 
 AVAILABLE ACTIONS:
 {actions_text}"""]
@@ -283,9 +296,8 @@ AVAILABLE ACTIONS:
                 f"""RESOURCE DECAY:
 - Every agent loses {resource_decay_pct}% of their resources at the END of each round.
 - Example: 25.0 → lose {decay_ex:.1f}, left with {25.0 - decay_ex:.1f}.
-- Doing nothing causes you to shrink. You NEED income (from others investing in you, or from winning attacks) to sustain yourself.
-- After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}.
-- BANKRUPTCY: if you lose a combat and cannot cover your loss, you forfeit ALL your remaining resources and are eliminated. You can no longer take actions or send messages. Bankruptcy is permanent — you have lost the game."""
+- Doing nothing causes you to shrink. Income (from others investing in you, or from winning attacks) offsets it.
+- After 10 rounds of doing nothing: 25.0 → {25.0 * (1 - resource_decay_pct/100)**10:.1f}."""
             )
 
         cs_label = "resources + arm bonus" if mu_arm > 0 else "resources"
@@ -356,11 +368,28 @@ AVAILABLE ACTIONS:
         resolution_invest = "Investments" + (" and arming" if mu_arm > 0 else "")
         resolution_strength = f"current resources{' + arm bonus' if mu_arm > 0 else ''}"
 
+        # Resolution order — insert harvest + regeneration steps when commons is on.
+        steps = [
+            f"1. {resolution_invest} resolve first.",
+            f"2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as {resolution_strength}.",
+            "3. Spoils transfer according to the combat outcome.",
+        ]
+        if commons_on:
+            steps.append(f"{len(steps) + 1}. Harvests from the shared stock are taken and added to your resources.")
+        eor = f"{len(steps) + 1}. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources)."
+        if mu_arm > 0:
+            eor += f" Arm bonuses decay (×{arm_decay})."
+        if commons_on:
+            eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
+        steps.append(eor)
+        resolution_steps = "\n".join(steps)
+
         parts.append(f"""COMBAT RULES:
 - Combat strength = {cs_label}.{arm_decay_line}
 - Win probability = attacker_strength / (attacker_strength + defender_strength).
 - {conflict_cost_line}
 - {combat_spoils}
+- BANKRUPTCY: if you lose a combat and cannot cover what you owe, you forfeit ALL your remaining resources and are eliminated — permanently, no longer able to act or send messages.
 
 COALITIONS (multi-attacker combat):
 - If multiple agents attack the same target in the same round, their combat strengths ADD into a coalition vs the defender.
@@ -368,10 +397,7 @@ COALITIONS (multi-attacker combat):
 - Investing in an attacker does NOT give you a share of their spoils — only co-attackers share.
 
 RESOLUTION ORDER (each round, after all agents submit actions simultaneously):
-1. {resolution_invest} resolve first.
-2. Attacks resolve next. Each participant first pays their conflict cost, THEN combat strength is computed as {resolution_strength}.
-3. Spoils transfer according to the combat outcome.
-4. End-of-round: resource decay applies to everyone (-{resource_decay_pct}% of current resources).{(' Arm bonuses decay (×' + str(arm_decay) + ').') if mu_arm > 0 else ''}""")
+{resolution_steps}""")
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
