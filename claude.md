@@ -2,7 +2,7 @@
 
 **Project**: The Origins of Order - Master Thesis in Computational Science
 **Author**: Koen Verlaan
-**Last Updated**: 2026-02-09
+**Last Updated**: 2026-05-30
 
 ---
 
@@ -16,24 +16,27 @@ At the end of this journey, Koen must be able to confidently say: "I wrote this 
 
 ## Project Context
 
-**RQ**: How do strategic reasoning, information structure, and communication scope each shape the emergence of social order in multi-agent LLM systems?
+**RQ** (complexity-ladder design, June 2026): where on a monotone complexity ladder does an LLM society switch from inherited (NAP) to invented (bespoke) coordination, and does the **language layer act as the "creating step"** for norm, institution, and governance? [TODO Koen — finalize formal RQ wording in own voice.]
 
-**Three IVs** — formally the three inputs of mechanism design (Hurwicz, 1960); narratively mapped to Hobbes's three causes of conflict (*Leviathan*, 1651) with caveats:
-1. **Reasoning depth** (L0-L3) — MD's solution concept / Hobbes's "competition" (strong mapping)
-2. **Network rewiring** (w ∈ {0, 0.05, 0.3, 1.0}) — MD's type space / Hobbes's "diffidence" (moderate: two-layered — hidden resources = source, w = structural response)
-3. **Communication scope** (no-comm → DM → broadcast → choice) — MD's message space / Hobbes's "lack of common power" (strong mapping)
+**The complexity ladder** (single spine — replaces the earlier 3-IV / G-transect framing). One unchanged engine; **communication + memory are a fixed base substrate (always on), NOT rungs** — language is the medium in which order is negotiated, and whether it is the "creating step" is tested by the **comms-off control**, not by adding language as a step. Each rung adds exactly **one** response-schema field and never removes one → the action space is nested and per-action payoffs are never re-priced (calibration holds by construction; %-based economy keeps relative stakes fixed). Four rungs, mapped onto the social-order hierarchy (coordination → cooperation → convention → norm/institution → governance):
+1. **T1 Cooperation dilemma** — `invest_other`, `hold` (clean Stag Hunt/PD, no violence).
+2. **T2 Predation + arming** — `take`, `arm_other` (Hobbesian power formation; strength-based combat; emergent coalitions).
+3. **T3 Association** — `drop`, `invite` (endogenous network → convention; Skyrms & Pemantle).
+4. **T4 Commons** — `harvest_amount` (logistic shared stock; Ostrom governance).
 
-**Base defaults** (not IVs): hidden resources ON, memory ON (window 10), 6 actions, %-based economy.
+Norm + institution emerge on the higher rungs out of the always-on messaging (predation repurposed as *endogenous* enforcement — Pinker R6); the comms-off control tests whether the language substrate is what makes them possible.
 
-**Design** (updated Mar 2): Three IVs manipulated independently on Qwen 3.5-27B (dense). Phase 2c: parameter characterisation + reasoning depth. Phase 2d: communication scope (no-comm/DM/broadcast/choice). Information IV = network rewiring probability w. Contracts moved to future work. The thesis aims for publishable quality (AAMAS 2027).
+Core model **Gemma 4 31B** dense (temp 0.3); **Qwen 3.6/3.7** second-family robustness arm. n=30, R30, %-based economy. **Pre-registration-led** (falsification is publishable). Theory anchors: Pinker 2010 (cognitive niche), the Lewis→Bicchieri→Searle→Crawford-Ostrom→Ostrom order-hierarchy, Skyrms & Pemantle 2000, Schelling 1960 (analysis lens). Living docs: `Thesis/PNAS/Paper v2/Protocol — Complexity Ladder (one-pager).md` + `cognitive_niche_ladder_v2.md`. Targeting **PNAS** (AAMAS 2027 fallback).
+
+**Base defaults**: resources observable (**hidden-resources OFF** — strength-opacity caused universal stasis), memory ON (window 10), **no invest_self/arm_self/private-decay** (autarky stagnates, not dies → dominance is inherently social), %-based economy. Reasoning-depth / ToM as a *manipulated* axis is **dropped** (legacy — own finding: effect unreliable, w dampened naming, ToM-priming not robust); trace-complexity is observed-only behavioural data.
 
 **Timeline**: Feb 2026 - Jul 15 2026 (submission), defence late July.
-**Meetings**: Biweekly Fridays 14:00 with Debraj (next: Feb 27).
+**Meetings**: Biweekly Fridays 14:00 with Debraj (last sync: Jun 11; next ~w/o Jun 15).
 **Ambition**: Publishable thesis — see Obsidian `Thesis/Referentie/Publishable Checklist.md` for full quality checklist.
 
 **All project notes live in Obsidian** (`~/Obsidian/Sente/Projecten/Thesis/`), not in this repo. This repo holds code (`simulation/`), LaTeX frame (`text/main/`), proposal (`text/proposal/`), and reference PDFs (`docs/`).
 
-**Current phase**: Phase 1 → Phase 2 transition. System characterization (parameter sweeps) running. Reasoning depth pilot complete with strong results. Next: full factorial (reasoning depth × spatial radius).
+**Current phase**: **Complexity-ladder pre-registration** (June 2026). Pivoted from the G-transect after the Jun-11 Debraj sync (reframe: complexity axis + cognitive niche construction; pre-registration is leading). Engine frozen. Next: Koen writes the one-pager's RQ / prediction / falsification; lock commons params (g, K, MSY) + a numeric discontinuity decision-rule; build the 5 rungs as additive schema fields; then run the ladder × second-family. Budget ~17K SBU.
 
 ### Debraj's Methodological Template
 
@@ -46,7 +49,7 @@ Debraj's paper "Higher Order Reasoning under Intent Uncertainty Reinforces the H
 5. **Clean metrics over time.** Track action distributions, probabilities, streaks -- not just final outcomes but trajectories.
 6. **Track WHY agents choose actions.** He collected action quality data (Q-values). For Koen: use reasoning traces as data, not just decoration.
 
-His reasoning levels (level-0 → level-1 → level-2) map to Koen's prompt variations:
+His reasoning levels (level-0 → level-1 → level-2) originally mapped to Koen's prompt variations (below). **NB: this L0–L3 prompt-as-IV mapping is superseded** — depth-as-axis was dropped (see Base defaults). The ladder now varies *affordances* (one schema field per rung), not reasoning prompts; principle #1 ("vary ONE thing at a time") still holds, the varied thing is the affordance.
 - Level-0 (fixed policy) → "State your choice briefly. Do not deliberate."
 - Level-1 (best response) → "Calculate the expected value of each available action..."
 - Level-2 (opponent modeling) → "First predict what each nearby agent is likely to do..."
@@ -58,6 +61,11 @@ When Koen feels lost about what to do next or how to structure experiments, refe
 
 | Document | Location | Purpose |
 |----------|----------|---------|
+| **PNAS SSOT** (living) | Obsidian `Thesis/PNAS/PNAS — Submission (SSOT).md` | Center of the constellation: PNAS skeleton + results tracker, open decisions, changelog |
+| Framing + validation | Obsidian `Thesis/PNAS/Framing (PNAS).md` | Cross-disciplinary framing, contamination/validation logic, best-responder spec |
+| Methodology | Obsidian `Thesis/PNAS/Methodology/` | Engine & Game Rules · Prompts · EV & Phase Boundaries · Experimental Setup · Convergence & Measurement · Regime Classifier |
+| Findings | Obsidian `Thesis/PNAS/Findings/` | F1 payoff→regime · F2 language→institutions · F3 reasoning-space (+ `_Findings Index`) |
+| AI Safety Frame | Obsidian `Thesis/PNAS/AI Safety Frame — Emergent Norms & Spirals.md` | Debraj-requested systemic/multi-agent safety framing |
 | Status + Roadmap | Obsidian `Thesis/1 Status.md`, `Thesis/3 Roadmap.md` | Current state, phases, sprint log |
 | Sprint log | Obsidian `Thesis/Archief/Sprints/` | Per-sprint tasks and outcomes |
 | Experiment log | Obsidian `Thesis/Research/Experiment Log.md` | All runs documented with observations |
@@ -81,7 +89,7 @@ This thesis aims for publication quality. Claude must actively enforce these sta
 
 **Reasoning trace integrity**: Always frame traces as behavioral data, not mechanistic explanations. Cite faithfulness literature (Turpin, Lanham, Chen). Implement at least one faithfulness validation (early-answering or Thought Anchors resampling). Frame prompts as manipulating computational depth, not semantic content.
 
-**Claims calibration**: Match claim strength to evidence. Strong evidence → "We find", moderate → "suggests", weak → "preliminary evidence". Never claim causality without faithfulness caveat. The novel claims are: (1) reasoning depth produces qualitatively different emergent structures, (2) the effect is non-monotonic and conditional on game structure, (3) extension of Hobbesian Trap from 2-agent RL to 30-agent LLM.
+**Claims calibration**: Match claim strength to evidence. Strong evidence → "We find", moderate → "suggests", weak → "preliminary evidence". Never claim causality without faithfulness caveat. The central question (complexity-ladder design, June 2026): does increasing complexity, added in theory-grounded steps along the ladder, produce qualitatively different *types* of social order? Language is the always-on base substrate (not a rung); its role as the "creating step" is tested via the comms-off control, not removed. The novel claims are framed as hypotheses we TEST, not assume (pre-registration-led): (1) whether, under one unchanged engine, the language substrate (always on; its necessity tested via the comms-off control) is the "creating step" — making norm + institution possible, social-order levels that without messaging the lower rungs (cooperation/predation/convention) may not reach; (2) whether an LLM society's switch from inherited (NAP) to invented (bespoke) coordination is locatable on the ladder; (3) whether the norm→rule transition is endogenous — predation (`take`) repurposed as enforcement (Pinker R6), not a built-in sanction; (4) whether governance (Ostrom) requires a rival commons (T4), distinguishing it from institution. NB: reasoning-depth (L0–L3 / ToM) as a manipulated axis is a **legacy angle, dropped** — own finding that the effect was unreliable (w dampened naming, ToM-priming not robust); reasoning-trace complexity is now observed-only behavioral data, not an IV.
 
 **When Claude reviews experimental design or analysis code**: actively check against Obsidian `Thesis/Referentie/Publishable Checklist.md` and flag gaps. Do not let methodological shortcuts slide because "it's just a master thesis."
 
