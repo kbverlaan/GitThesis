@@ -12,6 +12,7 @@ import json
 import time
 import platform
 import random
+import hashlib
 import subprocess
 import yaml
 import numpy as np
@@ -119,7 +120,10 @@ def run_simulation(game_params: dict,
 
     seed = game_params.get('random_seed')
     if seed is None:
-        seed = int.from_bytes(os.urandom(4), 'big')
+        # Deterministic per-run seed derived from the run_id: reproducible from the
+        # run_id alone (which is logged to meta + filename), while distinct run_ids
+        # stay independent. Replaces the old os.urandom fallback (irreproducible).
+        seed = int(hashlib.sha256(run_id.encode()).hexdigest()[:8], 16)
     np.random.seed(seed)
     random.seed(seed)
 

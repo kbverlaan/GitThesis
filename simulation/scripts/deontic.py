@@ -30,7 +30,12 @@ from collections import defaultdict
 OBLIGATION = [r"must", r"should", r"shall", r"ought", r"have to", r"has to",
               r"need to", r"needs to", r"supposed to", r"required", r"obligated",
               r"mandatory"]
-PROHIBITION = [r"must not", r"mustn't", r"cannot", r"can ?not", r"can't",
+# NB (kalibratie 2026-06-21): bare instrumentele negaties "cannot/can't/can not"
+# zijn GESCHRAPT -- ze vuren op niet-normatief EV-redeneren ("I cannot afford to
+# attack") en inflateren de deontische telling. De prohibitieve sense ("you cannot
+# attack a member") is zeldzaam in dit corpus en wordt door de duidelijker
+# prohibitieve termen hieronder + de COLLECTIVE-filter alsnog opgevangen.
+PROHIBITION = [r"must not", r"mustn't",
                r"should not", r"shouldn't", r"do not", r"don't", r"never",
                r"forbidden", r"prohibited", r"not allowed", r"may not",
                r"refuse to", r"cease", r"stop attacking", r"no longer"]
@@ -44,11 +49,11 @@ SANCTION = [r"exile", r"expel", r"banish", r"excluded?", r"targeted by",
             r"punish", r"sanction", r"retaliat", r"cast out", r"enforce",
             r"declaration of war", r"traitor", r"betrayer", r"wolf", r"wolves",
             r"purge", r"kicked", r"war on"]
-# Expliciete regel-introductie -> sterkste signaal van gecodificeerde institutie.
-RULE_INTRO = [r"rule \d", r"rule:", r"the rule is", r"any member who",
-              r"any agent who", r"anyone who", r"those who", r"terms",
-              r"protocol", r"\bcode\b", r"threshold", r"non-aggression pact",
-              r"\bpact\b", r"\bcharter\b"]
+# NB: de aparte "regel-introductie"-teller (RULE_INTRO: pact/those who/threshold/
+# protocol/...) is GESCHRAPT -- matchte te breed en bleek ruis (zie DVs.md). De
+# betrouwbare maten zijn norm-dichtheid (deontisch + collectief, Bicchieri) en de
+# sanctie-telling. Precisie van het lexicon is niet gevalideerd op een handgelabelde
+# sample -> rapporteer deze als "lexicale markers", niet als directe norm-meting.
 
 
 def _rx(words):
@@ -56,7 +61,6 @@ def _rx(words):
 
 RX_OBL, RX_PRO = _rx(OBLIGATION), _rx(PROHIBITION)
 RX_COL, RX_SAN = _rx(COLLECTIVE), _rx(SANCTION)
-RX_RULE = _rx(RULE_INTRO)
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
@@ -68,7 +72,6 @@ def classify(sent):
         "deontic": deontic,                       # deontisch van vorm
         "norm": deontic and collective,           # KERN: collectieve prescriptie
         "sanction": bool(RX_SAN.search(sent)),
-        "rule": bool(RX_RULE.search(sent)),
     }
 
 
@@ -96,8 +99,8 @@ def _scan(items, nr):
                     c[k] += 1
             if lab["norm"]:
                 per_round_norm[rnum][0] += 1
-            if lab["norm"] or (lab["rule"] and lab["deontic"]) or (lab["sanction"] and lab["deontic"]):
-                rules.append((lab["norm"] + lab["sanction"] + lab["rule"], rnum, frm, s))
+            if lab["norm"] or (lab["sanction"] and lab["deontic"]):
+                rules.append((lab["norm"] + lab["sanction"], rnum, frm, s))
     dens = lambda k: c[k] / n_sent if n_sent else 0.0
     thirds = [[0, 0], [0, 0], [0, 0]]
     for rnum, (nn, tt) in per_round_norm.items():
@@ -105,7 +108,7 @@ def _scan(items, nr):
         thirds[idx][0] += nn; thirds[idx][1] += tt
     temporal = [(t[0] / t[1] if t[1] else 0.0) for t in thirds]
     return dict(n_unit=n_unit, n_sent=n_sent, deontic=dens("deontic"), norm=dens("norm"),
-                sanction=c["sanction"], rule=c["rule"], temporal=temporal,
+                sanction=c["sanction"], temporal=temporal,
                 rules=sorted(rules, reverse=True))
 
 
@@ -124,7 +127,7 @@ def analyze(path):
                 # platte velden = publieke laag (triage-default, backwards-compatible)
                 n_msg=pub["n_unit"], n_sent=pub["n_sent"],
                 deontic=pub["deontic"], norm=pub["norm"],
-                sanction=pub["sanction"], rule=pub["rule"],
+                sanction=pub["sanction"],
                 temporal=pub["temporal"], rules=pub["rules"])
 
 
