@@ -27,6 +27,8 @@ PARITY_CONFIGS = [
 ALLOWED_TO_DIFFER = {
     "arm_enabled", "take_enabled", "assoc_enabled", "commons_enabled",
     "rewiring_prob", "commons_harvest_mode", "commons_harvest_pct", "comm_scope",
+    # commons affordance config (only active at L4), not a re-priced economy payoff:
+    "commons_init", "commons_regen",
     "memory",  # substrate config block, not an economy price
 }
 

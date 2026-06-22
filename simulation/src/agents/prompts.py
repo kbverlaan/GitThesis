@@ -299,14 +299,26 @@ class BaselinePrompt:
                 f"{conflict_cost_pct}% conflict cost. "
                 f"Win probability = your combat strength / (your strength + target's strength)."
             )
+        commons_on = self.game_params.get("commons_enabled", False)
+        harvest_mode = self.game_params.get("commons_harvest_mode", "category")
+        harvest_is_action = commons_on and harvest_mode == "action_own"
+
+        if harvest_is_action:
+            actions.append(
+                "- harvest: take a percent of YOUR OWN current resources out of the "
+                "shared stock, added to your resources in absolute units (set the "
+                "\"harvest\" field to that percent). There is NO upper limit — you may "
+                "take as much as you want, up to draining the entire stock. This USES "
+                "your action this round (you cannot also transfer/strengthen/take). "
+                "See SHARED STOCK below."
+            )
         actions.append("- hold: no cost, no effect")
 
         actions_text = "\n".join(actions)
 
-        commons_on = self.game_params.get("commons_enabled", False)
         harvest_aside = (
             " (Harvesting from the shared stock is separate and does NOT use up "
-            "your action — see SHARED STOCK below.)" if commons_on else ""
+            "your action — see SHARED STOCK below.)" if (commons_on and not harvest_is_action) else ""
         )
         parts = [f"""Choose exactly ONE action this round.{harvest_aside}
 
@@ -417,7 +429,15 @@ COALITIONS (multi-attacker combat):
         if arm_on:
             eor += f" Arm bonuses decay (×{arm_decay})."
         if commons_on:
-            eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
+            regen = self.game_params.get("commons_regen", 2.0)
+            if regen >= 2.0:
+                eor += " The shared stock then regenerates (whatever remains doubles, capped at capacity)."
+            elif regen > 1.0:
+                eor += f" The shared stock then regenerates (whatever remains grows by {(regen - 1) * 100:.0f}%, capped at capacity)."
+            elif regen == 1.0:
+                eor += " The shared stock does NOT regrow (what is harvested is gone)."
+            else:
+                eor += f" The shared stock then shrinks to {regen * 100:.0f}% of what remains (a depleting resource)."
         steps.append(eor)
         parts.append("RESOLUTION ORDER (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
 
@@ -479,33 +499,52 @@ COALITIONS (multi-attacker combat):
         # level is shown as a % of capacity (the absolute capacity is never stated).
         if self.game_params.get("commons_enabled", False):
             mode = self.game_params.get("commons_harvest_mode", "category")
-            if mode == "fraction_own":
+            regen = self.game_params.get("commons_regen", 2.0)
+            if regen >= 2.0:
+                regen_line = ("- REGENERATION: at the end of each round whatever remains DOUBLES, up to full "
+                              "capacity. Much left → it refills; little left → it can only double a little.")
+            elif regen > 1.0:
+                regen_line = (f"- REGENERATION: at the end of each round whatever remains grows by "
+                              f"{(regen - 1) * 100:.0f}% (×{regen:g}), up to full capacity — slower than it is "
+                              f"drawn down if harvests are large.")
+            elif regen == 1.0:
+                regen_line = ("- REGENERATION: the stock does NOT regrow — whatever is harvested is gone for good "
+                              "(only what is left remains).")
+            else:
+                regen_line = (f"- REGENERATION: the stock DWINDLES — each round whatever remains shrinks to "
+                              f"{regen * 100:.0f}% of itself even if untouched, so it is a depleting resource.")
+            collapse_line = ("- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty "
+                             "and nobody can harvest for the rest of the game.")
+            reveal_line = "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all."
+            ration_line = "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out."
+            intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
+                     "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.")
+            if mode == "action_own":
                 commons_lines = [
-                    "SHARED STOCK:",
-                    "Beyond your dealings with other agents, there is ONE shared stock that "
-                    "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
+                    "SHARED STOCK:", intro,
+                    "- HARVEST is one of your ACTIONS (see AVAILABLE ACTIONS): on a round you harvest, you "
+                    "choose a percent of YOUR OWN current resources to pull from the shared stock, added to "
+                    "your resources in absolute units. No upper limit — a large enough percent drains the whole "
+                    "stock. Harvesting USES your action, so that round you do not transfer, strengthen or take.",
+                    reveal_line, ration_line, regen_line, collapse_line,
+                ]
+            elif mode == "fraction_own":
+                commons_lines = [
+                    "SHARED STOCK:", intro,
                     "- HARVEST: each round you choose a percent of YOUR OWN current resources to take "
                     "from the shared stock. What you take is added to your own resources, in absolute units. "
                     "The percent can be any non-negative number, with no upper limit — a large enough percent "
                     "can draw out the entire stock.",
-                    "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
-                    "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
-                    "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
-                    "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
+                    reveal_line, ration_line, regen_line, collapse_line,
                 ]
             else:
                 cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
                 cat_str = ", ".join(f"{c:g}%" for c in cats)
                 commons_lines = [
-                    "SHARED STOCK:",
-                    "Beyond your dealings with other agents, there is ONE shared stock that "
-                    "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.",
+                    "SHARED STOCK:", intro,
                     f"- HARVEST: each round you may take one of these amounts from it: {cat_str} of capacity. "
                     "What you take is added to YOUR own resources, in absolute units.",
-                    "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all.",
-                    "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out.",
-                    "- REGENERATION: at the end of each round whatever remains DOUBLES, up to full capacity. Much left → it refills; little left → it can only double a little.",
-                    "- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty and nobody can harvest for the rest of the game.",
+                    reveal_line, ration_line, regen_line, collapse_line,
                 ]
             parts.append("\n".join(commons_lines))
 

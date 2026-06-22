@@ -84,6 +84,55 @@ NAMED_STRUCTURE_STOP = {
 NAMED_STRUCTURE_MIN_AGENTS = 2
 NAMED_STRUCTURE_MIN_OCCURRENCES = 3
 
+# Commons-governance vocabulary (T4 commons rung). Unlike the dyadic-economy
+# coinages above (proper-noun "Transfer Circle"-style names caught by
+# NAMED_STRUCTURE_RE), governance institutions over the shared stock surface as
+# lowercase common-noun phrases ("moratorium", "circuit breaker", "harvest
+# freeze", "80% recovery target") that the capitalised-coinage regex misses.
+# This is a CURATED lexicon (case-insensitive); each pattern maps to a canonical
+# institution name via _canon_commons_governance(). Matches are pushed through the
+# SAME by-agent / occurrence accumulators in detect_named_structures, so the
+# cascade-coherence gating (≥MIN_AGENTS distinct agents AND ≥MIN_OCCURRENCES) is
+# applied identically — a one-off mention of "moratorium" still does not count.
+COMMONS_GOVERNANCE_RE = re.compile(
+    r"\b("
+    r"moratorium|"
+    r"circuit[\-\s]breakers?|"
+    r"harvest[\-\s]freeze|"
+    r"harvest[\-\s](?:cap|caps|limit|limits|target|targets|quota|quotas)|"
+    r"quota|"
+    r"sustainable[\-\s]harvest(?:[\-\s]rule)?|"
+    r"(?:regeneration|recovery|stability)[\-\s]target|"
+    r"\d{1,3}\s?%[\-\s](?:recovery|regeneration|stability)?[\-\s]?targets?|"
+    r"\d{1,3}\s?%[\-\s](?:recovery|regeneration)(?:[\-\s]targets?)?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Canonical-name normaliser for governance matches: collapse surface variants
+# ("Circuit Breaker" / "circuit-breaker", "harvest cap" / "harvest limits",
+# "80% recovery target" / "recovery target") onto one institution name so the
+# coherence counts aggregate per-institution rather than per-spelling.
+def _canon_commons_governance(raw):
+    s = re.sub(r"[\-\s]+", " ", raw.strip().lower())
+    if "moratorium" in s:
+        return "Moratorium"
+    if "circuit breaker" in s:
+        return "Circuit Breaker"
+    if "harvest freeze" in s:
+        return "Harvest Freeze"
+    if "sustainable harvest" in s:
+        return "Sustainable-Harvest Rule"
+    if re.search(r"harvest (cap|limit|target|quota)", s):
+        return "Harvest Cap"
+    if "quota" in s:
+        return "Quota"
+    if "recovery" in s or "regeneration" in s:
+        return "Recovery Target"
+    if "stability" in s:
+        return "Stability Target"
+    return raw.strip().title()
+
 ROLE_CLAIM_RE = re.compile(
     r"\bI\s+(?:am|will\s+be|will\s+act\s+as|serve\s+as|have\s+become)\s+"
     r"(?:the\s+)?"
@@ -209,29 +258,37 @@ def detect_named_structures(rounds):
     """
     raw_total = Counter()
     by_agent = {}  # name -> set of distinct agent ids mentioning it
+    # Governance institutions are a curated single-/multi-word lexicon, so they
+    # must skip the capitalised-coinage-specific filters (2-word minimum +
+    # stopword blacklist) — but NOT the coherence gating, which still applies.
+    governance_names = set()
+
+    def _scan(text, who):
+        for m in NAMED_STRUCTURE_RE.finditer(text):
+            name = _normalize_structure_name(m.group(1))
+            raw_total[name] += 1
+            if who:
+                by_agent.setdefault(name, set()).add(who)
+        for m in COMMONS_GOVERNANCE_RE.finditer(text):
+            name = _canon_commons_governance(m.group(1))
+            governance_names.add(name)
+            raw_total[name] += 1
+            if who:
+                by_agent.setdefault(name, set()).add(who)
 
     for r in agent_rounds(rounds):
         for msg in r.get("messages", []) or []:
-            text = msg.get("text", "") or ""
-            sender = msg.get("from")
-            for m in NAMED_STRUCTURE_RE.finditer(text):
-                name = _normalize_structure_name(m.group(1))
-                raw_total[name] += 1
-                if sender:
-                    by_agent.setdefault(name, set()).add(sender)
+            _scan(msg.get("text", "") or "", msg.get("from"))
         for aid, a in r["agents"].items():
             for field in ("memory", "thinking"):
-                text = a.get(field) or ""
-                for m in NAMED_STRUCTURE_RE.finditer(text):
-                    name = _normalize_structure_name(m.group(1))
-                    raw_total[name] += 1
-                    by_agent.setdefault(name, set()).add(aid)
+                _scan(a.get(field) or "", aid)
 
     filtered = Counter()
     for name, count in raw_total.items():
-        if len(name.split()) < 2:
+        is_governance = name in governance_names
+        if not is_governance and len(name.split()) < 2:
             continue
-        if _structure_is_blacklisted(name):
+        if not is_governance and _structure_is_blacklisted(name):
             continue
         if count < NAMED_STRUCTURE_MIN_OCCURRENCES:
             continue

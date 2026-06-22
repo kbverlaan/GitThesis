@@ -213,9 +213,11 @@ class LLMAgent:
 
         return None
 
-    # Canonical action vocabulary
+    # Canonical action vocabulary. 'harvest' is only a real action under
+    # commons_harvest_mode="action_own" (gated in _action_dict_to_action);
+    # in other modes a stray 'harvest' string snaps to hold.
     _VALID_ACTIONS = {
-        'transfer', 'strengthen', 'take', 'hold'
+        'transfer', 'strengthen', 'take', 'hold', 'harvest'
     }
 
     # Legacy names + shorthands → canonical (input backward compatibility)
@@ -253,6 +255,7 @@ class LLMAgent:
             'strengthen': ActionType.ARM_OTHER,
             'take': ActionType.ATTACK,
             'hold': ActionType.DO_NOTHING,
+            'harvest': ActionType.HARVEST,
         }
 
         if not action_str or action_str not in action_map:
@@ -266,6 +269,13 @@ class LLMAgent:
             action_type = ActionType.DO_NOTHING
             target = None
         if action_type == ActionType.ATTACK and not self.game_params.get('take_enabled', True):
+            action_type = ActionType.DO_NOTHING
+            target = None
+        # HARVEST is a real action only under the action_own commons mode.
+        if action_type == ActionType.HARVEST and not (
+            self.game_params.get('commons_enabled', False)
+            and self.game_params.get('commons_harvest_mode') == 'action_own'
+        ):
             action_type = ActionType.DO_NOTHING
             target = None
 
@@ -301,7 +311,7 @@ class LLMAgent:
         if not self.game_params.get('commons_enabled', False):
             return 0.0
 
-        if self.game_params.get('commons_harvest_mode', 'category') == 'fraction_own':
+        if self.game_params.get('commons_harvest_mode', 'category') in ('fraction_own', 'action_own'):
             had_percent = isinstance(raw, str) and '%' in raw
             if isinstance(raw, str):
                 raw = raw.strip().rstrip('%').strip()
@@ -647,6 +657,7 @@ class LLMAgent:
                 'strengthen': ActionType.ARM_OTHER,
                 'take': ActionType.ATTACK,
                 'hold': ActionType.DO_NOTHING,
+                'harvest': ActionType.HARVEST,
             }
             action_type = action_map.get(action_str)
             if not action_type:

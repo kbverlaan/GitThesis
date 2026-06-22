@@ -1,0 +1,53 @@
+# Commons probe P2 — fragile stock, harvest stays a PARALLEL field (isolates options ii+iii).
+# Harvest mode unchanged from B+C (fraction_own parallel field, NOT an action), but the
+# pool is made fragile: slower regen (1.5x) + starts at MSY (K/2) not full. Tests whether
+# fragility ALONE creates harvest pressure while harvest is still a side-field.
+# Commons
+commons_enabled: true
+commons_K: 120.0
+commons_init: 60.0                    # start at MSY (K/2), not full → no buffer
+commons_harvest_mode: "fraction_own" # parallel field (current B+C mechanic)
+commons_regen: 1.5                    # slower than doubling → fragile
+commons_collapse_frac: 0.05
+
+# Agents
+num_agents: 30
+initial_resources: 100.0
+
+# Investment (prod g_inv held at 0.15 — these probes pick the COMMONS config, not the g_inv regime)
+c_inv: 0.10
+g_inv: 0.15
+gamma_sat: 0.80
+tau_sat: 5
+
+# Arming
+c_arm: 0.05
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat (prod: symmetric capped stakes, flat conflict cost)
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Economy
+delta_R: 0.97
+
+# Game length
+max_rounds: 30
+history_length: 10
+
+# Network
+network_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.0
+
+# Communication — ON (governance must emerge from language)
+comm_scope: "choice"
+
+# Memory
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true

@@ -34,17 +34,21 @@ symmetric_stakes: true               # pot = alpha × defender in BOTH win-branc
 lethal_pot: false                    # capability flag (OFF in prod). If true: phi = min(1, alpha·S_win/S_lose),
                                      # loser-sized → a coalition ≥ (1/alpha)× the defender KILLS. For lethality probes only.
 
-# Commons (T5 rung — tragedy of the commons; OFF by default, flag-gated)
-commons_enabled: false               # turn on the shared-stock rung (GovSim-style doubling)
-commons_K: 120.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K).
-                                     # per-capita sustainable harvest = K/(2n) = 2 units at n=30 = 2% of initial 100 R.
-                                     # Calibrated vs decay: covering 3% decay needs ~3% harvest > 2% sustainable
-                                     # → beating decay shrinks the pot (Ostrom temptation). Gap widens as R grows.
-commons_init: null                   # initial stock (null = start full at K)
-commons_harvest_pct: [0, 1, 2, 4, 8] # harvest categories as % of K (scale-invariant); sustainable p.p. ≈ 1.67%
+# Commons (L4 rung — tragedy of the commons; OFF by default, flag-gated).
+# LOCKED config (probe job 24092054, 2026-06-22): the FIXED commons outside option
+# for the ladder — OFAT sweeps g_inv only, NOT these. Probe-derived tragedy threshold
+# sits between regen 1.5 and 1.0: at 1.5 the initial over-draw (stock dips to ~25%) is
+# RECOVERABLE → agents pull back, recover, manage sustainably (rich governance); at 1.0
+# the R1 over-grab collapses a non-renewing pool irreversibly; 2.0 is too generous.
+commons_enabled: false               # turn on the shared-stock rung
+commons_K: 120.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K)
+commons_init: 60.0                   # LOCKED: start at MSY (K/2), not full → no buffer, dilemma bites from R1
+commons_regen: 1.5                   # LOCKED: fragile-but-recoverable regeneration (×1.5; 2.0=GovSim doubling=too easy)
+commons_harvest_mode: "action_own"   # LOCKED: harvest IS the action (mutually exclusive w/ transfer/take/hold) —
+                                     # a real choice with opportunity cost; surfaces engagement the parallel field missed.
+                                     # "category" = GovSim %-of-K grid; "fraction_own" = parallel unbounded field (legacy probes)
+commons_harvest_pct: [0, 1, 2, 4, 8] # only used in "category" mode (kept for that legacy path)
 commons_collapse_frac: 0.05          # stock collapses permanently below this fraction of K (GovSim C = 5%)
-commons_harvest_mode: "category"     # "category" = GovSim categories above (default); "fraction_own" =
-                                     # continuous, unbounded harvest = chosen percent of agent's OWN resources
 
 # Economy
 delta_R: 0.97                        # BASE resource decay (all rungs): R(t+1) = delta_R·(R(t) + ΔR).
