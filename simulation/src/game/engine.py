@@ -36,6 +36,8 @@ class ActionType(Enum):
     ARM_OTHER = "strengthen"      # give a combat bonus to another
     ATTACK = "take"               # take resources by force
     DO_NOTHING = "hold"           # do nothing
+    HARVEST = "harvest"           # take from the shared stock AS your action (commons_harvest_mode="action_own");
+                                  # mutually exclusive with the dyadic actions, so harvesting forgoes cooperating
 
 
 @dataclass
@@ -122,7 +124,8 @@ class GameEngine:
                  commons_K: float = 600.0,
                  commons_init: Optional[float] = None,
                  commons_collapse_frac: float = 0.05,
-                 commons_harvest_mode: str = "category"):
+                 commons_harvest_mode: str = "category",
+                 commons_regen: float = 2.0):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -154,6 +157,7 @@ class GameEngine:
             "commons_K": commons_K,
             "commons_collapse_frac": commons_collapse_frac,
             "commons_harvest_mode": commons_harvest_mode,
+            "commons_regen": commons_regen,
         }
 
         if isinstance(initial_resources, dict):
@@ -189,8 +193,8 @@ class GameEngine:
         With percentage-based costs, any action is affordable as long as
         resources are above a minimum threshold.
         """
-        if action_type == ActionType.DO_NOTHING:
-            return True
+        if action_type in (ActionType.DO_NOTHING, ActionType.HARVEST):
+            return True  # harvesting from the pool is free (lets the poor recover)
         return self.state.resources[agent_id] > 0.01
 
     def resolve_round(self, actions: List[Action]) -> Dict:
@@ -215,6 +219,14 @@ class GameEngine:
                 action = Action(action.agent_id, ActionType.DO_NOTHING, None,
                                 harvest=getattr(action, "harvest", 0.0))
             if action.action_type == ActionType.ARM_OTHER and not arm_enabled:
+                action = Action(action.agent_id, ActionType.DO_NOTHING, None,
+                                harvest=getattr(action, "harvest", 0.0))
+            # HARVEST is only a real action under commons_harvest_mode="action_own";
+            # otherwise (commons off, or parallel-field modes) it neutralises to hold.
+            if action.action_type == ActionType.HARVEST and not (
+                self.params.get("commons_enabled", False)
+                and self.params.get("commons_harvest_mode") == "action_own"
+            ):
                 action = Action(action.agent_id, ActionType.DO_NOTHING, None,
                                 harvest=getattr(action, "harvest", 0.0))
             if self.can_afford_action(action.agent_id, action.action_type):
@@ -282,14 +294,18 @@ class GameEngine:
         return round_log
 
     def _resolve_commons(self, valid_actions: List[Action], round_log: Dict):
-        """Harvest the shared stock. Two modes (commons_harvest_mode):
+        """Harvest the shared stock. Three modes (commons_harvest_mode):
 
         - "category" (default): claim is a category % of K (absolute units).
         - "fraction_own": claim is f_i × (agent's own current resources), where
-          f_i is a continuous, unbounded fraction the agent chose. A large enough
-          fraction can empty the whole pool.
+          f_i is a continuous, unbounded fraction the agent chose. Harvest is a
+          PARALLEL field — it happens alongside the agent's dyadic action.
+        - "action_own": same continuous f_i × own-resources claim, but harvesting
+          is the agent's ACTION (ActionType.HARVEST) — mutually exclusive with
+          transfer/take/hold, so harvesting forgoes cooperating that round. Only
+          agents whose action is HARVEST draw from the pool.
 
-        In both modes, if total claims exceed the stock, allocate in random order
+        In all modes, if total claims exceed the stock, allocate in random order
         until depleted (GovSim rationing); harvested units are added to resources.
         Regeneration and collapse are identical downstream."""
         if not self.params.get("commons_enabled", False):
@@ -307,6 +323,9 @@ class GameEngine:
         chosen_frac = {}  # agent_id -> chosen fraction of own resources (fraction_own mode)
         harvest_raw = {}  # agent_id -> the model's RAW harvest string, for scaling audit (C2)
         for a in valid_actions:
+            # action_own: harvesting is its OWN action — only HARVEST actions draw.
+            if mode == "action_own" and a.action_type != ActionType.HARVEST:
+                continue
             raw = max(0.0, float(getattr(a, "harvest", 0.0) or 0.0))
             if raw <= 0:
                 continue
@@ -314,7 +333,7 @@ class GameEngine:
             if raw_str is not None:
                 harvest_raw[a.agent_id] = raw_str
                 round_log["resource_breakdown"][a.agent_id]["harvest_raw"] = raw_str
-            if mode == "fraction_own":
+            if mode in ("fraction_own", "action_own"):
                 # raw is a fraction (>=0) of the agent's OWN current resources.
                 chosen_frac[a.agent_id] = raw
                 amt = raw * self.state.resources[a.agent_id]
@@ -334,7 +353,7 @@ class GameEngine:
         round_log["commons"]["stock_after_harvest"] = self.state.commons_stock
         if harvest_raw:
             round_log["commons"]["harvest_raw"] = harvest_raw  # raw model strings (C2 audit)
-        if mode == "fraction_own":
+        if mode in ("fraction_own", "action_own"):
             # Log the chosen fraction per agent (the decision variable) alongside
             # the realized absolute harvest, for the comeback/inequality analysis.
             round_log["commons"]["harvest_frac"] = dict(chosen_frac)
@@ -359,20 +378,21 @@ class GameEngine:
 
     def _regenerate_commons(self, round_log: Dict):
         """End-of-round stock dynamics: if the remaining stock is below the collapse
-        threshold it collapses permanently (absorbing 0); otherwise it doubles,
-        capped at K (GovSim)."""
+        threshold it collapses permanently (absorbing 0); otherwise it grows by
+        commons_regen× (GovSim doubling = 2.0), capped at K."""
         if not self.params.get("commons_enabled", False):
             return
         S = self.state.commons_stock
         K = self.params["commons_K"]
         C = K * self.params["commons_collapse_frac"]
+        regen = self.params.get("commons_regen", 2.0)
         if self.state.commons_collapsed:
             new_S = 0.0
         elif S < C:
             new_S = 0.0
             self.state.commons_collapsed = True
         else:
-            new_S = min(K, 2.0 * S)
+            new_S = min(K, regen * S)
         self.state.commons_stock = new_S
         if "commons" in round_log:
             round_log["commons"]["stock_after_regen"] = new_S

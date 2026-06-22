@@ -17,8 +17,11 @@ def _norm(s):
 
 
 def test_canonical_action_set():
-    assert LLMAgent._VALID_ACTIONS == {'transfer', 'strengthen', 'take', 'hold'}
-    for a in ('transfer', 'strengthen', 'take', 'hold'):
+    # 'harvest' is only a real action under commons_harvest_mode="action_own"
+    # (gated in _action_dict_to_action); it is in the canonical vocabulary so the
+    # normaliser recognises it rather than dropping it.
+    assert LLMAgent._VALID_ACTIONS == {'transfer', 'strengthen', 'take', 'hold', 'harvest'}
+    for a in ('transfer', 'strengthen', 'take', 'hold', 'harvest'):
         assert _norm(a) == a
 
 
