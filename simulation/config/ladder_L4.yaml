@@ -26,11 +26,17 @@ c_atk: 0.02
 symmetric_stakes: true
 lethal_pot: false
 
-# Commons — ON from L4
+# Commons — ON from L4. LOCKED config (probe job 24092054, 2026-06-22): the fixed
+# outside option for the ladder; OFAT sweeps g_inv only, NOT the commons.
+# Evidence: action-mode + regen 1.5 + start-at-MSY = genuine, RESOLVABLE tragedy
+# (agents over-draw to ~25%, fear collapse, pull back, recover, manage sustainably).
+# regen 1.0 collapses irreversibly (R1 over-grab kills a non-renewing pool); regen 2.0
+# is too generous (no pressure). 1.5 is the sweet spot with rich governance dynamics.
 commons_enabled: true
 commons_K: 120.0
-commons_init: null
-commons_harvest_pct: [0, 1, 2, 4, 8]
+commons_init: 60.0                    # start at MSY (K/2), not full → no buffer, dilemma bites from R1
+commons_harvest_mode: "action_own"   # harvest IS the action (mutually exclusive) — a real choice w/ opportunity cost
+commons_regen: 1.5                    # fragile-but-recoverable (tragedy threshold is between 1.5 and 1.0)
 commons_collapse_frac: 0.05
 
 # Economy
