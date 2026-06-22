@@ -1,0 +1,61 @@
+# L4 PREDATION/TRAGEDY PROBE B — predation-forced (g_inv 0.079 + saturation OFF).
+# Same scarcity as A, but gamma_sat 1.0 removes the wealth-leveling -> dyadic concentration
+# -> asymmetry builds -> take becomes +EV -> tests whether WAR (not just over-harvest) emerges
+# alongside commons tragedy. Recreates the old predation-enabling recipe + the commons.
+
+num_agents: 30
+initial_resources: 100.0
+
+# Investment
+c_inv: 0.10
+g_inv: 0.079                         # SCARCITY (probe): cooperation < hold (g_inv<c_inv) -> commons is the only growth path
+gamma_sat: 1.00                      # SATURATION OFF (probe): no leveling -> dyadic wealth concentrates -> asymmetry -> take pays
+tau_sat: 5
+
+# Arming — ON
+arm_enabled: true
+c_arm: 0.05
+mu_arm: 3.0
+delta_B: 0.50
+
+# Combat — ON
+take_enabled: true
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Commons — ON from L4. LOCKED config (probe job 24092054, 2026-06-22): the fixed
+# outside option for the ladder; OFAT sweeps g_inv only, NOT the commons.
+# Evidence: action-mode + regen 1.5 + start-at-MSY = genuine, RESOLVABLE tragedy
+# (agents over-draw to ~25%, fear collapse, pull back, recover, manage sustainably).
+# regen 1.0 collapses irreversibly (R1 over-grab kills a non-renewing pool); regen 2.0
+# is too generous (no pressure). 1.5 is the sweet spot with rich governance dynamics.
+commons_enabled: true
+commons_K: 120.0
+commons_init: 60.0                    # start at MSY (K/2), not full → no buffer, dilemma bites from R1
+commons_harvest_mode: "action_own"   # harvest IS the action (mutually exclusive) — a real choice w/ opportunity cost
+commons_regen: 1.5                    # fragile-but-recoverable (tragedy threshold is between 1.5 and 1.0)
+commons_collapse_frac: 0.05
+
+# Economy
+delta_R: 0.97
+
+# Game length
+max_rounds: 30
+history_length: 10
+
+# Network — association (rewiring) ON; w>0 gives it bite
+network_enabled: true
+assoc_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.5
+
+# Communication — ON (base substrate)
+comm_scope: "choice"
+
+# Memory — ON (base substrate)
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true
