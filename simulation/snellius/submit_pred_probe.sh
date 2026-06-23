@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
-#SBATCH --time=05:00:00
+#SBATCH --time=03:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --output=/home/kverlaan/origins/simulation/logs/iso_%x_%j.out
 #SBATCH --error=/home/kverlaan/origins/simulation/logs/iso_%x_%j.err
@@ -71,7 +71,7 @@ for CELL in "${CELLS[@]}"; do
   done
 done
 
-DEADLINE=$(( $(date +%s) + 16200 ))
+DEADLINE=$(( $(date +%s) + 9600 ))
 if [ "${#pids[@]}" -gt 0 ]; then
   for p in "${pids[@]}"; do
     while kill -0 "$p" 2>/dev/null; do

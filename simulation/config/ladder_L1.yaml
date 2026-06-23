@@ -15,7 +15,9 @@ initial_resources: 100.0
 # Investment
 c_inv: 0.10
 g_inv: 0.15
-gamma_sat: 0.80
+gamma_sat: 1.00                      # BASE: forced sociality OFF (Koen 2026-06-22) — dyadic lock-in allowed →
+                                     # wealth can concentrate → whale-hunting packs + Hobbesian predation can emerge.
+                                     # gamma_sat 0.80 = forced-distributed variant (L4 add-on, ladder_L4_forcedsocial.yaml).
 tau_sat: 5
 
 # Arming — OFF on L1

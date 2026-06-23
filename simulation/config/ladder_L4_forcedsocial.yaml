@@ -1,7 +1,7 @@
-# Complexity ladder — RUNG 4: Commons.
-# Affordances: L3 + harvest (shared logistic stock). Full ladder.
-# Comms + memory ON (always-on base substrate). Prod numeric params unchanged.
-#
+# Complexity ladder — L4 + FORCED-SOCIALITY ADD-ON.
+# = ladder_L4 but gamma_sat 0.80 (the cooperation barrier ON). Tests whether forced
+# distributed reciprocity flips a would-be-Hobbesian scarce world back to peace
+# (the satON vs satOFF "peace switch" finding, now as a deliberate L4 add-on step).
 # Flag matrix (see ladder_L1.yaml header).
 
 num_agents: 30
@@ -10,7 +10,7 @@ initial_resources: 100.0
 # Investment
 c_inv: 0.10
 g_inv: 0.15
-gamma_sat: 1.00                      # BASE: forced sociality OFF (Koen 2026-06-22) — dyadic lock-in allowed →
+gamma_sat: 0.80                      # FORCED-SOCIALITY ADD-ON: punishes dyadic lock-in → distributed reciprocity → suppresses concentration & predation (the "peace switch")
                                      # wealth can concentrate → whale-hunting packs + Hobbesian predation can emerge.
                                      # gamma_sat 0.80 = forced-distributed variant (L4 add-on, ladder_L4_forcedsocial.yaml).
 tau_sat: 5
