@@ -169,6 +169,45 @@ class BaselinePrompt:
                     line = f"  {aid}: {r_f:.1f}{suffix}"
             lines.append(line)
 
+        # Per-agent payoff arithmetic from the agent's CURRENT resources: the
+        # shared rules block explains mechanics on a fixed example; this block
+        # does this round's actual numbers so no agent has to derive them.
+        # Lives in the per-agent suffix on purpose — the shared rules prefix
+        # stays byte-identical across agents (vLLM prefix cache).
+        R = float(resources.get(agent_id, 0.0))
+        gp = self.game_params
+        num_lines = ["", f"YOUR NUMBERS THIS ROUND (from your current {R:.1f}):"]
+        num_lines.append(
+            f"  - transfer: you pay {R * gp.get('c_inv', 0.10):.1f}, "
+            f"the target receives {R * gp.get('g_inv', 0.15):.1f}"
+        )
+        if show_arm:
+            arm_cost = R * gp.get("c_arm", 0.05)
+            num_lines.append(
+                f"  - strengthen: you pay {arm_cost:.1f}, the target gains "
+                f"{arm_cost * gp.get('mu_arm', 3.0):.1f} combat bonus"
+            )
+        if take_on:
+            alpha = gp.get("alpha", 0.20)
+            num_lines.append(
+                f"  - take: you pay {R * gp.get('c_atk', 0.01):.1f} conflict cost; "
+                f"the pot is {alpha * 100:.0f}% of the DEFENDER's current resources "
+                f"(if YOU are the defender: {R * alpha:.1f})"
+            )
+        if (gp.get("commons_enabled", False)
+                and gp.get("commons_harvest_mode") == "action_own"):
+            num_lines.append(
+                f"  - harvest: every 1% you claim = {R * 0.01:.1f} absolute units "
+                f"from the shared stock"
+            )
+        delta_R = gp.get("delta_R", 1.0)
+        if delta_R < 1.0:
+            num_lines.append(
+                f"  - end-of-round decay: -{R * (1 - delta_R):.1f} → "
+                f"{R * delta_R:.1f} if nothing else changes"
+            )
+        lines.extend(num_lines)
+
         commons = observation.get("commons")
         if commons:
             lines.append("")
