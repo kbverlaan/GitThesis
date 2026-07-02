@@ -8,16 +8,16 @@ num_agents: 30
 initial_resources: 100.0
 
 # Investment
-c_inv: 0.10
-g_inv: 0.15
-gamma_sat: 0.80
+c_inv: 0.06
+g_inv: 0.091
+gamma_sat: 1.00
 tau_sat: 5
 
 # Arming — ON
 arm_enabled: true
 c_arm: 0.05
-mu_arm: 3.0
-delta_B: 0.50
+mu_arm: 4.0
+delta_B: 0.75
 
 # Combat — ON
 take_enabled: true
@@ -43,7 +43,7 @@ commons_collapse_frac: 0.05
 delta_R: 0.97
 
 # Game length
-max_rounds: 30
+max_rounds: 60
 history_length: 10
 
 # Network — association (rewiring) ON; w>0 gives it bite
