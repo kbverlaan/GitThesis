@@ -152,9 +152,18 @@ def print_single(r, top):
     print(f"  LENS B  normvervulling (invest/arm als naleving): {r['pos_rate']:.3f}"
           f"   ({r['n_pos']}/{r['n_investarm']} geframed)")
     te = f"{r['top_enforcer']} ({r['top_enf_share']:.0%})" if r['top_enforcer'] else "-"
-    print(f"  GOV-ROL  handhaver-concentratie (Gini): {r['enforcer_gini']:.3f}"
-          f"   ({r['n_enforcers']} handhaver(s); top {te})"
-          f"   {'-> geconcentreerde sanctioner-rol' if r['enforcer_gini'] >= 0.6 and r['n_enforcers'] else '-> diffuus/geen rol' if r['n_enforcers'] else ''}")
+    # Rol-verdict: top_enf_share (dominantie van EEN handhaver) is de betere
+    # discriminator dan Gini -- Gini over de hele populatie vuurt al bij "niet
+    # iedereen handhaaft". Drempel is ONGEKALIBREERD (nog geen bevestigde monitor-
+    # rol-run; die is voorspeld pas op de commons-trede) -> conservatief + gevlagd.
+    if not r['n_enforcers']:
+        verdict = ""
+    elif r['top_enf_share'] >= 0.40 and r['n_enforcers'] <= 4:
+        verdict = "-> concentr. sanctioner-rol? [drempel ongekalibreerd]"
+    else:
+        verdict = "-> diffuse handhaving (geen duidelijke rol)"
+    print(f"  GOV-ROL  handhaving: Gini {r['enforcer_gini']:.3f}, top-share {r['top_enf_share']:.0%}"
+          f"   ({r['n_enforcers']} handhaver(s); top {te})   {verdict}")
     for lens, tag in (("A", "NORMHANDHAVING (straf)"), ("B", "NORMVERVULLING (steun)")):
         tr = sorted(r["triples"][lens])
         print(f"\n  --- TOP {top} {tag}-TRIPLES (actie | citaat | ronde) ---")

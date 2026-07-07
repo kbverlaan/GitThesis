@@ -69,13 +69,15 @@ def analyze(path):
 
 
 def spearman(x, y):
-    """Rang-correlatie zonder scipy (Pearson op de rangen)."""
-    if len(x) < 3:
+    """Rang-correlatie zonder scipy (Pearson op de rangen).
+    Guard op de variantie van de ORIGINELE waarden: bij een constante reeks
+    (bv. coop=0.00 in een pure-conflict-cel) levert argsort een spurieuze rangorde
+    met niet-nul std -> dat zou een valse rho=+/-1.0 geven. Dan: nan."""
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    if len(x) < 3 or x.std() == 0 or y.std() == 0:
         return float('nan')
     rx = np.argsort(np.argsort(x)).astype(float)
     ry = np.argsort(np.argsort(y)).astype(float)
-    if rx.std() == 0 or ry.std() == 0:
-        return float('nan')
     return float(np.corrcoef(rx, ry)[0, 1])
 
 
@@ -95,20 +97,27 @@ def main():
         for r in sorted(rows, key=lambda r: -r['rewiring_rate']):
             print(f"  {r['name'][:49]:<50} {r['rewiring_rate']:9.2f} {r['net_rewire']:+7.2f} "
                   f"{r['transfer_share']:6.2f} {r['cons_std']:7.3f}")
-        rw = [r['rewiring_rate'] for r in rows]
-        coop = [r['transfer_share'] for r in rows]
-        instab = [r['cons_std'] for r in rows]
+        rw = np.array([r['rewiring_rate'] for r in rows])
+        coop = np.array([r['transfer_share'] for r in rows])
+        instab = np.array([r['cons_std'] for r in rows])
         print(f"\n  Santos/Rand-voorspelling (rang-correlatie over de sweep):")
-        print(f"    rewiring-rate vs cooperatie  : rho = {spearman(rw, coop):+.2f}  (voorspeld: +)")
-        print(f"    rewiring-rate vs stabiliteit : rho = {spearman(rw, [-x for x in instab]):+.2f}  "
-              f"(voorspeld: +; hoge rewire -> lage instab)")
-        med = float(np.median(rw))
-        hi = [c for r_, c in zip(rw, coop) if r_ >= med]
-        lo = [c for r_, c in zip(rw, coop) if r_ < med]
-        if hi and lo:
-            print(f"    drempel-knik (mediaan rewire={med:.2f}): coop hoog-rewire {np.mean(hi):.2f} "
-                  f"vs laag-rewire {np.mean(lo):.2f}")
-            print(f"      -> Santos/Rand: het effect zit bij de knik (niet-lineair), niet in een monotone lijn.")
+        # Spreidings-guard: de correlatie is alleen zinvol als coop EN rewire echt
+        # varieren over de runs. Bij te weinig spreiding (bv. replicates van EEN
+        # cel, of een pure-conflict-regime met coop~0) is de rho ruis op stof.
+        if np.ptp(coop) < 0.03 or np.ptp(rw) < 0.10:
+            print(f"    (!) te weinig spreiding: coop-range {np.ptp(coop):.3f}, rewire-range {np.ptp(rw):.2f}")
+            print(f"        -> waarschijnlijk EEN cel/replicates of een coop~0-regime, GEEN payoff-sweep;")
+            print(f"           correlatie niet zinvol. Draai op een echte L3 g_inv-sweep.")
+        else:
+            print(f"    rewiring-rate vs cooperatie  : rho = {spearman(rw, coop):+.2f}  (voorspeld: +)")
+            print(f"    rewiring-rate vs stabiliteit : rho = {spearman(rw, -instab):+.2f}  "
+                  f"(voorspeld: +; hoge rewire -> lage instab)")
+            med = float(np.median(rw))
+            hi = coop[rw >= med]; lo = coop[rw < med]
+            if len(hi) and len(lo):
+                print(f"    drempel-knik (mediaan rewire={med:.2f}): coop hoog-rewire {hi.mean():.2f} "
+                      f"vs laag-rewire {lo.mean():.2f}")
+                print(f"      -> Santos/Rand: het effect zit bij de knik (niet-lineair), niet in een monotone lijn.")
         print(f"\n  NB: te toetsen voorspelling, geen aanname; Santos/Rand = niet-LLM (analogie).")
     else:
         r = analyze(args.path)
