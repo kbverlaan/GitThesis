@@ -49,6 +49,15 @@ SANCTION = [r"exile", r"expel", r"banish", r"excluded?", r"targeted by",
             r"punish", r"sanction", r"retaliat", r"cast out", r"enforce",
             r"declaration of war", r"traitor", r"betrayer", r"wolf", r"wolves",
             r"purge", r"kicked", r"war on"]
+# MORAL / geInternaliseerde morele kracht (Sugden 1986, pp.147-161): de norm werkt
+# via schuld/resentment/ought/afkeuring, NIET via externe sanctie. Aparte teller,
+# vooral bedoeld voor de PRIVE laag (memory-notes) als internalisatie-signaal --
+# scheidt Sugden-interne morele norm (privE, moreel) van Searle/Hobbes-externe
+# handhaving (publiek, sanctie). Evaluatief/moreel-emotioneel, geen kale modaliteit.
+MORAL = [r"ought", r"resent\w*", r"guilt\w*", r"ashamed", r"shame\w*", r"blame\w*",
+         r"deserv\w*", r"condemn\w*", r"censure", r"disgrace\w*", r"unfair",
+         r"unjust", r"wrong to", r"immoral", r"morally", r"conscience",
+         r"dishonou?rable", r"betray\w*", r"duty", r"obligation"]
 # NB: de aparte "regel-introductie"-teller (RULE_INTRO: pact/those who/threshold/
 # protocol/...) is GESCHRAPT -- matchte te breed en bleek ruis (zie DVs.md). De
 # betrouwbare maten zijn norm-dichtheid (deontisch + collectief, Bicchieri) en de
@@ -61,6 +70,7 @@ def _rx(words):
 
 RX_OBL, RX_PRO = _rx(OBLIGATION), _rx(PROHIBITION)
 RX_COL, RX_SAN = _rx(COLLECTIVE), _rx(SANCTION)
+RX_MOR = _rx(MORAL)
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
@@ -72,6 +82,7 @@ def classify(sent):
         "deontic": deontic,                       # deontisch van vorm
         "norm": deontic and collective,           # KERN: collectieve prescriptie
         "sanction": bool(RX_SAN.search(sent)),
+        "moral": bool(RX_MOR.search(sent)),       # Sugden: geInternaliseerde morele kracht
     }
 
 
@@ -108,7 +119,7 @@ def _scan(items, nr):
         thirds[idx][0] += nn; thirds[idx][1] += tt
     temporal = [(t[0] / t[1] if t[1] else 0.0) for t in thirds]
     return dict(n_unit=n_unit, n_sent=n_sent, deontic=dens("deontic"), norm=dens("norm"),
-                sanction=c["sanction"], temporal=temporal,
+                sanction=c["sanction"], moral=dens("moral"), temporal=temporal,
                 rules=sorted(rules, reverse=True))
 
 
@@ -134,15 +145,19 @@ def analyze(path):
 def print_single(r, top):
     pub, priv = r['pub'], r['priv']
     print(f"\n{r['name']}  ({r['nr']} rondes)")
-    print(f"  {'laag':<22}{'norm':>7}{'deon':>7}{'sanc':>6}   temporeel(v/m/l)")
+    print(f"  {'laag':<22}{'norm':>7}{'deon':>7}{'moral':>7}{'sanc':>6}   temporeel(v/m/l)")
     for tag, L in (("PUBLIEK (messages)", pub), ("PRIVE (memory-notes)", priv)):
         tv = L['temporal']
-        print(f"  {tag:<22}{L['norm']:7.3f}{L['deontic']:7.3f}{L['sanction']:6d}"
+        print(f"  {tag:<22}{L['norm']:7.3f}{L['deontic']:7.3f}{L['moral']:7.3f}{L['sanction']:6d}"
               f"   {tv[0]:.2f}/{tv[1]:.2f}/{tv[2]:.2f}")
     # internalisering-ratio: privE-norm / publiek-norm -> wordt de afkondiging ook geleefd?
     ratio = priv['norm'] / pub['norm'] if pub['norm'] else 0.0
     print(f"  internalisering (privE-norm / publiek-norm): {ratio:.2f}"
           f"   {'(>=1: norm leeft in privE-redenering)' if ratio >= 0.8 else '(<1: vooral afgekondigd, minder geleefd)'}")
+    # Sugden-internalisatie: moreel-evaluatieve taal in de PRIVE laag (schuld/ought/resentment)
+    # = de geInternaliseerde-morele-kracht-lezing, los van externe sanctie.
+    print(f"  Sugden-moraal (privE moral-dichtheid): {priv['moral']:.3f}"
+          f"   (geInternaliseerde morele kracht; vgl publiek {pub['moral']:.3f})")
     print(f"\n  --- TOP {top} PUBLIEKE REGEL/NORM-ZINNEN (het 'wetboek') ---")
     for score, rnum, frm, s in pub['rules'][:top]:
         print(f"  R{rnum:<2} {frm}: \"{s[:140]}\"")
