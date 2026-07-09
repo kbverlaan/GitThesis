@@ -81,6 +81,9 @@ NAMED_STRUCTURE_STOP = {
     "if", "when", "while", "after", "before", "because",
 }
 
+# Pre-reg gating (Koen 2026-07-09): een gedeeld label telt als benoemde structuur
+# bij >=2 distincte agents en >=3 occurrences, whole-run. Reconcilieert de
+# doc<->code-discrepantie (doc zei "3 agents/2 windows"; pre-reg-keuze = 2 agents/3 occ).
 NAMED_STRUCTURE_MIN_AGENTS = 2
 NAMED_STRUCTURE_MIN_OCCURRENCES = 3
 
