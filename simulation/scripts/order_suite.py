@@ -76,6 +76,12 @@ def parse(lines):
         per_round.append({'round': d.get('round'), 'counts': cc, 'sumR': sum(Rs.values()), 'Rs': Rs})
     return sorted(agents), T, Mc, attacks, per_round
 
+# Regime-kwadrant drempels (P2-DV). Pre-reg SSOT: config/dv_thresholds.yaml
+# economy_regime. NB: top-aandeel is een PERCENTAGE (top = max/sum*100).
+ECON_POSITIVE_SUM = 0.3    # coop-kwadrant iff productivity-ratio > dit
+ECON_NEGATIVE_SUM = -0.3   # predatie-kwadrant iff pr < dit
+ECON_TOP_SHARE = 15        # concentratie-as iff top-aandeel (%) >= dit
+
 def economy(per_round):
     R0 = per_round[0]['sumR']; Rn = per_round[-1]['sumR']; n = len(per_round) - 1
     pr = ((Rn / R0) ** (1 / n) - 1) * 100 if R0 > 0 and Rn > 0 and n > 0 else 0.0
@@ -84,9 +90,9 @@ def economy(per_round):
     g = gini(finalRs)
     top = max(finalRs) / sum(finalRs) * 100 if finalRs and sum(finalRs) > 0 else 0.0
     alive = sum(1 for x in finalRs if x > 1.0)
-    if pr > 0.3:   reg = 'HEGEMONIE' if top >= 15 else 'BLOEI'
-    elif pr < -0.3: reg = 'VEROVERING' if top >= 15 else 'NIVELLERING'
-    else:          reg = 'VLAK-ongelijk' if top >= 15 else 'VLAK-gelijk'
+    if pr > ECON_POSITIVE_SUM:   reg = 'HEGEMONIE' if top >= ECON_TOP_SHARE else 'BLOEI'
+    elif pr < ECON_NEGATIVE_SUM: reg = 'VEROVERING' if top >= ECON_TOP_SHARE else 'NIVELLERING'
+    else:          reg = 'VLAK-ongelijk' if top >= ECON_TOP_SHARE else 'VLAK-gelijk'
     return pr, tot, g, top, alive, len(finalRs), reg
 
 def action_dist_drift(per_round):

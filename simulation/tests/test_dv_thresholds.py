@@ -12,6 +12,7 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import classify_run as C  # noqa: E402
+import order_suite as OS  # noqa: E402
 
 _CFG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "dv_thresholds.yaml")
 
@@ -46,3 +47,10 @@ def test_institution_overlay_match():
     io = _cfg()["institution_overlay"]
     assert C.INSTITUTION_UNIVERSALITY_FRAC == io["universality_frac"]
     assert C.INSTITUTION_ROBUSTNESS_FRAC == io["robustness_frac"]
+
+
+def test_economy_regime_match():
+    er = _cfg()["economy_regime"]
+    assert OS.ECON_POSITIVE_SUM == er["positive_sum_threshold"]
+    assert OS.ECON_NEGATIVE_SUM == er["negative_sum_threshold"]
+    assert OS.ECON_TOP_SHARE == er["top_share_threshold"]

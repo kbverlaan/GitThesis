@@ -38,10 +38,10 @@ named_institution:     # classify_run.py:84-85 — CONFIRMATORY (aanwezigheid be
   min_occurrences: 3             # >=3 occurrences, whole-run
   # NB venster-propagatie (>=2 vensters) = optionele EXPLORATORY verfijning, geen gate
 
-economy_regime:        # order_suite.py:79-90 economy() — CONFIRMATORY (P2, regime binnen niveau)
+economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime binnen niveau)
   positive_sum_threshold: 0.3    # coop-kwadrant iff productivity-ratio > dit
   negative_sum_threshold: -0.3   # predatie-kwadrant iff pr < dit
-  top_share_threshold: 0.15      # concentratie-as iff top-aandeel >= dit
+  top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
 
 commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
   # MSY = commons_init = commons_K/2 (config/ladder_L4.yaml: K=120, init=60).
