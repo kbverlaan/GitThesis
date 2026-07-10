@@ -5,7 +5,7 @@ base_url: "https://openrouter.ai/api/v1"
 model: "google/gemma-4-31b-it"
 
 temperature: 0.3
-max_tokens: 8000          # thinking model: room for <think> + JSON
+max_tokens: 16000        # thinking model: <think> telt mee in completion; 8000 gaf truncatie+retries vanaf ~R13 (median CoT 8.4K tok)
 timeout: 900
 retry_attempts: 3
 retry_delay: 5
