@@ -225,20 +225,35 @@ class BaselinePrompt:
         commons = observation.get("commons")
         if commons:
             lines.append("")
+            # Absolute display (flag-gated): drop the %-veil entirely — level and
+            # harvests in plain units (GovSim-parity). K is then simply known.
+            show_abs = self.game_params.get("commons_show_absolute", False)
+            K_abs = self.game_params.get("commons_K", 0) or 0
+            def _lvl():
+                pct = commons['stock_pct']
+                if show_abs and K_abs > 0:
+                    return f"{pct * K_abs / 100.0:.0f} of {K_abs:.0f} units ({pct:.0f}%)"
+                return f"{pct:.0f}% of capacity"
             if commons.get("collapsed"):
-                lines.append("SHARED STOCK: COLLAPSED (0% — permanently depleted, nothing left to harvest).")
+                lines.append("SHARED STOCK: COLLAPSED (0 — permanently depleted, nothing left to harvest).")
             elif commons.get("opens_in_round"):
-                lines.append(f"SHARED STOCK: {commons['stock_pct']:.0f}% of capacity — NOT YET OPEN: "
+                lines.append(f"SHARED STOCK: {_lvl()} — NOT YET OPEN: "
                              f"harvesting becomes possible in round {commons['opens_in_round']}. "
                              "This round you can only discuss it.")
             else:
-                lines.append(f"SHARED STOCK: {commons['stock_pct']:.0f}% of capacity.")
+                lines.append(f"SHARED STOCK: {_lvl()}.")
             last = commons.get("last_harvests_pct") or {}
             if last:
-                parts_h = ", ".join(
-                    f"{a} {p:.0f}%" for a, p in sorted(last.items(), key=lambda kv: -kv[1])
-                )
-                lines.append(f"  Harvests last round (% of capacity): {parts_h}")
+                if show_abs and K_abs > 0:
+                    parts_h = ", ".join(
+                        f"{a} {p * K_abs / 100.0:.1f}" for a, p in sorted(last.items(), key=lambda kv: -kv[1])
+                    )
+                    lines.append(f"  Harvests last round (units): {parts_h}")
+                else:
+                    parts_h = ", ".join(
+                        f"{a} {p:.0f}%" for a, p in sorted(last.items(), key=lambda kv: -kv[1])
+                    )
+                    lines.append(f"  Harvests last round (% of capacity): {parts_h}")
 
         received_messages = observation.get("received_messages", [])
         if received_messages:
@@ -578,8 +593,14 @@ COALITIONS (multi-attacker combat):
                             "stock can only be observed and discussed.") if open_round > 1 else None
             reveal_line = "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all."
             ration_line = "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out."
-            intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
-                     "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.")
+            if self.game_params.get("commons_show_absolute", False):
+                K_intro = self.game_params.get("commons_K", 0) or 0
+                intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
+                         f"everyone draws from. Its full capacity is {K_intro:.0f} units; its current "
+                         "level is shown to you in units each round.")
+            else:
+                intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
+                         "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.")
             if mode == "action_own":
                 commons_lines = [
                     "SHARED STOCK:", intro,
