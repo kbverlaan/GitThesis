@@ -213,6 +213,10 @@ class BaselinePrompt:
             lines.append("")
             if commons.get("collapsed"):
                 lines.append("SHARED STOCK: COLLAPSED (0% — permanently depleted, nothing left to harvest).")
+            elif commons.get("opens_in_round"):
+                lines.append(f"SHARED STOCK: {commons['stock_pct']:.0f}% of capacity — NOT YET OPEN: "
+                             f"harvesting becomes possible in round {commons['opens_in_round']}. "
+                             "This round you can only discuss it.")
             else:
                 lines.append(f"SHARED STOCK: {commons['stock_pct']:.0f}% of capacity.")
             last = commons.get("last_harvests_pct") or {}
@@ -554,6 +558,10 @@ COALITIONS (multi-attacker combat):
                               f"{regen * 100:.0f}% of itself even if untouched, so it is a depleting resource.")
             collapse_line = ("- COLLAPSE: if the stock falls too low it collapses permanently — it stays empty "
                              "and nobody can harvest for the rest of the game.")
+            open_round = int(self.game_params.get("commons_open_round", 1))
+            opening_line = (f"- OPENING: harvesting is IMPOSSIBLE before round {open_round} — an earlier "
+                            "harvest attempt yields nothing (and still uses your action). Until then the "
+                            "stock can only be observed and discussed.") if open_round > 1 else None
             reveal_line = "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all."
             ration_line = "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out."
             intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
@@ -585,6 +593,8 @@ COALITIONS (multi-attacker combat):
                     "What you take is added to YOUR own resources, in absolute units.",
                     reveal_line, ration_line, regen_line, collapse_line,
                 ]
+            if opening_line:
+                commons_lines.insert(3, opening_line)
             parts.append("\n".join(commons_lines))
 
         parts.append("OTHER AGENTS:\n" + SOCIAL_SETTING)

@@ -78,3 +78,55 @@ def test_commons_off_by_default_no_state():
     assert eng.state.commons_K == 0.0
     obs = eng.state.get_observation("A")
     assert "commons" not in obs                                      # gated off
+
+
+# ── commons_open_round (R2-gate) ─────────────────────────────────────────────
+
+def _gate_engine(open_round=2):
+    return GameEngine(agent_ids=["A", "B"], initial_resources=100.0,
+                      delta_R=1.0, mu_arm=0.0,
+                      commons_enabled=True, commons_K=120.0, commons_init=60.0,
+                      commons_harvest_mode="action_own", commons_regen=1.5,
+                      commons_open_round=open_round)
+
+
+def _act_harvest(eng, fracs):
+    acts = [Action(a, ActionType.HARVEST if a in fracs else ActionType.DO_NOTHING,
+                   None, harvest=fracs.get(a, 0.0))
+            for a in eng.state.agents]
+    return eng.resolve_round(acts)
+
+
+def test_gate_blocks_harvest_before_open_round():
+    eng = _gate_engine(open_round=2)
+    log = _act_harvest(eng, {"A": 0.50})  # R1: probeert 50% van eigen R te oogsten
+    assert log["commons"]["harvested"] == 0.0
+    assert log["commons"]["closed_until"] == 2
+    assert eng.state.commons_stock == 60.0          # bevroren: geen draw, geen regen
+    assert eng.state.resources["A"] == 100.0         # niets ontvangen
+
+
+def test_gate_opens_exactly_at_open_round():
+    eng = _gate_engine(open_round=2)
+    _act_harvest(eng, {"A": 0.10})                   # R1: dicht
+    log = _act_harvest(eng, {"A": 0.10})             # R2: open
+    assert log["commons"]["harvested"] == pytest.approx(10.0)
+    assert eng.state.resources["A"] == pytest.approx(110.0)
+    # regen loopt weer: (60-10) * 1.5 = 75
+    assert eng.state.commons_stock == pytest.approx(75.0)
+
+
+def test_gate_default_is_open_from_r1():
+    eng = _gate_engine(open_round=1)
+    log = _act_harvest(eng, {"A": 0.10})
+    assert log["commons"]["harvested"] == pytest.approx(10.0)
+
+
+def test_gate_observation_announces_opening():
+    eng = _gate_engine(open_round=3)
+    obs = eng.state.get_observation("A")
+    assert obs["commons"]["opens_in_round"] == 3
+    _act_harvest(eng, {})
+    _act_harvest(eng, {})
+    obs = eng.state.get_observation("A")             # R3: open → geen aankondiging
+    assert "opens_in_round" not in obs["commons"]
