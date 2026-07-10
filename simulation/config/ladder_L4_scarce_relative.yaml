@@ -1,0 +1,82 @@
+# Complexity ladder — RUNG 4: Commons — SCARCITY cell + R2-GATE + CONVERSION + RELATIVE OBJECTIVE (playground n5).
+# Registered g_inv triplet: scarcity 0.039 · bistable 0.091 · abundance 0.142.
+# Identical to ladder_L4.yaml except g_inv.
+# Affordances: L3 + harvest (shared logistic stock). Full ladder.
+# Comms + memory ON (always-on base substrate). Prod numeric params unchanged.
+#
+# Flag matrix (see ladder_L1.yaml header).
+
+num_agents: 30
+initial_resources: 100.0
+
+# Investment
+c_inv: 0.06
+g_inv: 0.039
+gamma_sat: 1.00
+tau_sat: 5
+
+# Arming — ON
+arm_enabled: true
+c_arm: 0.05
+mu_arm: 4.0
+delta_B: 0.75
+
+# Combat — ON
+take_enabled: true
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Commons — ON from L4. LOCKED config (probe job 24092054, 2026-06-22): the fixed
+# outside option for the ladder; OFAT sweeps g_inv only, NOT the commons.
+# Evidence: action-mode + regen 1.5 + start-at-MSY = genuine, RESOLVABLE tragedy
+# (agents over-draw to ~25%, fear collapse, pull back, recover, manage sustainably).
+# regen 1.0 collapses irreversibly (R1 over-grab kills a non-renewing pool); regen 2.0
+# is too generous (no pressure). 1.5 is the sweet spot with rich governance dynamics.
+commons_enabled: true
+commons_K: 120.0
+commons_init: 60.0                    # start at MSY (K/2), not full → no buffer, dilemma bites from R1
+commons_harvest_mode: "action_own"   # harvest IS the action (mutually exclusive) — a real choice w/ opportunity cost
+commons_regen: 1.5                    # fragile-but-recoverable (tragedy threshold is between 1.5 and 1.0)
+commons_collapse_frac: 0.05
+
+# Economy
+delta_R: 0.97
+
+# Game length
+max_rounds: 60
+history_length: 10
+
+# Network — association (rewiring) ON; w>0 gives it bite
+network_enabled: true
+assoc_enabled: true
+mean_degree: 5.0
+rewiring_prob: 0.5
+
+# Communication — ON (base substrate)
+comm_scope: "choice"
+
+# Memory — ON (base substrate)
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true
+
+# Commons opens in R2: announced in the R1 prompt (stock visible, "NOT YET OPEN"),
+# harvestable from R2 — gives the society exactly one round of talk before the
+# first harvest decision (messages are delivered with a one-round lag, so without
+# this gate the first harvest precedes the first conversation → R1 collapse, run n2).
+commons_open_round: 2
+
+# Commensurability: show each agent what 1% of own resources is as a % of the
+# stock's FULL CAPACITY (K stays hidden). Run n3 showed talk alone cannot make
+# the R2 pact sustainable: own-% claims and the %-of-capacity stock display are
+# incommensurable until the first harvest is revealed — the honored pact drained
+# the stock exactly (60/60) in R2. GovSim-parity: there agents know the numbers.
+commons_show_capacity_frac: true
+
+# PLAYGROUND (n5): positional goal — "end with MORE than the others". Zero-sum
+# framing: predicts hold-peace unravels (mutual decline preserves rank = pointless)
+# and take/coalition become the only rank-improving moves. NOT a registered cell.
+objective: "relative"

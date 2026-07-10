@@ -52,6 +52,11 @@ class BaselinePrompt:
     part of the substrate — no outcome priming — not an IV."""
 
     OBJECTIVE = "Maximize your absolute resource count."
+    # Flag-gated positional variant (game_params objective: "relative"). Zero-sum
+    # framing: only your rank matters, so mutual decline preserves nothing.
+    OBJECTIVE_RELATIVE = ("End the game with MORE resources than the other agents. "
+                          "Only your position relative to the others counts — "
+                          "absolute wealth is worthless if others have more.")
 
     def __init__(self, game_params: Optional[Dict] = None,
                  hide_resources: bool = False,
@@ -111,10 +116,13 @@ class BaselinePrompt:
         return "\n\n".join(parts)
 
     def _format_identity(self, observation: Dict) -> str:
+        objective = (self.OBJECTIVE_RELATIVE
+                     if self.game_params.get("objective") == "relative"
+                     else self.OBJECTIVE)
         return (
             f"IDENTITY:\n"
             f"You are {observation['agent_id']}.\n"
-            f"Objective: {self.OBJECTIVE}\n"
+            f"Objective: {objective}\n"
             f"This is a repeated game with multiple rounds. Other agents can "
             f"observe your past actions. Your choice this round may affect "
             f"future rounds."
