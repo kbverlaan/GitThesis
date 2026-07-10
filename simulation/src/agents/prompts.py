@@ -196,10 +196,16 @@ class BaselinePrompt:
             )
         if (gp.get("commons_enabled", False)
                 and gp.get("commons_harvest_mode") == "action_own"):
-            num_lines.append(
-                f"  - harvest: every 1% you claim = {R * 0.01:.1f} absolute units "
-                f"from the shared stock"
-            )
+            harvest_num = (f"  - harvest: every 1% you claim = {R * 0.01:.1f} absolute units "
+                           f"from the shared stock")
+            if gp.get("commons_show_capacity_frac", False):
+                # Commensurability (flag-gated): own-% claims expressed in the same
+                # unit as the displayed stock level, so a group quota is computable
+                # BEFORE the first harvest reveals the scale. K itself stays hidden.
+                K = gp.get("commons_K", 0) or 0
+                if K > 0:
+                    harvest_num += f" (≈ {100.0 * (R * 0.01) / K:.2f}% of the stock's full capacity)"
+            num_lines.append(harvest_num)
         delta_R = gp.get("delta_R", 1.0)
         if delta_R < 1.0:
             num_lines.append(
