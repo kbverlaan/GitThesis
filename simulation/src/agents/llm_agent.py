@@ -105,6 +105,7 @@ class LLMAgent:
             self.memory = None
 
         # Initialize OpenAI-compatible client (works with OpenRouter, vLLM, etc.)
+        self.is_openrouter = "openrouter" in (base_url or "")
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url
@@ -454,9 +455,15 @@ class LLMAgent:
                 # vLLM exposes the chain-of-thought through reasoning_content
                 # when the matching --reasoning-parser is enabled server-side.
                 if self.is_thinking_model:
-                    api_kwargs["extra_body"] = {
-                        "chat_template_kwargs": {"enable_thinking": True}
-                    }
+                    if self.is_openrouter:
+                        # OpenRouter only RETURNS the chain-of-thought when asked:
+                        # without this the reasoning tokens are billed but the
+                        # message.reasoning field stays absent (traces lost).
+                        api_kwargs["extra_body"] = {"reasoning": {"enabled": True}}
+                    else:
+                        api_kwargs["extra_body"] = {
+                            "chat_template_kwargs": {"enable_thinking": True}
+                        }
 
                 response = self.client.chat.completions.create(**api_kwargs)
                 latency = time.time() - t0
