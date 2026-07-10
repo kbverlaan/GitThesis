@@ -611,7 +611,7 @@ COALITIONS (multi-attacker combat):
             fields.append('  "rewire_drop": "<neighbour agent_id to disconnect from, or null>"')
             fields.append('  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>"')
         if commons_enabled:
-            if commons_mode == "fraction_own":
+            if commons_mode in ("fraction_own", "action_own"):
                 fields.append('  "harvest": "<how much to take from the shared stock this round, as a percent of your own current resources: any number >= 0 (no upper limit); 0 for none>"')
             else:
                 fields.append(f'  "harvest": "<how much of the shared stock to take this round: one of {cat_str} (percent of capacity); 0 for none>"')
@@ -624,7 +624,14 @@ COALITIONS (multi-attacker combat):
             'target must be null (not the string "null") when no target is needed.',
         ]
         if commons_enabled:
-            if commons_mode == "fraction_own":
+            if commons_mode == "action_own":
+                notes.append(
+                    "harvest: a percent of your own current resources to take from the "
+                    "shared stock this round — any number 0 or greater, with no upper limit. "
+                    'Only drawn when your action is "harvest" (harvesting IS your action '
+                    "for the round); with any other action, set harvest to 0."
+                )
+            elif commons_mode == "fraction_own":
                 notes.append(
                     "harvest: a percent of your own current resources to take from the "
                     "shared stock this round — any number 0 or greater, with no upper limit. "
