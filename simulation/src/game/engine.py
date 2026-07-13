@@ -65,6 +65,7 @@ class GameState:
     commons_stock: float = 0.0     # shared common-pool resource level (absolute units); 0 if commons off
     commons_K: float = 0.0         # carrying capacity (absolute); >0 signals commons is active
     commons_collapsed: bool = False  # absorbing state once stock falls below the collapse threshold
+    commons_open_round: int = 1    # first round harvesting is possible (announced from R1)
 
     def get_observation(self, agent_id: str, history_length: int = 10) -> Dict:
         """Get complete information observation for an agent."""
@@ -89,6 +90,8 @@ class GameState:
                 "collapsed": self.commons_collapsed,
                 "last_harvests_pct": last_harvests,
             }
+            if self.round_number < self.commons_open_round:
+                obs["commons"]["opens_in_round"] = self.commons_open_round
         return obs
 
 
@@ -125,7 +128,8 @@ class GameEngine:
                  commons_init: Optional[float] = None,
                  commons_collapse_frac: float = 0.05,
                  commons_harvest_mode: str = "category",
-                 commons_regen: float = 2.0):
+                 commons_regen: float = 2.0,
+                 commons_open_round: int = 1):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -158,6 +162,7 @@ class GameEngine:
             "commons_collapse_frac": commons_collapse_frac,
             "commons_harvest_mode": commons_harvest_mode,
             "commons_regen": commons_regen,
+            "commons_open_round": commons_open_round,
         }
 
         if isinstance(initial_resources, dict):
@@ -173,6 +178,7 @@ class GameEngine:
         if commons_enabled:
             self.state.commons_K = commons_K
             self.state.commons_stock = commons_init if commons_init is not None else commons_K
+            self.state.commons_open_round = commons_open_round
         self._valid_targets: Optional[Dict[str, List[str]]] = None
 
     def set_valid_targets(self, valid_targets: Optional[Dict[str, List[str]]]):
@@ -315,6 +321,14 @@ class GameEngine:
         mode = self.params.get("commons_harvest_mode", "category")
         round_log["commons"] = {"stock_before": S, "K": K,
                                 "collapsed": self.state.commons_collapsed}
+        open_round = int(self.params.get("commons_open_round", 1))
+        if self.state.round_number < open_round:
+            # Commons not yet open: announced in the prompt from R1, harvestable
+            # from open_round. Attempts draw nothing (the action is still spent).
+            round_log["commons"]["closed_until"] = open_round
+            round_log["commons"]["grants_pct"] = {}
+            round_log["commons"]["harvested"] = 0.0
+            return
         if self.state.commons_collapsed or S <= 0:
             round_log["commons"]["grants_pct"] = {}
             round_log["commons"]["harvested"] = 0.0
@@ -381,6 +395,10 @@ class GameEngine:
         threshold it collapses permanently (absorbing 0); otherwise it grows by
         commons_regen× (GovSim doubling = 2.0), capped at K."""
         if not self.params.get("commons_enabled", False):
+            return
+        if self.state.round_number < int(self.params.get("commons_open_round", 1)):
+            # Stock frozen while the commons is closed: no regen, no collapse
+            # check — it opens exactly at the configured level (e.g. MSY).
             return
         S = self.state.commons_stock
         K = self.params["commons_K"]
