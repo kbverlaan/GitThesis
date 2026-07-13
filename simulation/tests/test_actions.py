@@ -20,7 +20,8 @@ def test_canonical_action_set():
     # 'harvest' is only a real action under commons_harvest_mode="action_own"
     # (gated in _action_dict_to_action); it is in the canonical vocabulary so the
     # normaliser recognises it rather than dropping it.
-    assert LLMAgent._VALID_ACTIONS == {'transfer', 'strengthen', 'take', 'hold', 'harvest'}
+    assert LLMAgent._VALID_ACTIONS == {'transfer', 'strengthen', 'take', 'hold', 'harvest',
+                                        'drop', 'invite'}
     for a in ('transfer', 'strengthen', 'take', 'hold', 'harvest'):
         assert _norm(a) == a
 
@@ -44,3 +45,60 @@ def test_arm_self_not_available():
     assert 'arm_self' not in LLMAgent._VALID_ACTIONS
     assert _norm('arm_self') is None
     assert _norm('arm self') is None
+
+
+# ── assoc_rewire_mode="action": drop/invite als actie (A/B-probe) ────────────
+
+from game.engine import ActionType
+
+
+def _agent_stub(mode="action", visible=("B",)):
+    from types import SimpleNamespace
+    stub = SimpleNamespace(
+        agent_id="A",
+        game_params={"assoc_enabled": True, "assoc_rewire_mode": mode,
+                     "arm_enabled": True, "take_enabled": True},
+        _visible_agents=list(visible),
+        _last_rewire_nom=None,
+        _VALID_ACTIONS=LLMAgent._VALID_ACTIONS,
+        _ACTION_ALIASES=LLMAgent._ACTION_ALIASES,
+    )
+    stub._normalize_action = lambda s: LLMAgent._normalize_action(stub, s)
+    stub._snap_harvest = lambda raw: 0.0
+    return stub
+
+
+def _to_action(stub, d):
+    return LLMAgent._action_dict_to_action(stub, d)
+
+
+def test_action_mode_drop_is_noop_plus_nomination():
+    stub = _agent_stub()
+    a = _to_action(stub, {"action": "drop", "target": "B"})
+    assert a.action_type == ActionType.DO_NOTHING and a.target_id is None
+    assert stub._last_rewire_nom == {"drop": "B", "invite": None}
+
+
+def test_action_mode_invite_nonneighbor_allowed():
+    stub = _agent_stub(visible=("B",))
+    a = _to_action(stub, {"action": "invite", "target": "C"})
+    assert a.action_type == ActionType.DO_NOTHING
+    assert stub._last_rewire_nom == {"drop": None, "invite": "C"}
+
+
+def test_action_mode_drop_requires_neighbor():
+    stub = _agent_stub(visible=("B",))
+    assert _to_action(stub, {"action": "drop", "target": "C"}) is None
+
+
+def test_parallel_mode_rejects_drop_as_action():
+    stub = _agent_stub(mode="parallel")
+    assert _to_action(stub, {"action": "drop", "target": "B"}) is None
+    assert stub._last_rewire_nom is None
+
+
+def test_action_mode_store_rewire_ignores_parallel_fields():
+    stub = _agent_stub()
+    stub._last_rewire_nom = {"drop": "B", "invite": None}  # gezet door de actie
+    LLMAgent._store_rewire(stub, {"rewire_drop": "X", "rewire_invite": "Y"})
+    assert stub._last_rewire_nom == {"drop": "B", "invite": None}

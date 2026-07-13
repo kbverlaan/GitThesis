@@ -384,6 +384,18 @@ class BaselinePrompt:
                 "your action this round (you cannot also transfer/strengthen/take). "
                 "See SHARED STOCK below."
             )
+        if (self._rewiring_on()
+                and self.game_params.get("assoc_rewire_mode", "parallel") == "action"):
+            actions.append(
+                "- drop: disconnect from TARGET (must be a current neighbor). "
+                "No resource cost, but this USES your action this round. "
+                "See REWIRING below."
+            )
+            actions.append(
+                "- invite: request a connection with TARGET (any agent you know of, "
+                "neighbor or not). No resource cost, but this USES your action this "
+                "round. See REWIRING below."
+            )
         actions.append("- hold: no cost, no effect")
 
         actions_text = "\n".join(actions)
@@ -538,7 +550,12 @@ COALITIONS (multi-attacker combat):
             if rewiring_on:
                 network_block.append("Connections can change over time based on how agents interact.")
             network_block.append("You cannot verify claims about agents whose resources are hidden from you.")
-            if rewiring_on:
+            if rewiring_on and self.game_params.get("assoc_rewire_mode", "parallel") == "action":
+                network_block.append("")
+                network_block.append(
+                    f"REWIRING: rewiring is an ACTION. On a round you choose the action \"drop\" (TARGET = a current neighbour, to disconnect) or \"invite\" (TARGET = any agent you know of, to connect), the system applies your nomination with probability {rewiring_prob:.2f}. Rewiring USES your action, so that round you do not transfer, strengthen, take or hold-and-wait. Nominations are unilateral: no consent is required from the counterparty."
+                )
+            elif rewiring_on:
                 network_block.append("")
                 network_block.append(
                     f"REWIRING: each round, with probability {rewiring_prob:.2f}, the system applies your rewiring nominations. You may nominate at most one neighbour to disconnect from (drop) and at most one agent — neighbour or not — to connect with (invite). Nominations are unilateral: no consent is required from the counterparty."
@@ -639,7 +656,10 @@ COALITIONS (multi-attacker combat):
         """Build the JSON output schema. Field order: comm → action → target →
         rewire → memory. Memory last so it reflects on a just-decided action.
         """
-        has_rewire = self._rewiring_on()
+        # Parallel-mode only: under assoc_rewire_mode="action" the drop/invite
+        # nomination travels through action+target, so no extra schema fields.
+        has_rewire = (self._rewiring_on()
+                      and self.game_params.get("assoc_rewire_mode", "parallel") == "parallel")
         commons_enabled = self.game_params.get("commons_enabled", False)
         commons_mode = self.game_params.get("commons_harvest_mode", "category")
         cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])

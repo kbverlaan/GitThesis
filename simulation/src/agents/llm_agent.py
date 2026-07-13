@@ -134,7 +134,8 @@ class LLMAgent:
         if self.prompt.comm_scope != "none":
             fields.append('"message": "<your message, or null>"')
             fields.append('"message_to": "<list of recipient agent_ids, or null>"')
-        if gp.get('assoc_enabled', True) and gp.get('rewiring_prob', 0.0) > 0:
+        if (gp.get('assoc_enabled', True) and gp.get('rewiring_prob', 0.0) > 0
+                and gp.get('assoc_rewire_mode', 'parallel') == 'parallel'):
             fields.append('"rewire_drop": "<neighbour to disconnect, or null>"')
             fields.append('"rewire_invite": "<agent to connect with, or null>"')
         if gp.get('commons_enabled', False):
@@ -218,7 +219,10 @@ class LLMAgent:
     # commons_harvest_mode="action_own" (gated in _action_dict_to_action);
     # in other modes a stray 'harvest' string snaps to hold.
     _VALID_ACTIONS = {
-        'transfer', 'strengthen', 'take', 'hold', 'harvest'
+        'transfer', 'strengthen', 'take', 'hold', 'harvest',
+        # only meaningful under assoc_rewire_mode="action" (gated in
+        # _action_dict_to_action; otherwise unknown → parse-retry)
+        'drop', 'invite',
     }
 
     # Legacy names + shorthands → canonical (input backward compatibility)
@@ -258,6 +262,26 @@ class LLMAgent:
             'hold': ActionType.DO_NOTHING,
             'harvest': ActionType.HARVEST,
         }
+
+        # assoc_rewire_mode="action": drop/invite are ACTIONS (probe A/B vs the
+        # default parallel intent channel). Economically neutral — the round is
+        # spent on the network move; the nomination is stored via the action
+        # fields and picked up by the normal runner→network path.
+        rewire_as_action = (
+            self.game_params.get('assoc_enabled', True)
+            and self.game_params.get('assoc_rewire_mode', 'parallel') == 'action'
+        )
+        if rewire_as_action and action_str in ('drop', 'invite'):
+            if not target or target == self.agent_id:
+                return None
+            if action_str == 'drop' and self._visible_agents is not None \
+                    and target not in self._visible_agents:
+                return None  # can only drop a current neighbour
+            self._last_rewire_nom = ({'drop': target, 'invite': None}
+                                     if action_str == 'drop'
+                                     else {'drop': None, 'invite': target})
+            return Action(agent_id=self.agent_id,
+                          action_type=ActionType.DO_NOTHING, target_id=None)
 
         if not action_str or action_str not in action_map:
             return None
@@ -389,6 +413,11 @@ class LLMAgent:
         so any drop/invite the model emits is ignored."""
         if not self.game_params.get('assoc_enabled', True):
             self._last_rewire_nom = None
+            return
+        if self.game_params.get('assoc_rewire_mode', 'parallel') == 'action':
+            # Nomination komt uit de drop/invite-ACTIE (al gezet in
+            # _action_dict_to_action); parallelle velden bestaan niet in dit
+            # schema en worden genegeerd als het model ze toch stuurt.
             return
         drop = action_dict.get('rewire_drop')
         invite = action_dict.get('rewire_invite')
