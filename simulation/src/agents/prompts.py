@@ -551,9 +551,11 @@ COALITIONS (multi-attacker combat):
                 network_block.append("Connections can change over time based on how agents interact.")
             network_block.append("You cannot verify claims about agents whose resources are hidden from you.")
             if rewiring_on and self.game_params.get("assoc_rewire_mode", "parallel") == "action":
+                applies = ("your nomination is applied" if rewiring_prob >= 1.0
+                           else f"the system applies your nomination with probability {rewiring_prob:.2f}")
                 network_block.append("")
                 network_block.append(
-                    f"REWIRING: rewiring is an ACTION. On a round you choose the action \"drop\" (TARGET = a current neighbour, to disconnect) or \"invite\" (TARGET = any agent you know of, to connect), the system applies your nomination with probability {rewiring_prob:.2f}. Rewiring USES your action, so that round you do not transfer, strengthen, take or hold-and-wait. Nominations are unilateral: no consent is required from the counterparty."
+                    f"REWIRING: rewiring is an ACTION. On a round you choose the action \"drop\" (TARGET = a current neighbour, to disconnect) or \"invite\" (TARGET = any agent you know of, to connect), {applies}. Rewiring USES your action, so that round you do not transfer, strengthen, take or hold-and-wait. Nominations are unilateral: no consent is required from the counterparty."
                 )
             elif rewiring_on:
                 network_block.append("")
