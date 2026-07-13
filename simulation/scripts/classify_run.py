@@ -81,6 +81,9 @@ NAMED_STRUCTURE_STOP = {
     "if", "when", "while", "after", "before", "because",
 }
 
+# Pre-reg gating (Koen 2026-07-09): een gedeeld label telt als benoemde structuur
+# bij >=2 distincte agents en >=3 occurrences, whole-run. Reconcilieert de
+# doc<->code-discrepantie (doc zei "3 agents/2 windows"; pre-reg-keuze = 2 agents/3 occ).
 NAMED_STRUCTURE_MIN_AGENTS = 2
 NAMED_STRUCTURE_MIN_OCCURRENCES = 3
 
@@ -250,11 +253,16 @@ def _structure_is_blacklisted(name):
 
 
 def detect_named_structures(rounds):
-    """Return (filtered_counts, raw_counts).
+    """Return (filtered_counts, raw_counts, coverage).
 
     filtered_counts: institutions passing min-distinct-agents AND min-occurrences
                      filters and not in stopword blacklist.
     raw_counts: every regex match (for debugging / refinement).
+    coverage: {name: n_distinct_agents} for the filtered institutions -- used by
+              institution_markers() to score Aoki's 'universality of relevance'
+              (Aoki 2001 p.197: an institution is "universally relevant to all the
+              agents in the domain, providing ... a common understanding, or shared
+              cognition").
     """
     raw_total = Counter()
     by_agent = {}  # name -> set of distinct agent ids mentioning it
@@ -295,7 +303,8 @@ def detect_named_structures(rounds):
         if len(by_agent.get(name, ())) < NAMED_STRUCTURE_MIN_AGENTS:
             continue
         filtered[name] = count
-    return filtered, raw_total
+    coverage = {name: len(by_agent.get(name, ())) for name in filtered}
+    return filtered, raw_total, coverage
 
 
 def detect_role_claims(rounds, top_agents=None):
@@ -464,7 +473,7 @@ def extract_features(rounds, params, window=None):
             solo_attacker_counts[a] += 1
     persistent_solo_predators = {a for a, n in solo_attacker_counts.items() if n >= params["solo_predator_min_strikes"]}
 
-    named, named_raw = detect_named_structures(rounds)
+    named, named_raw, named_coverage = detect_named_structures(rounds)
     role_claims = detect_role_claims(rounds, top_agents={top_agent} if top_agent else None)
     role_claims_top1 = role_claims.get(top_agent, Counter())
 
@@ -500,6 +509,7 @@ def extract_features(rounds, params, window=None):
         "n_all_strike_events": len(all_strikes),
         "n_unique_coalition_attackers": _unique_attacker_count(coalition_attempts),
         "named_structures": dict(named),
+        "named_structures_coverage": dict(named_coverage),
         "named_structures_raw_top": dict(named_raw.most_common(15)),
         "role_claims_top1": dict(role_claims_top1),
         "bankruptcy_framing_hits_last_window": bankruptcy_hits,
@@ -669,6 +679,87 @@ def _coalition_size_unique(strike_events):
     return len(s)
 
 
+# ─── Aoki five-characteristics overlay (DIAGNOSTIC, off the label path) ───────
+
+INSTITUTION_UNIVERSALITY_FRAC = 0.6  # ONGEKALIBREERD: 'bijna alle agenten'
+INSTITUTION_ROBUSTNESS_FRAC = 0.6    # ONGEKALIBREERD: aandeel windows waarin label persisteert
+
+
+def institution_markers(features, trajectory_windows=None):
+    """Aoki (2001) vijf-kenmerken-overlay (Ch.7 pp.185, 197) -- DIAGNOSTISCH, staat
+    NIET in het label-pad (raakt de regime-labels 1a..2c niet, zodat die derivabel
+    blijven; AAMAS-rigor). Aoki: een emergente orde telt pas als INSTITUTIE (niet
+    louter patroon/conventie) als ze deze vijf kenmerken vertoont -- "endogenicity,
+    information compression or summary representation, robustness or durability ...,
+    universality of relevance to all agents in a domain, and multiplicity" (p.185).
+
+    Wat binnen data derivabel is:
+      - endogeniteit: structureel True. De engine kent geen exogene regels; alle orde
+        is endogeen ("institutions are endogenously created in the domain rather than
+        exogenously given from the outside", p.197). By-design, geen meting.
+      - informatie-compressie: bestaat er een gedeeld gecomprimeerd label? = een named
+        structure die de coherentie-gating haalt ("institutions as the conveyers of
+        compressed information regarding how the game is actually played", p.197).
+      - universaliteit: wordt het label door (bijna) alle agenten gedeeld? Max agent-
+        dekking / n_agents (p.197: "universally relevant to all the agents ... a common
+        understanding, or shared cognition"). Als een structuur maar door een subgroep
+        wordt herkend "it should not be recognized as an institution" (p.197).
+      - robuustheid: persistentie. NIET betrouwbaar binnen een statische run -- Aoki's
+        robuustheid = reproductie NA omgevingsverandering, wat een schok-conditie vergt
+        (p.197). Zwakke proxy in trajectory-modus: haalt een named label in >=X% van de
+        windows. In whole-run-modus None + vlag 'needs perturbation test'.
+      - multipliciteit: CROSS-RUN (dezelfde structuur -> verschillende ordes over runs;
+        Aoki Ch.10 padafhankelijkheid). N/A binnen EEN run -> None + verwijzing naar de
+        run-to-run-analyse.
+
+    Alle drempels ONGEKALIBREERD. Geeft per-kenmerk (waarde, derivabel?) + een telling
+    van gehaalde derivabele kenmerken terug."""
+    n_agents = features.get("n_agents", 0) or 0
+    named = features.get("named_structures", {}) or {}
+    coverage = features.get("named_structures_coverage", {}) or {}
+
+    compression = bool(named)
+    max_cov = max(coverage.values()) if coverage else 0
+    universality_frac = (max_cov / n_agents) if n_agents else 0.0
+    universality = universality_frac >= INSTITUTION_UNIVERSALITY_FRAC
+
+    # robuustheid: alleen in trajectory-modus (persistentie over windows) als zwakke proxy
+    if trajectory_windows:
+        names_per_window = [set((w["features"].get("named_structures") or {}).keys())
+                            for w in trajectory_windows]
+        nz = [s for s in names_per_window if s]  # windows met minstens 1 structuur
+        if nz:
+            all_names = set().union(*nz)
+            best = max((sum(nm in s for s in names_per_window) for nm in all_names),
+                       default=0)
+            robustness_frac = best / len(names_per_window)
+            robustness = robustness_frac >= INSTITUTION_ROBUSTNESS_FRAC
+        else:
+            robustness_frac, robustness = 0.0, False
+    else:
+        robustness_frac, robustness = None, None  # needs perturbation test
+
+    derivable_met = sum([True, compression, universality] + ([robustness] if robustness is not None else []))
+    return {
+        "endogenicity": {"value": True, "derivable": True,
+                         "note": "structureel: engine heeft geen exogene regels (Aoki p.197)"},
+        "information_compression": {"value": compression, "derivable": True,
+                                    "note": f"named structure aanwezig: {list(named.keys())[:3]}"},
+        "universality": {"value": universality, "frac": round(universality_frac, 3),
+                         "derivable": True,
+                         "note": f"max agent-dekking {max_cov}/{n_agents} (drempel {INSTITUTION_UNIVERSALITY_FRAC}, ongekalibreerd)"},
+        "robustness": {"value": robustness,
+                       "frac": round(robustness_frac, 3) if robustness_frac is not None else None,
+                       "derivable": robustness is not None,
+                       "note": "persistentie over windows (proxy)" if robustness is not None
+                               else "needs perturbation test (schok-conditie; Aoki p.197)"},
+        "multiplicity": {"value": None, "derivable": False,
+                         "note": "cross-run: run-to-run-variatie (Aoki Ch.10 padafhankelijkheid)"},
+        "derivable_markers_met": derivable_met,
+        "_calibration": "ONGEKALIBREERD -- diagnostische overlay, niet in het label-pad",
+    }
+
+
 # ─── trajectory (rolling window) ────────────────────────────────────────────
 
 def classify_window(rounds, params, start_round, end_round):
@@ -817,6 +908,8 @@ def classify_file(path, params):
             "label": label,
             "label_name": LABEL_NAMES[label],
             "layer2": layer2,
+            # Aoki-vijf-kenmerken-overlay (diagnostisch; robuustheid=None zonder trajectory)
+            "institution_markers": institution_markers(features),
             "decision_trace": trace,
             "flags": flags,
             "features": {k: v for k, v in features.items() if not k.startswith("_")},
@@ -828,6 +921,9 @@ def classify_file(path, params):
     end_state = windows[-1]
     episodes = compress_trajectory(windows)
     pattern = trajectory_pattern(episodes)
+    # Aoki-overlay op de EIND-window-features, met de volledige window-reeks zodat de
+    # robuustheid-proxy (persistentie over windows) derivabel is.
+    inst_markers = institution_markers(end_state["features"], trajectory_windows=windows)
     return {
         "run": Path(path).stem.replace("_log", "").replace("_reasoning_live", ""),
         "path": str(path),
@@ -838,6 +934,7 @@ def classify_file(path, params):
         "end_state_label": end_state["label"],
         "end_state_label_name": LABEL_NAMES[end_state["label"]],
         "end_state_layer2": end_state["layer2"],
+        "institution_markers": inst_markers,
         "trajectory_pattern": pattern,
         "trajectory_labels": [w["label"] for w in windows],
         "regime_episodes": episodes,

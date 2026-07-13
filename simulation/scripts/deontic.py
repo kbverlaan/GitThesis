@@ -49,15 +49,24 @@ SANCTION = [r"exile", r"expel", r"banish", r"excluded?", r"targeted by",
             r"punish", r"sanction", r"retaliat", r"cast out", r"enforce",
             r"declaration of war", r"traitor", r"betrayer", r"wolf", r"wolves",
             r"purge", r"kicked", r"war on"]
-# MORAL / geInternaliseerde morele kracht (Sugden 1986, pp.147-161): de norm werkt
-# via schuld/resentment/ought/afkeuring, NIET via externe sanctie. Aparte teller,
-# vooral bedoeld voor de PRIVE laag (memory-notes) als internalisatie-signaal --
-# scheidt Sugden-interne morele norm (privE, moreel) van Searle/Hobbes-externe
-# handhaving (publiek, sanctie). Evaluatief/moreel-emotioneel, geen kale modaliteit.
-MORAL = [r"ought", r"resent\w*", r"guilt\w*", r"ashamed", r"shame\w*", r"blame\w*",
-         r"deserv\w*", r"condemn\w*", r"censure", r"disgrace\w*", r"unfair",
-         r"unjust", r"wrong to", r"immoral", r"morally", r"conscience",
-         r"dishonou?rable", r"betray\w*", r"duty", r"obligation"]
+# MORAL / geInternaliseerde morele kracht (Sugden 1986, pp.147-161; Aoki 2001 Ch.3
+# pp.77-78): de norm werkt via schuld/resentment/ought/afkeuring, NIET via externe
+# sanctie. Aoki splitst naar handhavings-AGENT (Table 3.1: self / partner / community /
+# third party):
+#   - FIRST-PARTY = in het zelf, geInternaliseerd uit gewoonte: "violating the rules ...
+#     should evoke autonomously negative moral sentiments and emotions, such as guilt,
+#     shame, or anxiety, within the agent's mind" (p.78); "thou shalt not steal" als
+#     ge-ought (p.77). Dit is de Sugden-internalisatie-lezing.
+#   - SECOND/THIRD-PARTY = gericht op de overtreder: resentment/blame/censure door
+#     partner of gemeenschap (Aoki Table 3.1; Sugden: resentment sustains the norm).
+# Twee tellers -> scheidt geInternaliseerde morele norm (privE, zelf-referentieel) van
+# gericht-veroordelende handhavingstaal. MORAL = union (backward-compat teller).
+MORAL_FIRST = [r"ought", r"guilt\w*", r"ashamed", r"shame\w*", r"conscience",
+               r"duty", r"obligation", r"morally", r"immoral", r"wrong to",
+               r"dishonou?rable"]
+MORAL_OTHER = [r"resent\w*", r"blame\w*", r"deserv\w*", r"condemn\w*", r"censure",
+               r"disgrace\w*", r"unfair", r"unjust", r"betray\w*"]
+MORAL = MORAL_FIRST + MORAL_OTHER
 # NB: de aparte "regel-introductie"-teller (RULE_INTRO: pact/those who/threshold/
 # protocol/...) is GESCHRAPT -- matchte te breed en bleek ruis (zie DVs.md). De
 # betrouwbare maten zijn norm-dichtheid (deontisch + collectief, Bicchieri) en de
@@ -71,6 +80,7 @@ def _rx(words):
 RX_OBL, RX_PRO = _rx(OBLIGATION), _rx(PROHIBITION)
 RX_COL, RX_SAN = _rx(COLLECTIVE), _rx(SANCTION)
 RX_MOR = _rx(MORAL)
+RX_MOR_F, RX_MOR_O = _rx(MORAL_FIRST), _rx(MORAL_OTHER)
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
@@ -82,7 +92,9 @@ def classify(sent):
         "deontic": deontic,                       # deontisch van vorm
         "norm": deontic and collective,           # KERN: collectieve prescriptie
         "sanction": bool(RX_SAN.search(sent)),
-        "moral": bool(RX_MOR.search(sent)),       # Sugden: geInternaliseerde morele kracht
+        "moral": bool(RX_MOR.search(sent)),       # Sugden: geInternaliseerde morele kracht (union)
+        "moral_first": bool(RX_MOR_F.search(sent)),   # Aoki first-party (guilt/shame/ought, zelf)
+        "moral_other": bool(RX_MOR_O.search(sent)),   # Aoki second/third-party (resent/blame/censure, gericht)
     }
 
 
@@ -119,8 +131,9 @@ def _scan(items, nr):
         thirds[idx][0] += nn; thirds[idx][1] += tt
     temporal = [(t[0] / t[1] if t[1] else 0.0) for t in thirds]
     return dict(n_unit=n_unit, n_sent=n_sent, deontic=dens("deontic"), norm=dens("norm"),
-                sanction=c["sanction"], moral=dens("moral"), temporal=temporal,
-                rules=sorted(rules, reverse=True))
+                sanction=c["sanction"], moral=dens("moral"),
+                moral_first=dens("moral_first"), moral_other=dens("moral_other"),
+                temporal=temporal, rules=sorted(rules, reverse=True))
 
 
 def analyze(path):
@@ -156,7 +169,10 @@ def print_single(r, top):
           f"   {'(>=1: norm leeft in privE-redenering)' if ratio >= 0.8 else '(<1: vooral afgekondigd, minder geleefd)'}")
     # Sugden-internalisatie: moreel-evaluatieve taal in de PRIVE laag (schuld/ought/resentment)
     # = de geInternaliseerde-morele-kracht-lezing, los van externe sanctie.
+    # Aoki-split (Ch.3 pp.77-78): first-party (guilt/shame/ought, geInternaliseerd) vs
+    # second/third-party (resent/blame/censure, gericht op de overtreder).
     print(f"  Sugden-moraal (privE moral-dichtheid): {priv['moral']:.3f}"
+          f"  [first-party {priv['moral_first']:.3f} / 2e-3e-party {priv['moral_other']:.3f}]"
           f"   (geInternaliseerde morele kracht; vgl publiek {pub['moral']:.3f})")
     print(f"\n  --- TOP {top} PUBLIEKE REGEL/NORM-ZINNEN (het 'wetboek') ---")
     for score, rnum, frm, s in pub['rules'][:top]:

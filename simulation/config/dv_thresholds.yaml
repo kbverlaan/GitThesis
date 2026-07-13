@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DV pre-registratie — SINGLE SOURCE OF TRUTH voor alle classifier/DV-drempels.
+#
+# status: v0 DRAFT — nog NIET frozen. Freeze (git-SHA + datum hieronder invullen)
+#         pas ná IRR-validatie van de order-type-classifier (fixplan Fase 3).
+# freeze_sha:  <TODO na IRR>
+# freeze_date: <TODO na IRR>
+#
+# Bron: driehoek-audit secties <-> DVs.md <-> engine (2026-07-09). Elke waarde met
+# herkomst (bestand:regel). CONFIRMATORY = draagt een P-hypothese (moet frozen).
+# EXPLORATORY = triage / narratief-duik, geen P-toets (drempels mogen los blijven).
+#
+# Dit bestand is de bron-van-record. De drift-guard-test
+# (tests/test_dv_thresholds.py) dwingt af dat de code-constanten hiermee
+# overeenkomen, zodat code en pre-reg niet stil uiteenlopen.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── CONFIRMATORY ─────────────────────────────────────────────────────────────
+
+order_type:            # classify_run.py:24-44 DEFAULTS — kern-DV voor P1 (order klimt de ladder)
+  attempt_threshold: 1            # PREDATION iff >k coalition-attempts in event_window
+  strike_threshold: 0            # success vs failed binnen predation-subs
+  paralysis_stdev: 5.0           # 1b iff stdev(final_wealth) < dit
+  paralysis_do_nothing: 0.6      # 1b iff do_nothing_fraction > dit
+  top_n_others: 3                # math-protected: top vs sum(top-N others)
+  hegemony_top_ratio: 2.0        # 1c iff top_wealth >= dit x mean(others)
+  hegemony_runnerup_ratio: 1.5   # 1c ook: top >= dit x second_highest
+  bankruptcy_window: 5           # laatste-K rondes voor bankruptcy-framing
+  solo_predator_min_strikes: 2   # persistente solo-predator drempel (per venster)
+  partial_outcome_ratio: 0.5     # outcome=partial iff 0 < success_ratio < dit
+  window_size: 10                # rolling window (0 = whole run)
+  window_step: 1
+  event_window: 3                # laatste-K rondes voor predation/violence-detectie
+  smoothing: false               # 3-window majority filter (default OFF = AAMAS-rigor)
+
+named_institution:     # classify_run.py:84-85 — CONFIRMATORY (aanwezigheid benoemde structuur)
+  min_agents: 2                  # >=2 distincte agents (pre-reg Koen 2026-07-09)
+  min_occurrences: 3             # >=3 occurrences, whole-run
+  # NB venster-propagatie (>=2 vensters) = optionele EXPLORATORY verfijning, geen gate
+
+economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime binnen niveau)
+  positive_sum_threshold: 0.3    # coop-kwadrant iff productivity-ratio > dit
+  negative_sum_threshold: -0.3   # predatie-kwadrant iff pr < dit
+  top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
+
+commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
+  # MSY = commons_init = commons_K/2 (config/ladder_L4.yaml: K=120, init=60).
+  # sustained iff (not collapsed) AND stock_final >= MSY.
+  # collapse zelf is engine-absorbing (commons_collapse_frac=0.05 in ladder_L4.yaml) —
+  # geen aparte analyse-drempel; de DV leest de gelogde 'collapsed'-vlag.
+  sustained_requires_msy: true
+
+# ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
+
+governance_roles:      # enforcement.py:190-194 — EXPLORATORY (Koen 2026-07-09)
+  # ONGEKALIBREERD (code-comment: "nog geen bevestigde governance-run"). NIET in de
+  # confirmatory hypothese-set. Monitor/sanctioner-detectie voor de narratief-duik.
+  top_enforcer_share: 0.40       # concentr.-handhaver iff top_enf_share >= dit
+  max_enforcers: 4               # ... AND n_enforcers <= dit
+  top_target_share: 0.40         # vast-doelwit (roof-signatuur) iff top_tgt_share >= dit
+
+institution_overlay:   # classify_run.py:681-682 — EXPLORATORY (Aoki 5-kenmerken, buiten label-pad)
+  universality_frac: 0.6         # ONGEKALIBREERD — diagnostische overlay, niet in het label-pad
+  robustness_frac: 0.6           # ONGEKALIBREERD

@@ -123,12 +123,25 @@ def analyze(path):
             n_framed[lens] += 1
             triples[lens].append((r, actor, label, tg, f[0], f[1][:150]))
     rate = lambda l: n_framed[l] / n_act[l] if n_act[l] else 0.0
-    # ── Governance-rol-attributie (rol-laag, 2026-07-07) ─────────────────────
-    # WIE voert de handhaving uit? Geconcentreerde geframede sanctie (lens A) op
-    # een paar agents = een monitor/sanctioner-ROL is ontstaan (governance-rol;
-    # design-voorspelling: pas op de commons-trede robuust). Diffuus = geen
-    # handhaver-rol. Macht-rollen (sovereign/tribuut) meet de actie-familie
-    # (flow-centralisatie) apart -- dit is de GOVERNANCE-kant, niet de macht-kant.
+    # ── Governance-rol-attributie (rol-laag, 2026-07-07; Aoki-verfijning 2026-07-08) ──
+    # WIE handhaaft, en OP WIE? Geconcentreerde geframede sanctie (lens A) op een
+    # paar agents = een monitor/sanctioner-ROL is ontstaan. MAAR: concentratie van
+    # sanctiecapaciteit ALLEEN volstaat niet om governance te herkennen. Aoki (2001)
+    # Ch.6 laat zien dat dezelfde hoge top-share past op zowel een democratische/
+    # rule-of-law-staat (een handhaver die een gedeelde regel volgt) als een
+    # COLLUSIEVE/roof-staat (handhaver + kliek roven systematisch een minderheid):
+    # "A government strong enough to protect property rights and enforce contracts is
+    # also strong enough to confiscate the wealth of its citizens" (Weingast, in Aoki
+    # p.151). Het onderscheidende is niet de concentratie maar (a) WIE het doelwit is
+    # -- systematisch dezelfde minderheid (collusief) vs roterend onder gedeelde
+    # dreiging (democratisch; Aoki p.156 "punished by the withdrawal of the support of
+    # private agents ... nonvictims" / p.158 "lack of government's information about the
+    # identity ... a commitment device ... to abstain from random extortion"); en (b) of
+    # de tophandhaver ZELF disciplineerbaar is (ooit zelf doelwit van geframede sanctie;
+    # Glorious-Revolution-mechaniek, Aoki p.161-162). Daarom meten we naast enforcer-
+    # concentratie ook TARGET-concentratie en enforcer-disciplineerbaarheid.
+    # Alle drempels ONGEKALIBREERD (nog geen bevestigde governance-run; voorspeld pas
+    # op de commons-trede) -> conservatief + gevlagd.
     enf_by_actor = Counter(actor for (r, actor, label, tg, frm, s) in triples["A"])
     counts = [enf_by_actor.get(a, 0) for a in agents]
     total_enf = sum(counts)
@@ -136,12 +149,26 @@ def analyze(path):
     n_enforcers = sum(1 for c in counts if c > 0)
     top_enf = enf_by_actor.most_common(1)[0] if enf_by_actor else (None, 0)
     top_enf_share = top_enf[1] / total_enf if total_enf else 0.0
+    # Target-laag: op wie valt de geframede sanctie? Vaste minderheid = roof-signatuur;
+    # roterend = democratische-zelfbeperking-signatuur (Aoki p.156/p.158).
+    tgt_by_target = Counter(tg for (r, actor, label, tg, frm, s) in triples["A"])
+    tcounts = [tgt_by_target.get(a, 0) for a in agents]
+    target_gini = gini(tcounts)
+    n_targets = sum(1 for c in tcounts if c > 0)
+    top_tgt = tgt_by_target.most_common(1)[0] if tgt_by_target else (None, 0)
+    top_tgt_share = top_tgt[1] / total_enf if total_enf else 0.0
+    # Disciplineerbaarheid: is de tophandhaver zélf ooit doelwit van geframede sanctie?
+    # (democratisch = de handhaver-rol is zelf onderworpen aan de orde; Aoki p.152/p.161)
+    top_enforcer_targeted = bool(top_enf[0]) and tgt_by_target.get(top_enf[0], 0) > 0
     return dict(name=os.path.basename(path), nr=nr,
                 neg_rate=rate("A"), pos_rate=rate("B"),
                 n_takedrop=n_act["A"], n_investarm=n_act["B"],
                 n_neg=n_framed["A"], n_pos=n_framed["B"],
                 enforcer_gini=enforcer_gini, n_enforcers=n_enforcers,
                 top_enforcer=top_enf[0], top_enf_share=top_enf_share,
+                target_gini=target_gini, n_targets=n_targets,
+                top_target=top_tgt[0], top_tgt_share=top_tgt_share,
+                top_enforcer_targeted=top_enforcer_targeted,
                 triples=triples)
 
 
@@ -152,18 +179,29 @@ def print_single(r, top):
     print(f"  LENS B  normvervulling (invest/arm als naleving): {r['pos_rate']:.3f}"
           f"   ({r['n_pos']}/{r['n_investarm']} geframed)")
     te = f"{r['top_enforcer']} ({r['top_enf_share']:.0%})" if r['top_enforcer'] else "-"
+    tt = f"{r['top_target']} ({r['top_tgt_share']:.0%})" if r['top_target'] else "-"
     # Rol-verdict: top_enf_share (dominantie van EEN handhaver) is de betere
     # discriminator dan Gini -- Gini over de hele populatie vuurt al bij "niet
-    # iedereen handhaaft". Drempel is ONGEKALIBREERD (nog geen bevestigde monitor-
-    # rol-run; die is voorspeld pas op de commons-trede) -> conservatief + gevlagd.
+    # iedereen handhaaft". Maar concentratie alleen scheidt democratisch niet van
+    # collusief (Aoki Ch.6, zie analyze()) -> gebruik de target-laag + enforcer-
+    # disciplineerbaarheid als tweede as. Alle drempels ONGEKALIBREERD -> gevlagd.
     if not r['n_enforcers']:
         verdict = ""
     elif r['top_enf_share'] >= 0.40 and r['n_enforcers'] <= 4:
-        verdict = "-> concentr. sanctioner-rol? [drempel ongekalibreerd]"
+        # Er is een concentreerde handhaver-rol. Aoki-discriminator dem. vs collusief:
+        if r['top_enforcer_targeted']:
+            verdict = "-> concentr. handhaver MAAR zelf disciplineerbaar = rule-of-law/democratisch? [ongekalibreerd]"
+        elif r['top_tgt_share'] >= 0.40:
+            verdict = "-> concentr. handhaver + vast doelwit + niet zelf gesanctioneerd = COLLUSIEF/roof? [ongekalibreerd]"
+        else:
+            verdict = "-> concentr. sanctioner-rol; doelwit roteert = ambigu [ongekalibreerd]"
     else:
         verdict = "-> diffuse handhaving (geen duidelijke rol)"
     print(f"  GOV-ROL  handhaving: Gini {r['enforcer_gini']:.3f}, top-share {r['top_enf_share']:.0%}"
           f"   ({r['n_enforcers']} handhaver(s); top {te})   {verdict}")
+    disc = "ja (disciplineerbaar)" if r['top_enforcer_targeted'] else "nee"
+    print(f"  GOV-TGT  doelwit: Gini {r['target_gini']:.3f}, top-share {r['top_tgt_share']:.0%}"
+          f"   ({r['n_targets']} doelwit(en); top {tt}); tophandhaver zelf gesanctioneerd: {disc}")
     for lens, tag in (("A", "NORMHANDHAVING (straf)"), ("B", "NORMVERVULLING (steun)")):
         tr = sorted(r["triples"][lens])
         print(f"\n  --- TOP {top} {tag}-TRIPLES (actie | citaat | ronde) ---")
