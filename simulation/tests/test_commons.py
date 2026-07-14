@@ -1,4 +1,5 @@
-"""Commons stock dynamics: GovSim-style doubling, % -of-K harvest, random
+"""Commons stock dynamics (production behaviour): harvest is an ACTION whose
+claim is a fraction of the actor's OWN resources; GovSim-style regen, random
 rationing on over-claim, absorbing collapse. Deterministic (no LLM)."""
 import numpy as np
 import pytest
@@ -14,17 +15,20 @@ def _engine(agents, K=100.0, init=None, collapse_frac=0.05, R0=100.0):
 
 
 def _harvest_round(eng, harvests):
-    """harvests: {aid: pct}. Everyone holds; given agents also harvest."""
-    acts = [Action(a, ActionType.DO_NOTHING, None, harvest=harvests.get(a, 0.0))
+    """harvests: {aid: fractie-van-eigen}. Wie erin staat kiest de HARVEST-actie;
+    de rest holdt (productie: alleen HARVEST-acties trekken uit de pot)."""
+    acts = [Action(a, ActionType.HARVEST if a in harvests else ActionType.DO_NOTHING,
+                   None, harvest=harvests.get(a, 0.0))
             for a in eng.state.agents]
     return eng.resolve_round(acts)
 
 
 def test_sustainable_harvest_holds_stock():
-    # GovSim slice: K=100, 5 agents each take 10% (=10 units) → 50 left → doubles to 100.
+    # GovSim slice: K=100, 5 agents nemen elk 10% van eigen R0=100 (=10 units)
+    # → 50 over → verdubbelt naar 100.
     a = [f"A{i}" for i in range(5)]
     eng = _engine(a, K=100.0)
-    log = _harvest_round(eng, {x: 10.0 for x in a})
+    log = _harvest_round(eng, {x: 0.10 for x in a})
     assert eng.state.commons_stock == pytest.approx(100.0)          # held at K
     assert log["commons"]["harvested"] == pytest.approx(50.0)
     for x in a:
@@ -43,7 +47,7 @@ def test_overclaim_rationed_to_stock():
     np.random.seed(0)
     a = [f"A{i}" for i in range(5)]
     eng = _engine(a, K=100.0, init=30.0)
-    log = _harvest_round(eng, {x: 10.0 for x in a})
+    log = _harvest_round(eng, {x: 0.10 for x in a})
     assert log["commons"]["harvested"] == pytest.approx(30.0)        # never more than stock
     total_gain = sum(eng.state.resources[x] - 100.0 for x in a)
     assert total_gain == pytest.approx(30.0)
@@ -54,12 +58,12 @@ def test_overharvest_collapses_and_is_absorbing():
     np.random.seed(0)
     a = [f"A{i}" for i in range(5)]
     eng = _engine(a, K=100.0, init=50.0)
-    _harvest_round(eng, {x: 10.0 for x in a})
+    _harvest_round(eng, {x: 0.10 for x in a})
     assert eng.state.commons_collapsed is True
     assert eng.state.commons_stock == pytest.approx(0.0)
     # absorbing: a later round grants nothing, stays collapsed
     r_before = dict(eng.state.resources)
-    log2 = _harvest_round(eng, {x: 8.0 for x in a})
+    log2 = _harvest_round(eng, {x: 0.08 for x in a})
     assert log2["commons"]["harvested"] == pytest.approx(0.0)
     assert eng.state.commons_stock == pytest.approx(0.0)
     assert eng.state.resources == r_before
@@ -86,8 +90,7 @@ def _gate_engine(open_round=2):
     return GameEngine(agent_ids=["A", "B"], initial_resources=100.0,
                       delta_R=1.0, mu_arm=0.0,
                       commons_enabled=True, commons_K=120.0, commons_init=60.0,
-                      commons_harvest_mode="action_own", commons_regen=1.5,
-                      commons_open_round=open_round)
+                      commons_regen=1.5, commons_open_round=open_round)
 
 
 def _act_harvest(eng, fracs):

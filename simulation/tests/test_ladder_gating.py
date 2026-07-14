@@ -146,29 +146,34 @@ def test_parse_strengthen_kept_on_L2():
 
 
 def test_parse_rewire_dropped_when_assoc_off():
+    # onder L3 bestaat de drop/invite-actie niet -> parse faalt (retry-pad)
     agent = _agent(RUNGS["L2"])
-    agent._store_rewire({"rewire_drop": "B", "rewire_invite": "C"})
+    assert agent._action_dict_to_action({"action": "invite", "target": "C"}) is None
     assert agent.get_last_rewire_nomination() is None
 
 
 def test_parse_rewire_kept_when_assoc_on():
     agent = _agent(RUNGS["L3"])
-    agent._store_rewire({"rewire_drop": "B", "rewire_invite": "C"})
-    assert agent.get_last_rewire_nomination() == {"drop": "B", "invite": "C"}
+    agent._visible_agents = ["B"]
+    act = agent._action_dict_to_action({"action": "invite", "target": "C"})
+    assert act.action_type == ActionType.DO_NOTHING
+    assert agent.get_last_rewire_nomination() == {"drop": None, "invite": "C"}
+    act = agent._action_dict_to_action({"action": "drop", "target": "B"})
+    assert agent.get_last_rewire_nomination() == {"drop": "B", "invite": None}
 
 
 def test_parse_harvest_snaps_to_zero_when_commons_off():
     agent = _agent(RUNGS["L3"])
     assert agent._snap_harvest(4) == 0.0
     agent4 = _agent(RUNGS["L4"])
-    assert agent4._snap_harvest(4) == 4.0
+    assert agent4._snap_harvest(4) == pytest.approx(0.04)  # "4" = 4% van eigen -> fractie
 
 
 # ── (c) prompt: disabled mechanics' keywords absent, enabled ones present ──────
 
 ARM_KW = ["strengthen", "arm bonus", "combat bonus"]
 TAKE_KW = ["take:", "COMBAT", "Win probability", "BANKRUPTCY"]
-ASSOC_KW = ["REWIRING", "rewire_drop", "rewire_invite", "drop", "invite"]
+ASSOC_KW = ["REWIRING", "- drop:", "- invite:"]
 COMMONS_KW = ["SHARED STOCK", "HARVEST", "harvest"]
 
 
@@ -203,7 +208,7 @@ def test_prompt_L2_adds_arm_and_take_only():
 
 def test_prompt_L3_adds_association_only():
     t = _prompt_text(RUNGS["L3"])
-    _assert_present(t, ["strengthen", "COMBAT", "REWIRING", "rewire_drop"], "L3")
+    _assert_present(t, ["strengthen", "COMBAT", "REWIRING", "- drop:", "- invite:"], "L3")
     _assert_absent(t, COMMONS_KW, "L3")
 
 

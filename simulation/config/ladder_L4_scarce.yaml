@@ -28,18 +28,21 @@ c_atk: 0.02
 symmetric_stakes: true
 lethal_pot: false
 
-# Commons — ON from L4. LOCKED config (probe job 24092054, 2026-06-22): the fixed
-# outside option for the ladder; OFAT sweeps g_inv only, NOT the commons.
-# Evidence: action-mode + regen 1.5 + start-at-MSY = genuine, RESOLVABLE tragedy
-# (agents over-draw to ~25%, fear collapse, pull back, recover, manage sustainably).
-# regen 1.0 collapses irreversibly (R1 over-grab kills a non-renewing pool); regen 2.0
-# is too generous (no pressure). 1.5 is the sweet spot with rich governance dynamics.
+# Commons — ON from L4. RE-LOCKED 2026-07-14 (production freeze) after the
+# action_own prompt-bug invalidated the old lock evidence (job 24092054).
+# Production design, validated in the OpenRouter probe series (runs n2-n6, C):
+# harvest is an ACTION (fraction of own resources), stock shown in absolute
+# units, announced in R1 and harvestable from R2 (one round of talk before the
+# first draw), start at full K so one collective over-draw is a lesson, not
+# death. Evidence: n6 (overshoot -> computed freeze -> correctly scaled quota
+# -> sustained management). regen 1.5 = fragile-but-recoverable; OFAT sweeps
+# g_inv only, NOT the commons.
 commons_enabled: true
 commons_K: 120.0
-commons_init: 60.0                    # start at MSY (K/2), not full → no buffer, dilemma bites from R1
-commons_harvest_mode: "action_own"   # harvest IS the action (mutually exclusive) — a real choice w/ opportunity cost
+commons_init: 120.0                   # start op volle K (GovSim-parity; her-lock 2026-07-14)
 commons_regen: 1.5                    # fragile-but-recoverable (tragedy threshold is between 1.5 and 1.0)
 commons_collapse_frac: 0.05
+commons_open_round: 2                 # R1 = aangekondigd + bespreekbaar, oogstbaar vanaf R2
 
 # Economy
 delta_R: 0.97
@@ -52,7 +55,7 @@ history_length: 10
 network_enabled: true
 assoc_enabled: true
 mean_degree: 5.0
-rewiring_prob: 0.5
+rewiring_prob: 1.0                    # actie = zekere uitkomst (productie, 2026-07-14)
 
 # Communication — ON (base substrate)
 comm_scope: "choice"

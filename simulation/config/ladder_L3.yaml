@@ -31,8 +31,8 @@ lethal_pot: false
 commons_enabled: false
 commons_K: 120.0
 commons_init: null
-commons_harvest_pct: [0, 1, 2, 4, 8]
 commons_collapse_frac: 0.05
+commons_open_round: 2                 # inert zolang commons_enabled false (parity met L4)
 
 # Economy
 delta_R: 0.97
@@ -45,7 +45,7 @@ history_length: 10
 network_enabled: true
 assoc_enabled: true
 mean_degree: 5.0
-rewiring_prob: 0.5
+rewiring_prob: 1.0                    # actie = zekere uitkomst (productie, 2026-07-14)
 
 # Communication — ON (base substrate)
 comm_scope: "choice"

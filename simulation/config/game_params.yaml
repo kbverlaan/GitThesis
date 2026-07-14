@@ -51,10 +51,8 @@ commons_enabled: false               # turn on the shared-stock rung
 commons_K: 120.0                     # carrying capacity (absolute, HIDDEN — agents see stock as % of K)
 commons_init: 60.0                   # LOCKED: start at MSY (K/2), not full → no buffer, dilemma bites from R1
 commons_regen: 1.5                   # LOCKED: fragile-but-recoverable regeneration (×1.5; 2.0=GovSim doubling=too easy)
-commons_harvest_mode: "action_own"   # LOCKED: harvest IS the action (mutually exclusive w/ transfer/take/hold) —
                                      # a real choice with opportunity cost; surfaces engagement the parallel field missed.
                                      # "category" = GovSim %-of-K grid; "fraction_own" = parallel unbounded field (legacy probes)
-commons_harvest_pct: [0, 1, 2, 4, 8] # only used in "category" mode (kept for that legacy path)
 commons_collapse_frac: 0.05          # stock collapses permanently below this fraction of K (GovSim C = 5%)
 
 # Economy

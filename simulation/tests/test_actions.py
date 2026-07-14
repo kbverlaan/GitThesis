@@ -52,11 +52,11 @@ def test_arm_self_not_available():
 from game.engine import ActionType
 
 
-def _agent_stub(mode="action", visible=("B",)):
+def _agent_stub(visible=("B",)):
     from types import SimpleNamespace
     stub = SimpleNamespace(
         agent_id="A",
-        game_params={"assoc_enabled": True, "assoc_rewire_mode": mode,
+        game_params={"assoc_enabled": True,
                      "arm_enabled": True, "take_enabled": True},
         _visible_agents=list(visible),
         _last_rewire_nom=None,
@@ -91,14 +91,3 @@ def test_action_mode_drop_requires_neighbor():
     assert _to_action(stub, {"action": "drop", "target": "C"}) is None
 
 
-def test_parallel_mode_rejects_drop_as_action():
-    stub = _agent_stub(mode="parallel")
-    assert _to_action(stub, {"action": "drop", "target": "B"}) is None
-    assert stub._last_rewire_nom is None
-
-
-def test_action_mode_store_rewire_ignores_parallel_fields():
-    stub = _agent_stub()
-    stub._last_rewire_nom = {"drop": "B", "invite": None}  # gezet door de actie
-    LLMAgent._store_rewire(stub, {"rewire_drop": "X", "rewire_invite": "Y"})
-    assert stub._last_rewire_nom == {"drop": "B", "invite": None}
