@@ -18,17 +18,29 @@ try:
 except ImportError:
     HAVE_LEIDEN = False
 
-PRIMARY = ['transfer', 'hold', 'take', 'strengthen_self', 'strengthen_other']
+# Productie-actieruimte (freeze 2026-07-14): rewire + harvest zijn echte acties.
+PRIMARY = ['transfer', 'strengthen', 'take', 'harvest', 'drop', 'invite', 'hold']
 
 def cat(a):
     if a is None: return 'hold'
     a = str(a).lower()
     if a.startswith('invest') or a == 'transfer': return 'transfer'
     if a.startswith('take') or a == 'attack': return 'take'
-    if 'arm_self' in a or 'strengthen_self' in a: return 'strengthen_self'
-    if 'arm' in a or 'strengthen' in a: return 'strengthen_other'
-    if a.startswith('drop') or a.startswith('invite'): return 'hold'  # rewire -> ignore at T2
+    if 'arm' in a or 'strengthen' in a: return 'strengthen'
+    if a.startswith('harvest'): return 'harvest'
+    if a.startswith('drop'): return 'drop'
+    if a.startswith('invite'): return 'invite'
     return 'hold'
+
+def effective_action(info):
+    """Actie zoals gekozen: productie-logs schrijven de rewire-keuze als
+    action='hold' + rewire_intent (engine-neutraal); hier terugvertaald."""
+    a = info.get('action')
+    ri = info.get('rewire_intent') or {}
+    if (a in (None, 'hold', 'do_nothing')) and isinstance(ri, dict):
+        if ri.get('drop'): return 'drop'
+        if ri.get('invite'): return 'invite'
+    return a
 
 def gini(xs):
     xs = sorted(x for x in xs if x is not None)
@@ -56,7 +68,7 @@ def parse(lines):
         cc = Counter(); Rs = {}
         bf = d.get('bilateral_flows') or {}
         for aid, info in ag.items():
-            c = cat(info.get('action')); cc[c] += 1
+            c = cat(effective_action(info)); cc[c] += 1
             R = info.get('resources')
             if R is not None: Rs[aid] = R
             if c == 'take':
@@ -147,7 +159,7 @@ def main():
     print(f"\n[ECONOMIE]  {reg}   {pr:+.2f}%/ronde ({tot:+.1f}% tot) | Gini {g:.2f} | top {top:.0f}% | alive {alive}/{N}")
 
     dist, drift, cmean, cstd = action_dist_drift(per_round)
-    print(f"\n[ACTIEVERDELING] " + " ".join(f"{k.split('_')[0] if 'strength' not in k else k[10:]}:{dist[k]:.0f}%" for k in PRIMARY))
+    print(f"\n[ACTIEVERDELING] " + " ".join(f"{k}:{dist[k]:.0f}%" for k in PRIMARY))
     print(f"[DRIFT] {drift:.3f}  (laag=stabiel, hoog=wisselt)")
     print(f"[CONSENSUS] mean {cmean:.2f} (eensgezindheid) | std {cstd:.2f} (golf: hoog=eenheid breekt+herstelt)")
 
@@ -197,7 +209,7 @@ def main():
         cc = Counter()
         for d in lines:
             for aid, info in d.get('agents', {}).items():
-                if aid in memset: cc[cat(info.get('action'))] += 1
+                if aid in memset: cc[cat(effective_action(info))] += 1
         ct = sum(cc.values()) or 1
         mix = " ".join(f"{k[:4]}:{100*cc.get(k,0)/ct:.0f}" for k in PRIMARY)
         # action-entropie van de club (genormaliseerd Shannon over 5 vaste categorieen)
