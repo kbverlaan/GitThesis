@@ -502,6 +502,10 @@ def run_simulation(game_params: dict,
                 }
                 for aid in agent_ids
             },
+            # Commons-blok (stock/grants/collapse) = primaire T4-DV; zonder deze
+            # regel haalde hij de SSOT-JSONL nooit (gevonden in de ground-truth-
+            # test van commons_dv, 2026-07-14).
+            **({'commons': round_result['commons']} if round_result.get('commons') else {}),
             'combat': round_result.get('combat_results', []),
             'messages': [
                 {'from': m.get('from'), 'to': m.get('message_to'), 'text': m.get('message', '')}

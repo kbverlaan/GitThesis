@@ -184,12 +184,23 @@ def final_wealth(rounds):
     return {aid: a["resources"] for aid, a in last["agents"].items()}
 
 
+# Canoniek actie-vocabulaire (productie-freeze 2026-07-14); legacy-namen uit
+# archief-logs worden bij het tellen genormaliseerd zodat alle features op
+# beide log-generaties werken.
+_ACTION_CANONICAL = {
+    "invest_other": "transfer", "invest_self": "transfer",
+    "arm_other": "strengthen", "arm_self": "strengthen",
+    "attack": "take", "do_nothing": "hold",
+}
+
+
 def action_counts(rounds):
     c = Counter()
     total = 0
     for r in agent_rounds(rounds):
         for a in r["agents"].values():
-            c[a.get("action", "")] += 1
+            raw = a.get("action", "")
+            c[_ACTION_CANONICAL.get(raw, raw)] += 1
             total += 1
     return c, total
 
@@ -450,7 +461,7 @@ def extract_features(rounds, params, window=None):
     mean_others_all = (sum(others_all) / len(others_all)) if others_all else 0.0
 
     actions, total_actions = action_counts(rounds)
-    do_nothing_n = actions.get("no_action", 0) + actions.get("do_nothing", 0)
+    do_nothing_n = actions.get("no_action", 0) + actions.get("hold", 0)
     do_nothing_frac = do_nothing_n / total_actions if total_actions else 0.0
 
     # Violence/predation features: count only over the last `event_window` rounds of
@@ -483,9 +494,9 @@ def extract_features(rounds, params, window=None):
 
     network = extract_network_features(rounds)
     comms = extract_communication_features(rounds)
-    attack_actions = actions.get("attack", 0)
-    arm_actions = actions.get("arm_self", 0) + actions.get("arm_other", 0)
-    invest_actions = actions.get("invest_other", 0) + actions.get("invest_self", 0)
+    attack_actions = actions.get("take", 0)
+    arm_actions = actions.get("strengthen", 0)
+    invest_actions = actions.get("transfer", 0)
 
     return {
         "n_agents": n_agents,
