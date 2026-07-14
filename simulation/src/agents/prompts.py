@@ -642,9 +642,9 @@ COALITIONS (multi-attacker combat):
             "note is kept for the rest of the game — so it is your lasting "
             "record. Capture what mattered this round AND refresh your running "
             "understanding: any standing agreements or arrangements, recurring "
-            "patterns you have noticed, your current plan, and who you trust or "
-            "distrust right now. Write freely, in your own voice, and make it "
-            "legible to yourself many rounds from now."
+            "patterns you have noticed, your current plan, and how each relevant "
+            "agent has acted toward you so far. Write freely, in your own voice, "
+            "and make it legible to yourself many rounds from now."
         )
         notes.append("Do not include any text outside the JSON.")
 
