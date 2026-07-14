@@ -279,7 +279,7 @@ class BaselinePrompt:
             f"INTRODUCTION:\n"
             f"You are one of {n_agents} agents playing a repeated multi-agent "
             f"game. You will receive a new prompt like this every round. The "
-            f"sections below appear in this order:\n"
+            f"sections below appear in this sequence:\n"
             f"  1. Game rules — {rules_summary}.\n"
             f"  2. The other agents — how to reason about them.\n"
             f"  3. Identity — who you are and your objective.\n"
@@ -500,7 +500,7 @@ COALITIONS (multi-attacker combat):
             else:
                 eor += f" The shared stock then shrinks to {regen * 100:.0f}% of what remains (a depleting resource)."
         steps.append(eor)
-        parts.append("RESOLUTION ORDER (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
+        parts.append("RESOLUTION SEQUENCE (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
