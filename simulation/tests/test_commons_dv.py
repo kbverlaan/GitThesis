@@ -43,17 +43,37 @@ def test_collapse_scenario():
 
 
 def test_sustainable_scenario():
+    # Semantiek 2026-07-15: 'sustained' = configureerbare regel (default
+    # window_stock: gem. eind-stock slotvenster >= 2/3*K = 80, het
+    # engine-anker voor regen x1.5). De oude K/2-grens was ongegrond.
     rounds = [
-        _round(60, 45, 67),
-        _round(67, 50, 75),
-        _round(75, 60, 90),
+        _round(80, 30, 95),
+        _round(95, 35, 105),
+        _round(105, 40, 120),
     ]
     m = commons_metrics(rounds)
     assert m["collapsed"] is False
     assert m["round_of_collapse"] is None
-    assert m["sustained"] is True          # eindigt op 90 >= MSY(60)
-    assert m["sustainability"] == 0.75     # 90/120
+    assert m["sustained"] is True          # gem. slotvenster (95+105+120)/3 >= 80
+    assert m["sustainability"] == 1.0      # 120/120
     assert m["over_harvest_rate"] == 0.0   # stock stijgt netto elke ronde
+    assert m["sustained_by_rule"]["no_collapse"] is True
+
+
+def test_rules_discriminate():
+    # Eindigt levend maar onder het duurzame peil: no_collapse zegt ja,
+    # window_stock/final_stock zeggen nee, window_flow (oogst > 40) nee.
+    rounds = [
+        _round(120, 60, 90),
+        _round(90, 50, 60),
+        _round(60, 45, 70),
+    ]
+    m = commons_metrics(rounds)
+    br = m["sustained_by_rule"]
+    assert br["no_collapse"] is True
+    assert br["window_stock"] is False
+    assert br["final_stock"] is False
+    assert br["window_flow"] is False
 
 
 def test_over_harvest_no_collapse():

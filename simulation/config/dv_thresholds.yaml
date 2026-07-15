@@ -44,13 +44,17 @@ economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime b
   top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
 
 commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
-  # STALE (gemarkeerd 2026-07-15): comment/waarde stammen van init=K/2-ontwerp.
-  # Frozen engine: init=K (120), regen x1.5 gecapt => klassiek MSY (K/2) is
-  # ONGEGROND; engine-afgeleid anker = post-harvest >= K/regen = 2/3*K (80),
-  # duurzaam debiet K/3 (40/ronde). Kandidaat-gates: flow (laatste-W oogst <=
-  # K/3), stock (eindstock >= 2/3*K), of GovSim-binair (geen collapse R60).
-  # KOEN beslist na T4-smoke (smoke_T4_knife); dan commons_dv.py mee-updaten.
-  sustained_requires_msy: true
+  # Engine-afgeleid anker (frozen engine: init=K, regen x1.5 gecapt): duurzaam
+  # punt = post-harvest >= K/regen (2/3*K = 80), duurzaam debiet K*(1-1/regen)
+  # (= 40/ronde). Klassiek MSY (K/2, logistisch) is voor deze groei ONGEGROND.
+  # T4-smoke 2026-07-15 (tragedie->moratorium->quota): kies eindstand-/slot-
+  # venster-criteria; whole-run-minima keuren herstel-arcs onterecht af.
+  # sustained_rule = KOEN-BESLISSING vóór freeze; alle kandidaten worden
+  # per run naast elkaar gerapporteerd (sustained_by_rule).
+  sustained_rule: "window_stock"  # v0 PROPOSED | final_stock | window_flow | no_collapse
+  sustained_stock_frac: 0.6667    # = 1/regen (engine-anker 2/3*K)
+  sustained_window: 10            # slotvenster (rondes)
+  regen: 1.5                      # spiegel van ladder_L4.yaml commons_regen (drift-guard)
 
 order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, ordinale label)
   # v0 PROPOSED (Claude-scaffold 2026-07-15) — KOEN beslist waarden; freeze na
