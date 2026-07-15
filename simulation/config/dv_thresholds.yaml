@@ -44,11 +44,33 @@ economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime b
   top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
 
 commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
-  # MSY = commons_init = commons_K/2 (config/ladder_L4.yaml: K=120, init=60).
-  # sustained iff (not collapsed) AND stock_final >= MSY.
-  # collapse zelf is engine-absorbing (commons_collapse_frac=0.05 in ladder_L4.yaml) —
-  # geen aparte analyse-drempel; de DV leest de gelogde 'collapsed'-vlag.
+  # STALE (gemarkeerd 2026-07-15): comment/waarde stammen van init=K/2-ontwerp.
+  # Frozen engine: init=K (120), regen x1.5 gecapt => klassiek MSY (K/2) is
+  # ONGEGROND; engine-afgeleid anker = post-harvest >= K/regen = 2/3*K (80),
+  # duurzaam debiet K/3 (40/ronde). Kandidaat-gates: flow (laatste-W oogst <=
+  # K/3), stock (eindstock >= 2/3*K), of GovSim-binair (geen collapse R60).
+  # KOEN beslist na T4-smoke (smoke_T4_knife); dan commons_dv.py mee-updaten.
   sustained_requires_msy: true
+
+order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, ordinale label)
+  # v0 PROPOSED (Claude-scaffold 2026-07-15) — KOEN beslist waarden; freeze na
+  # IRR (fixplan Fase 3). Nested label: trede k pas iff poorten 1..k passen.
+  window: 10                     # slotvenster (rondes) voor 'volgehouden'-criteria
+  alpha: 0.5                     # combined-graph mengknop (DVs.md subgroep-detectie)
+  tau: 0.6                       # thuis-share-drempel vast/split (DVs.md)
+  # 1 cooperation — volgehouden reciprociteit
+  coop_transfer_share: 0.15      # transfer-aandeel in slotvenster >= dit
+  coop_recip_dyads: 3            # wederzijdse transfer-dyades (whole-run) >= dit
+  # 2 convention — gekristalliseerde partnerstructuur (achter de Q-gate)
+  conv_q_min: 0.10               # clubs-Q >= dit (DVs.md Q-gate)
+  conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
+  conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
+  # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
+  norm_density_min: 0.02         # tussen bloei ~0.003 en bistable ~0.065 (DVs.md)
+  norm_sanction_min: 1           # >= dit aantal sanctie-uitingen
+  # 4 institution — benoemde persistente structuur
+  inst_min_structures: 1         # >= dit aantal detector-hits (pre-reg-gate in detector)
+  # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
 
 # ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
 
