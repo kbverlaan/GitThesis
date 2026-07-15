@@ -93,6 +93,9 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
                                  # ook post-scrub natuurlijk voor (memneutral 6x) —
                                  # "resolution order" is gewoon Engels voor beurtvolgorde
   # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
+  # refutatie-marge (§2): equivalentie-claim alleen als bootstrap-CI-bovengrens
+  # van de max paarsgewijze TV tussen cel-profielen < delta (delta_equivalence.py).
+  delta: null                    # KOEN beslist vóór deposit (bv. 0.2)
 
 # ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
 
