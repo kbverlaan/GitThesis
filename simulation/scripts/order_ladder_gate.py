@@ -118,17 +118,55 @@ def gate_run(path, thr):
         gates["convention"] = None
         detail["Q"] = detail["cohesion"] = None
 
-    # ── 3 norm: collectieve prescriptie + sanctie-taal (publieke laag) ──────
+    # ── 3 norm: collectieve prescriptie + sanctie-taal ──────────────────────
+    # Publieke laag (Bicchieri: afkondiging) OF privé-laag (Sugden:
+    # internalisering in notes). De OF is essentieel voor falsifieerbaarheid
+    # onder comms-off: pub is daar structureel 0, dus zonder de privé-route zou
+    # de norm-breuk per DV-constructie vaststaan i.p.v. empirisch zijn.
+    # (T1-nocomm-smoke: priv 0.0001 vs memneutral priv 0.0027 — discrimineert.)
     deo = deontic.analyze(path)
-    gates["norm"] = (deo["norm"] >= thr["norm_density_min"]
-                     and deo["sanction"] >= thr["norm_sanction_min"])
+    pub_pass = (deo["norm"] >= thr["norm_density_min"]
+                and deo["sanction"] >= thr["norm_sanction_min"])
+    priv_pass = deo["priv"]["norm"] >= thr.get("norm_density_priv_min", 0.002)
+    gates["norm"] = bool(pub_pass or priv_pass)
     detail["norm_density_pub"] = round(deo["norm"], 4)
+    detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)
     detail["sanctions"] = deo["sanction"]
 
     # ── 4 institution: benoemde persistente structuur, ALLEEN bespoke ───────
     # NAP e.d. = baseline/gegeven (Koen 2026-07-15): universeel vanaf R<=5,
     # geen muntmoment -> telt niet als bewijs van uitgevonden orde.
+    # PUBLIEKE-CIRCULATIE-toets (v0, T1-nocomm-smoke 2026-07-15). De detector
+    # mint kandidaat-namen Title-Case over ALLE lagen (precisie), maar een label
+    # in privé-notes alleen is convergente taal, geen gedeeld symbool
+    # ("Reciprocal Loop" verscheen in een run ZONDER berichten). Searle:
+    # institutie vergt publieke collectieve representatie. Tegelijk schrijven
+    # agents in berichten lowercase ("our transfer circle") die de Title-Case-
+    # regex mist. Daarom tweetraps: kandidaten uit de volle scan, gate =
+    # case-insensitieve circulatie in MESSAGES (>= min_agents distincte zenders,
+    # >= min_occurrences). Privé-only-hits apart gerapporteerd (baseline).
     named, _raw, coverage = detect_named_structures(lines)
+    if thr.get("inst_public_only", True):
+        import re as _re
+        msgs = [((m.get("from") or ""), (m.get("text") or ""))
+                for d in lines for m in (d.get("messages") or [])]
+        pub_named = {}
+        for nm, cnt in named.items():
+            rx = _re.compile(_re.escape(nm), _re.I)
+            occ, senders = 0, set()
+            for frm, txt in msgs:
+                k = len(rx.findall(txt))
+                if k:
+                    occ += k
+                    senders.add(frm)
+            if (occ >= thr.get("inst_min_occurrences", 3)
+                    and len(senders) >= thr.get("inst_min_agents", 2)):
+                pub_named[nm] = occ
+        prive_only = {n: c for n, c in named.items() if n not in pub_named}
+        if prive_only:
+            detail["named_private_only"] = dict(
+                sorted(prive_only.items(), key=lambda kv: -kv[1])[:5])
+        named = pub_named
     baseline_names = {n.lower() for n in thr.get("inst_baseline_names", [])}
     bespoke = {n: c for n, c in named.items() if n.lower() not in baseline_names}
     gates["institution"] = len(bespoke) >= thr["inst_min_structures"]

@@ -66,14 +66,26 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
   conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
   # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
-  norm_density_min: 0.02         # tussen bloei ~0.003 en bistable ~0.065 (DVs.md)
-  norm_sanction_min: 1           # >= dit aantal sanctie-uitingen
+  norm_density_min: 0.02         # PUBLIEK (Bicchieri): tussen bloei ~0.003 en bistable ~0.065
+  norm_sanction_min: 1           # >= dit aantal sanctie-uitingen (publiek)
+  norm_density_priv_min: 0.002   # PRIVÉ (Sugden-internalisering, notes) — OF-route;
+                                 # essentieel onder comms-off (pub structureel 0, anders
+                                 # is de norm-breuk definitorisch i.p.v. empirisch).
+                                 # Kalibratie n=2: nocomm 0.0001 / memneutral 0.0027
   # 4 institution — benoemde persistente structuur, ALLEEN bespoke/invented
   # (Koen 2026-07-15: NAP = baseline/gegeven, telt niet; naming-baseline toont
   # NAP universeel vanaf R<=5. Claim-formulering: "gedraagt zich als voorgevormde
   # term" — geen muntmoment, canonieke naam, conditie-invariant — GEEN harde
   # inherited-claim. Bespoke = wel muntmoment: eerste vermelding -> diffusie.)
   inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits
+  inst_public_only: true         # tweetraps: kandidaten Title-Case over alle lagen,
+                                 # gate = case-insensitieve CIRCULATIE in messages
+                                 # (Searle: publieke collectieve representatie; agents
+                                 # schrijven lowercase in berichten). Privé-only =
+                                 # convergentie-baseline, apart gerapporteerd.
+                                 # Bewijs: "Reciprocal Loop" in T1-nocomm (0 berichten).
+  inst_min_agents: 2             # publieke circulatie: >= distincte zenders (= named_institution)
+  inst_min_occurrences: 3        # publieke circulatie: >= vermeldingen (= named_institution)
   inst_baseline_names:           # uitgesloten van de poort; apart gerapporteerd
     - "Non-Aggression Pact"
     - "NAP"
