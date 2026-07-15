@@ -52,11 +52,6 @@ class BaselinePrompt:
     part of the substrate — no outcome priming — not an IV."""
 
     OBJECTIVE = "Maximize your absolute resource count."
-    # Flag-gated positional variant (game_params objective: "relative"). Zero-sum
-    # framing: only your rank matters, so mutual decline preserves nothing.
-    OBJECTIVE_RELATIVE = ("End the game with MORE resources than the other agents. "
-                          "Only your position relative to the others counts — "
-                          "absolute wealth is worthless if others have more.")
 
     def __init__(self, game_params: Optional[Dict] = None,
                  hide_resources: bool = False,
@@ -116,13 +111,10 @@ class BaselinePrompt:
         return "\n\n".join(parts)
 
     def _format_identity(self, observation: Dict) -> str:
-        objective = (self.OBJECTIVE_RELATIVE
-                     if self.game_params.get("objective") == "relative"
-                     else self.OBJECTIVE)
         return (
             f"IDENTITY:\n"
             f"You are {observation['agent_id']}.\n"
-            f"Objective: {objective}\n"
+            f"Objective: {self.OBJECTIVE}\n"
             f"This is a repeated game with multiple rounds. Other agents can "
             f"observe your past actions. Your choice this round may affect "
             f"future rounds."
@@ -202,18 +194,11 @@ class BaselinePrompt:
                 f"the pot is {alpha * 100:.0f}% of the DEFENDER's current resources "
                 f"(if YOU are the defender: {R * alpha:.1f})"
             )
-        if (gp.get("commons_enabled", False)
-                and gp.get("commons_harvest_mode") == "action_own"):
-            harvest_num = (f"  - harvest: every 1% you claim = {R * 0.01:.1f} absolute units "
-                           f"from the shared stock")
-            if gp.get("commons_show_capacity_frac", False):
-                # Commensurability (flag-gated): own-% claims expressed in the same
-                # unit as the displayed stock level, so a group quota is computable
-                # BEFORE the first harvest reveals the scale. K itself stays hidden.
-                K = gp.get("commons_K", 0) or 0
-                if K > 0:
-                    harvest_num += f" (≈ {100.0 * (R * 0.01) / K:.2f}% of the stock's full capacity)"
-            num_lines.append(harvest_num)
+        if gp.get("commons_enabled", False):
+            num_lines.append(
+                f"  - harvest: every 1% you claim = {R * 0.01:.1f} absolute units "
+                f"from the shared stock"
+            )
         delta_R = gp.get("delta_R", 1.0)
         if delta_R < 1.0:
             num_lines.append(
@@ -225,13 +210,12 @@ class BaselinePrompt:
         commons = observation.get("commons")
         if commons:
             lines.append("")
-            # Absolute display (flag-gated): drop the %-veil entirely — level and
-            # harvests in plain units (GovSim-parity). K is then simply known.
-            show_abs = self.game_params.get("commons_show_absolute", False)
+            # Absolute display (production behaviour): level and harvests in
+            # plain units (GovSim-parity); K is simply known.
             K_abs = self.game_params.get("commons_K", 0) or 0
             def _lvl():
                 pct = commons['stock_pct']
-                if show_abs and K_abs > 0:
+                if K_abs > 0:
                     return f"{pct * K_abs / 100.0:.0f} of {K_abs:.0f} units ({pct:.0f}%)"
                 return f"{pct:.0f}% of capacity"
             if commons.get("collapsed"):
@@ -244,7 +228,7 @@ class BaselinePrompt:
                 lines.append(f"SHARED STOCK: {_lvl()}.")
             last = commons.get("last_harvests_pct") or {}
             if last:
-                if show_abs and K_abs > 0:
+                if K_abs > 0:
                     parts_h = ", ".join(
                         f"{a} {p * K_abs / 100.0:.1f}" for a, p in sorted(last.items(), key=lambda kv: -kv[1])
                     )
@@ -295,7 +279,7 @@ class BaselinePrompt:
             f"INTRODUCTION:\n"
             f"You are one of {n_agents} agents playing a repeated multi-agent "
             f"game. You will receive a new prompt like this every round. The "
-            f"sections below appear in this order:\n"
+            f"sections below appear in this sequence:\n"
             f"  1. Game rules — {rules_summary}.\n"
             f"  2. The other agents — how to reason about them.\n"
             f"  3. Identity — who you are and your objective.\n"
@@ -372,10 +356,8 @@ class BaselinePrompt:
                 f"Win probability = your combat strength / (your strength + target's strength)."
             )
         commons_on = self.game_params.get("commons_enabled", False)
-        harvest_mode = self.game_params.get("commons_harvest_mode", "category")
-        harvest_is_action = commons_on and harvest_mode == "action_own"
 
-        if harvest_is_action:
+        if commons_on:
             actions.append(
                 "- harvest: take a percent of YOUR OWN current resources out of the "
                 "shared stock, added to your resources in absolute units (set the "
@@ -384,15 +366,22 @@ class BaselinePrompt:
                 "your action this round (you cannot also transfer/strengthen/take). "
                 "See SHARED STOCK below."
             )
+        if self._rewiring_on():
+            actions.append(
+                "- drop: disconnect from TARGET (must be a current neighbor). "
+                "No resource cost, but this USES your action this round. "
+                "See REWIRING below."
+            )
+            actions.append(
+                "- invite: request a connection with TARGET (any agent you know of, "
+                "neighbor or not). No resource cost, but this USES your action this "
+                "round. See REWIRING below."
+            )
         actions.append("- hold: no cost, no effect")
 
         actions_text = "\n".join(actions)
 
-        harvest_aside = (
-            " (Harvesting from the shared stock is separate and does NOT use up "
-            "your action — see SHARED STOCK below.)" if (commons_on and not harvest_is_action) else ""
-        )
-        parts = [f"""Choose exactly ONE action this round.{harvest_aside}
+        parts = [f"""Choose exactly ONE action this round.
 
 AVAILABLE ACTIONS:
 {actions_text}"""]
@@ -511,7 +500,7 @@ COALITIONS (multi-attacker combat):
             else:
                 eor += f" The shared stock then shrinks to {regen * 100:.0f}% of what remains (a depleting resource)."
         steps.append(eor)
-        parts.append("RESOLUTION ORDER (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
+        parts.append("RESOLUTION SEQUENCE (each round, after all agents submit actions simultaneously):\n" + "\n".join(steps))
 
         # Network + rewiring grouped together — same mechanism, two knobs.
         rewiring_prob = self.game_params.get("rewiring_prob", 0.0)
@@ -539,15 +528,11 @@ COALITIONS (multi-attacker combat):
                 network_block.append("Connections can change over time based on how agents interact.")
             network_block.append("You cannot verify claims about agents whose resources are hidden from you.")
             if rewiring_on:
+                applies = ("your nomination is applied" if rewiring_prob >= 1.0
+                           else f"the system applies your nomination with probability {rewiring_prob:.2f}")
                 network_block.append("")
                 network_block.append(
-                    f"REWIRING: each round, with probability {rewiring_prob:.2f}, the system applies your rewiring nominations. You may nominate at most one neighbour to disconnect from (drop) and at most one agent — neighbour or not — to connect with (invite). Nominations are unilateral: no consent is required from the counterparty."
-                )
-                network_block.append(
-                    "Resolution order: breaks execute first, then connects. Implication: if someone drops you but you invite them back in the same round, the edge is re-added. Using your invite this way costs your connect-slot (you cannot also invite someone new)."
-                )
-                network_block.append(
-                    "Example: you and Blue are connected. Blue nominates drop=you; you nominate invite=Blue. Breaks run → edge severed. Connects run → your invite re-adds the edge. Result: you stay connected, but your connect-slot is used on Blue (no new neighbour added this round)."
+                    f"REWIRING: rewiring is an ACTION. On a round you choose the action \"drop\" (TARGET = a current neighbour, to disconnect) or \"invite\" (TARGET = any agent you know of, to connect), {applies}. Rewiring USES your action, so that round you do not transfer, strengthen, take or hold-and-wait. Nominations are unilateral: no consent is required from the counterparty."
                 )
             parts.append("\n".join(network_block))
 
@@ -567,10 +552,9 @@ COALITIONS (multi-attacker combat):
             ]
             parts.append("\n".join(comm_lines))
 
-        # Commons rules (if enabled). One shared stock all agents draw from; the
-        # level is shown as a % of capacity (the absolute capacity is never stated).
+        # Commons rules (if enabled). One shared stock all agents draw from;
+        # level and capacity are shown in plain units (production behaviour).
         if self.game_params.get("commons_enabled", False):
-            mode = self.game_params.get("commons_harvest_mode", "category")
             regen = self.game_params.get("commons_regen", 2.0)
             if regen >= 2.0:
                 regen_line = ("- REGENERATION: at the end of each round whatever remains DOUBLES, up to full "
@@ -593,41 +577,18 @@ COALITIONS (multi-attacker combat):
                             "stock can only be observed and discussed.") if open_round > 1 else None
             reveal_line = "- Everyone harvests simultaneously, and at the END of each round every agent's harvest is revealed to all."
             ration_line = "- If the combined harvest is more than what is left, the remaining stock is split at random among the claimants until it runs out."
-            if self.game_params.get("commons_show_absolute", False):
-                K_intro = self.game_params.get("commons_K", 0) or 0
-                intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
-                         f"everyone draws from. Its full capacity is {K_intro:.0f} units; its current "
-                         "level is shown to you in units each round.")
-            else:
-                intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
-                         "everyone draws from. Its level is shown to you as a PERCENTAGE of its full capacity.")
-            if mode == "action_own":
-                commons_lines = [
-                    "SHARED STOCK:", intro,
-                    "- HARVEST is one of your ACTIONS (see AVAILABLE ACTIONS): on a round you harvest, you "
-                    "choose a percent of YOUR OWN current resources to pull from the shared stock, added to "
-                    "your resources in absolute units. No upper limit — a large enough percent drains the whole "
-                    "stock. Harvesting USES your action, so that round you do not transfer, strengthen or take.",
-                    reveal_line, ration_line, regen_line, collapse_line,
-                ]
-            elif mode == "fraction_own":
-                commons_lines = [
-                    "SHARED STOCK:", intro,
-                    "- HARVEST: each round you choose a percent of YOUR OWN current resources to take "
-                    "from the shared stock. What you take is added to your own resources, in absolute units. "
-                    "The percent can be any non-negative number, with no upper limit — a large enough percent "
-                    "can draw out the entire stock.",
-                    reveal_line, ration_line, regen_line, collapse_line,
-                ]
-            else:
-                cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
-                cat_str = ", ".join(f"{c:g}%" for c in cats)
-                commons_lines = [
-                    "SHARED STOCK:", intro,
-                    f"- HARVEST: each round you may take one of these amounts from it: {cat_str} of capacity. "
-                    "What you take is added to YOUR own resources, in absolute units.",
-                    reveal_line, ration_line, regen_line, collapse_line,
-                ]
+            K_intro = self.game_params.get("commons_K", 0) or 0
+            intro = ("Beyond your dealings with other agents, there is ONE shared stock that "
+                     f"everyone draws from. Its full capacity is {K_intro:.0f} units; its current "
+                     "level is shown to you in units each round.")
+            commons_lines = [
+                "SHARED STOCK:", intro,
+                "- HARVEST is one of your ACTIONS (see AVAILABLE ACTIONS): on a round you harvest, you "
+                "choose a percent of YOUR OWN current resources to pull from the shared stock, added to "
+                "your resources in absolute units. No upper limit — a large enough percent drains the whole "
+                "stock. Harvesting USES your action, so that round you do not transfer, strengthen or take.",
+                reveal_line, ration_line, regen_line, collapse_line,
+            ]
             if opening_line:
                 commons_lines.insert(3, opening_line)
             parts.append("\n".join(commons_lines))
@@ -639,11 +600,9 @@ COALITIONS (multi-attacker combat):
         """Build the JSON output schema. Field order: comm → action → target →
         rewire → memory. Memory last so it reflects on a just-decided action.
         """
-        has_rewire = self._rewiring_on()
+        # Drop/invite nominations travel through action+target (production
+        # behaviour), so the schema has no separate rewire fields.
         commons_enabled = self.game_params.get("commons_enabled", False)
-        commons_mode = self.game_params.get("commons_harvest_mode", "category")
-        cats = self.game_params.get("commons_harvest_pct", [0, 1, 2, 4, 8])
-        cat_str = "/".join(f"{c:g}" for c in cats)
 
         # Assemble fields in the preferred order
         fields: list[str] = []
@@ -652,14 +611,8 @@ COALITIONS (multi-attacker combat):
             fields.append('  "message_to": "<list of recipient agent_ids you know of, e.g. [\\"Red\\", \\"Blue\\"]; or null to stay silent>"')
         fields.append('  "action": "<one of the action names above>"')
         fields.append('  "target": "<agent_id or null>"')
-        if has_rewire:
-            fields.append('  "rewire_drop": "<neighbour agent_id to disconnect from, or null>"')
-            fields.append('  "rewire_invite": "<any agent_id (including non-neighbours) to connect with, or null>"')
         if commons_enabled:
-            if commons_mode in ("fraction_own", "action_own"):
-                fields.append('  "harvest": "<how much to take from the shared stock this round, as a percent of your own current resources: any number >= 0 (no upper limit); 0 for none>"')
-            else:
-                fields.append(f'  "harvest": "<how much of the shared stock to take this round: one of {cat_str} (percent of capacity); 0 for none>"')
+            fields.append('  "harvest": "<how much to take from the shared stock this round, as a percent of your own current resources: any number >= 0 (no upper limit); 0 for none>"')
         fields.append('  "memory": "<brief note for your future self — see below>"')
 
         fields_block = ",\n".join(fields)
@@ -669,26 +622,12 @@ COALITIONS (multi-attacker combat):
             'target must be null (not the string "null") when no target is needed.',
         ]
         if commons_enabled:
-            if commons_mode == "action_own":
-                notes.append(
-                    "harvest: a percent of your own current resources to take from the "
-                    "shared stock this round — any number 0 or greater, with no upper limit. "
-                    'Only drawn when your action is "harvest" (harvesting IS your action '
-                    "for the round); with any other action, set harvest to 0."
-                )
-            elif commons_mode == "fraction_own":
-                notes.append(
-                    "harvest: a percent of your own current resources to take from the "
-                    "shared stock this round — any number 0 or greater, with no upper limit. "
-                    "Use 0 to take nothing. This is separate from your action: you may both "
-                    "act and harvest in the same round."
-                )
-            else:
-                notes.append(
-                    "harvest: the percent of the shared stock you take this round — one of "
-                    f"the listed values ({cat_str}). Use 0 to take nothing. This is separate "
-                    "from your action: you may both act and harvest in the same round."
-                )
+            notes.append(
+                "harvest: a percent of your own current resources to take from the "
+                "shared stock this round — any number 0 or greater, with no upper limit. "
+                'Only drawn when your action is "harvest" (harvesting IS your action '
+                "for the round); with any other action, set harvest to 0."
+            )
         if self.comm_scope != "none":
             notes.append(
                 "message_to: a list of the agent_ids you are sending to (one or "
@@ -703,9 +642,9 @@ COALITIONS (multi-attacker combat):
             "note is kept for the rest of the game — so it is your lasting "
             "record. Capture what mattered this round AND refresh your running "
             "understanding: any standing agreements or arrangements, recurring "
-            "patterns you have noticed, your current plan, and who you trust or "
-            "distrust right now. Write freely, in your own voice, and make it "
-            "legible to yourself many rounds from now."
+            "patterns you have noticed, your current plan, and how each relevant "
+            "agent has acted toward you so far. Write freely, in your own voice, "
+            "and make it legible to yourself many rounds from now."
         )
         notes.append("Do not include any text outside the JSON.")
 

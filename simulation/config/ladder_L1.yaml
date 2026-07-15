@@ -35,8 +35,8 @@ lethal_pot: false
 commons_enabled: false
 commons_K: 120.0
 commons_init: null
-commons_harvest_pct: [0, 1, 2, 4, 8]
 commons_collapse_frac: 0.05
+commons_open_round: 2                 # inert zolang commons_enabled false (parity met L4)
 
 # Economy
 delta_R: 0.97

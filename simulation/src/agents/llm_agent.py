@@ -134,9 +134,6 @@ class LLMAgent:
         if self.prompt.comm_scope != "none":
             fields.append('"message": "<your message, or null>"')
             fields.append('"message_to": "<list of recipient agent_ids, or null>"')
-        if gp.get('assoc_enabled', True) and gp.get('rewiring_prob', 0.0) > 0:
-            fields.append('"rewire_drop": "<neighbour to disconnect, or null>"')
-            fields.append('"rewire_invite": "<agent to connect with, or null>"')
         if gp.get('commons_enabled', False):
             fields.append('"harvest": "<how much to take from the shared stock, or 0>"')
         return fields
@@ -199,12 +196,6 @@ class LLMAgent:
                     # Extract free-form memory entry if present
                     if parsed.get('memory'):
                         result['memory'] = parsed['memory']
-                    # Extract rewire nomination if present
-                    drop = parsed.get('rewire_drop')
-                    invite = parsed.get('rewire_invite')
-                    if drop is not None or invite is not None:
-                        result['rewire_drop'] = drop
-                        result['rewire_invite'] = invite
                     # Extract commons harvest claim if present
                     if parsed.get('harvest') is not None:
                         result['harvest'] = parsed.get('harvest')
@@ -218,7 +209,10 @@ class LLMAgent:
     # commons_harvest_mode="action_own" (gated in _action_dict_to_action);
     # in other modes a stray 'harvest' string snaps to hold.
     _VALID_ACTIONS = {
-        'transfer', 'strengthen', 'take', 'hold', 'harvest'
+        'transfer', 'strengthen', 'take', 'hold', 'harvest',
+        # rewiring as an action (production behaviour; gated on assoc_enabled
+        # in _action_dict_to_action)
+        'drop', 'invite',
     }
 
     # Legacy names + shorthands → canonical (input backward compatibility)
@@ -259,6 +253,21 @@ class LLMAgent:
             'harvest': ActionType.HARVEST,
         }
 
+        # Rewiring is an ACTION (production behaviour, frozen 2026-07-14):
+        # drop/invite spend the round on the network move. Economically neutral;
+        # the nomination is stored here and picked up by the runner->network path.
+        if self.game_params.get('assoc_enabled', True) and action_str in ('drop', 'invite'):
+            if not target or target == self.agent_id:
+                return None
+            if action_str == 'drop' and self._visible_agents is not None \
+                    and target not in self._visible_agents:
+                return None  # can only drop a current neighbour
+            self._last_rewire_nom = ({'drop': target, 'invite': None}
+                                     if action_str == 'drop'
+                                     else {'drop': None, 'invite': target})
+            return Action(agent_id=self.agent_id,
+                          action_type=ActionType.DO_NOTHING, target_id=None)
+
         if not action_str or action_str not in action_map:
             return None
 
@@ -272,11 +281,8 @@ class LLMAgent:
         if action_type == ActionType.ATTACK and not self.game_params.get('take_enabled', True):
             action_type = ActionType.DO_NOTHING
             target = None
-        # HARVEST is a real action only under the action_own commons mode.
-        if action_type == ActionType.HARVEST and not (
-            self.game_params.get('commons_enabled', False)
-            and self.game_params.get('commons_harvest_mode') == 'action_own'
-        ):
+        # HARVEST exists only on the commons rung.
+        if action_type == ActionType.HARVEST and not self.game_params.get('commons_enabled', False):
             action_type = ActionType.DO_NOTHING
             target = None
 
@@ -298,47 +304,32 @@ class LLMAgent:
         )
 
     def _snap_harvest(self, raw) -> float:
-        """Parse the model's harvest claim. Returns 0.0 if commons is off or the
-        value is unusable.
-
-        Two modes (game_params['commons_harvest_mode']):
-        - "category" (default): snap to the nearest allowed category (% of K)
-          from game_params['commons_harvest_pct'] (default {0,1,2,4,8}).
-        - "fraction_own": parse as a continuous, unbounded, non-negative PERCENT
-          of the agent's own resources, returned as a FRACTION. Convention: the
-          field is a percent number, so "5", "5%", and "0.05" are all read as the
-          NUMBER first, then divided by 100 → 0.05 (i.e. "5" → 5% → fraction 0.05).
-          No category snapping, no upper bound; negatives clamp to 0."""
+        """Parse the model's harvest claim as a continuous, unbounded,
+        non-negative PERCENT of the agent's own resources, returned as a
+        FRACTION. Convention: the field is a percent number, so "5", "5%", and
+        "0.05" are all read as the NUMBER first, then divided by 100 -> 0.05.
+        No upper bound; negatives clamp to 0. Returns 0.0 if commons is off or
+        the value is unusable."""
         if not self.game_params.get('commons_enabled', False):
             return 0.0
 
-        if self.game_params.get('commons_harvest_mode', 'category') in ('fraction_own', 'action_own'):
-            had_percent = isinstance(raw, str) and '%' in raw
-            if isinstance(raw, str):
-                raw = raw.strip().rstrip('%').strip()
-            try:
-                v = float(raw)
-            except (TypeError, ValueError):
-                return 0.0
-            if v <= 0:
-                return 0.0
-            # Audit flag (C2): a bare decimal < 1 with no '%' is ambiguous — it
-            # could be an intended fraction (0.05) rather than a percent (0.05% →
-            # 0.0005). We DO NOT rescale (percent semantics are fixed); just warn
-            # so any mis-scale is detectable post-hoc.
-            if v < 1 and not had_percent:
-                print(f"WARN: {getattr(self, 'agent_id', '?')} harvest '{raw}' is a "
-                      f"bare decimal < 1 (read as {v}% → fraction {v / 100.0}); verify intent.")
-            return v / 100.0
-
-        cats = self.game_params.get('commons_harvest_pct', [0, 1, 2, 4, 8])
+        had_percent = isinstance(raw, str) and '%' in raw
+        if isinstance(raw, str):
+            raw = raw.strip().rstrip('%').strip()
         try:
             v = float(raw)
         except (TypeError, ValueError):
             return 0.0
         if v <= 0:
             return 0.0
-        return float(min(cats, key=lambda c: abs(c - v)))
+        # Audit flag (C2): a bare decimal < 1 with no '%' is ambiguous — it
+        # could be an intended fraction (0.05) rather than a percent (0.05% →
+        # 0.0005). We DO NOT rescale (percent semantics are fixed); just warn
+        # so any mis-scale is detectable post-hoc.
+        if v < 1 and not had_percent:
+            print(f"WARN: {getattr(self, 'agent_id', '?')} harvest '{raw}' is a "
+                  f"bare decimal < 1 (read as {v}% -> fraction {v / 100.0}); verify intent.")
+        return v / 100.0
     
     def _store_message(self, action_dict: Dict):
         """Store communication message from LLM response.
@@ -381,34 +372,6 @@ class LLMAgent:
             self._last_memory = mem.strip()
         else:
             self._last_memory = None
-
-    def _store_rewire(self, action_dict: Dict):
-        """Store rewire nomination ({drop, invite}) from LLM response.
-
-        Below the association rung (assoc_enabled=False) the topology is frozen,
-        so any drop/invite the model emits is ignored."""
-        if not self.game_params.get('assoc_enabled', True):
-            self._last_rewire_nom = None
-            return
-        drop = action_dict.get('rewire_drop')
-        invite = action_dict.get('rewire_invite')
-
-        def _norm(v):
-            if v is None:
-                return None
-            if isinstance(v, str):
-                s = v.strip()
-                if not s or s.lower() in ('null', 'none', 'no_one', 'nobody'):
-                    return None
-                return s
-            return None
-
-        drop_n = _norm(drop)
-        invite_n = _norm(invite)
-        if drop_n is None and invite_n is None:
-            self._last_rewire_nom = None
-        else:
-            self._last_rewire_nom = {'drop': drop_n, 'invite': invite_n}
 
     def get_last_message(self) -> Optional[Dict]:
         """Return the message from the last select_action call, or None."""
@@ -517,7 +480,6 @@ class LLMAgent:
                     if action:
                         self._store_message(action_dict)
                         self._store_memory(action_dict)
-                        self._store_rewire(action_dict)
                         return action
 
                 # JSON missing — send a follow-up requesting structured output
@@ -552,8 +514,7 @@ class LLMAgent:
                         if action_dict:
                             # Audit (I4): warn if a schema field that the original
                             # response carried got dropped by the retry → silently zeroed.
-                            for f in ("harvest", "message", "message_to",
-                                      "rewire_drop", "rewire_invite"):
+                            for f in ("harvest", "message", "message_to"):
                                 if f in (response_text or "") and f not in action_dict:
                                     print(f"WARN: {self.agent_id} JSON-retry dropped "
                                           f"previously-present field '{f}' (zeroed).")
@@ -561,7 +522,6 @@ class LLMAgent:
                             if action:
                                 self._store_message(action_dict)
                                 self._store_memory(action_dict)
-                                self._store_rewire(action_dict)
                                 # Log the retry trace
                                 self.reasoning_traces.append({
                                     "round": observation['round'],

@@ -210,7 +210,6 @@ def run_simulation(game_params: dict,
         commons_K=game_params.get('commons_K', 600.0),
         commons_init=game_params.get('commons_init', None),
         commons_collapse_frac=game_params.get('commons_collapse_frac', 0.05),
-        commons_harvest_mode=game_params.get('commons_harvest_mode', 'category'),
         commons_regen=game_params.get('commons_regen', 2.0),
         commons_open_round=game_params.get('commons_open_round', 1),
     )
@@ -503,6 +502,10 @@ def run_simulation(game_params: dict,
                 }
                 for aid in agent_ids
             },
+            # Commons-blok (stock/grants/collapse) = primaire T4-DV; zonder deze
+            # regel haalde hij de SSOT-JSONL nooit (gevonden in de ground-truth-
+            # test van commons_dv, 2026-07-14).
+            **({'commons': round_result['commons']} if round_result.get('commons') else {}),
             'combat': round_result.get('combat_results', []),
             'messages': [
                 {'from': m.get('from'), 'to': m.get('message_to'), 'text': m.get('message', '')}

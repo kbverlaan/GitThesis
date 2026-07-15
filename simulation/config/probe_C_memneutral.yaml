@@ -1,4 +1,4 @@
-# Complexity ladder — RUNG 3: Association.
+# C-REPLICATIE met gedragsmatige memory-instructie (freeze-substraat), abundance-cel.
 # Affordances: L2 + drop/invite (network rewiring). No commons.
 # Comms + memory ON (always-on base substrate). Prod numeric params unchanged.
 # rewiring_prob > 0 so association actually has bite (w=0.5).
@@ -10,7 +10,7 @@ initial_resources: 100.0
 
 # Investment
 c_inv: 0.06
-g_inv: 0.091
+g_inv: 0.142
 gamma_sat: 1.00
 tau_sat: 5
 
@@ -55,3 +55,8 @@ memory:
   enabled: true
   window_size: 10
   notes_persist: true
+
+# Zelfde seed als de originele C-run (rewactC): identieke agent-namen en
+# starttopologie, zodat het memory-instructie-verschil zo zuiver mogelijk
+# vergelijkt (LLM-stochasticiteit bij temp 0.3 blijft).
+random_seed: 3410631900

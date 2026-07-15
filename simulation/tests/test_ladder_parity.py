@@ -18,7 +18,6 @@ CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "config")
 # Configs that share one frozen economy (the ladder + the commons probes).
 PARITY_CONFIGS = [
     "ladder_L1.yaml", "ladder_L2.yaml", "ladder_L3.yaml", "ladder_L4.yaml",
-    "commons_probe.yaml", "commons_probe_bc.yaml",
 ]
 
 # Keys allowed to differ between rungs: the rung FLAGS (which affordances are on),

@@ -357,11 +357,13 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
 .history-item .hist-res { color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* Action colors */
-.action-invest_other { color: var(--coop); }
-.action-invest_self { color: var(--text2); }
-.action-arm_self, .action-arm_other { color: var(--arm); }
-.action-attack { color: var(--attack); }
-.action-do_nothing { color: var(--dim); }
+.action-transfer { color: var(--coop); }
+.action-strengthen { color: var(--arm); }
+.action-take { color: var(--attack); }
+.action-hold { color: var(--dim); }
+.action-harvest { color: #2dd4bf; }
+.action-drop { color: #fb923c; }
+.action-invite { color: #60a5fa; }
 
 /* Cluster hulls */
 .cluster-hull {
@@ -405,7 +407,7 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
   <div class="logo"><span>Origins</span> of Order</div>
 
   <div class="metrics-row">
-    <div class="metric-pill" title="Cooperation fraction: invest_other / meaningful actions">
+    <div class="metric-pill" title="Cooperation fraction: transfer / meaningful actions">
       <div>
         <div class="label">f_C</div>
         <div class="value" id="m-fc">--</div>
@@ -451,6 +453,7 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
   <div class="toolbar-group">
     <label class="toggle-label"><input type="checkbox" id="show-actions" checked> Actions</label>
     <label class="toggle-label"><input type="checkbox" id="show-messages" checked> Msgs</label>
+    <label class="toggle-label"><input type="checkbox" id="show-connects" checked> Connects</label>
     <label class="toggle-label"><input type="checkbox" id="show-edge-diff"> Edge diff</label>
   </div>
   <div class="toolbar-sep"></div>
@@ -530,10 +533,13 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
       </div>
     </div>
     <div id="legend">
-      <span style="color:var(--coop)">&#9679; invest</span>
-      <span style="color:var(--attack)">&#9679; attack</span>
-      <span style="color:var(--arm)">&#9679; arm</span>
-      <span style="color:var(--dim)">&#9679; do nothing</span>
+      <span style="color:var(--coop)">&#9679; transfer</span>
+      <span style="color:var(--arm)">&#9679; strengthen</span>
+      <span style="color:var(--attack)">&#9679; take</span>
+      <span style="color:#2dd4bf">&#9679; harvest</span>
+      <span style="color:#fb923c">&#9679; drop</span>
+      <span style="color:#60a5fa">&#9679; invite</span>
+      <span style="color:var(--dim)">&#9679; hold</span>
       <span id="legend-diff" style="display:none">
         | <span style="color:var(--coop)">--- new edge</span>
         <span style="color:var(--attack);opacity:0.5">--- removed</span>
@@ -573,10 +579,10 @@ const AGENT_COLORS = [
   '#ec4899','#4ade80','#3b82f6','#eab308','#8b5cf6','#14b8a6',
   '#a8a29e','#cbd5e1','#94a3b8','#d8b4fe','#86efac','#93c5fd'
 ];
-const ACTION_ICONS = {invest_other:'&#10230;',invest_self:'&#9651;',arm_self:'&#9670;',arm_other:'&#9670;',attack:'&#9876;',do_nothing:'&#183;'};
-const ACTION_LABELS = {invest_other:'transfer',invest_self:'invest self',arm_self:'arm self',arm_other:'strengthen',attack:'take',do_nothing:'hold'};
-const ACTION_COLORS_MAP = {invest_other:'#34d399',invest_self:'#94a3b8',arm_self:'#fbbf24',arm_other:'#fbbf24',attack:'#f87171',do_nothing:'#64748b'};
-const ACTION_ORDER = ['invest_other','invest_self','arm_self','arm_other','attack','do_nothing'];
+const ACTION_ICONS = {transfer:'&#10230;',strengthen:'&#9670;',take:'&#9876;',hold:'&#183;',harvest:'&#10038;',drop:'&#9986;',invite:'&#43;'};
+const ACTION_LABELS = {transfer:'transfer',strengthen:'strengthen',take:'take',hold:'hold',harvest:'harvest',drop:'drop',invite:'invite',no_action:'eliminated'};
+const ACTION_COLORS_MAP = {transfer:'#34d399',strengthen:'#fbbf24',take:'#f87171',hold:'#64748b',harvest:'#2dd4bf',drop:'#fb923c',invite:'#60a5fa',no_action:'#3f3f46'};
+const ACTION_ORDER = ['transfer','strengthen','take','harvest','drop','invite','hold','no_action'];
 const ACTION_CSS = a => `action-${a}`;
 
 // Message recipients — backward compatible.
@@ -590,13 +596,19 @@ function msgTargets(m){
   return [];
 }
 
-// Action vocabulary — map the new canonical names to the viewer's internal
-// (legacy) keys so all existing logic + CSS keep working. Old logs pass through
-// unchanged; display labels (new names) come from ACTION_LABELS.
-const _ACTION_TO_INTERNAL = {transfer:'invest_other', strengthen:'arm_other', take:'attack', hold:'do_nothing'};
+// Action vocabulary — canonical names ARE the internal vocabulary (production
+// freeze 2026-07-14). Legacy logs (pre-rename) are translated on load. A hold
+// that carries a rewire_intent is the drop/invite ACTION (production logs
+// record the engine-neutral 'hold'; the intent field holds the real choice).
+const _LEGACY_TO_CANONICAL = {invest_other:'transfer', arm_other:'strengthen', attack:'take', do_nothing:'hold'};
 function normRoundActions(rd){
   if (rd && rd.agents) for (const a of Object.values(rd.agents)) {
-    if (a && _ACTION_TO_INTERNAL[a.action]) a.action = _ACTION_TO_INTERNAL[a.action];
+    if (!a) continue;
+    if (_LEGACY_TO_CANONICAL[a.action]) a.action = _LEGACY_TO_CANONICAL[a.action];
+    if (a.action === 'hold' && a.rewire_intent) {
+      if (a.rewire_intent.drop) { a.action = 'drop'; a.target = a.target || a.rewire_intent.drop; }
+      else if (a.rewire_intent.invite) { a.action = 'invite'; a.target = a.target || a.rewire_intent.invite; }
+    }
   }
   return rd;
 }
@@ -628,7 +640,7 @@ function computeMetrics(rd, prevRd) {
   const agents = rd.agents || {};
   const actions = Object.values(agents).map(a => a.action || 'no_action');
   const activeActions = actions.filter(a => a && a !== 'no_action');
-  const coopCount = activeActions.filter(a => a === 'invest_other' || a === 'arm_other').length;
+  const coopCount = activeActions.filter(a => a === 'transfer' || a === 'strengthen').length;
   const cooperation_ratio = activeActions.length ? coopCount / activeActions.length : 0;
 
   // Action distribution
@@ -935,6 +947,9 @@ document.getElementById('show-edge-diff').onchange = () => {
 document.getElementById('show-actions').onchange = () => {
   if (rounds.length) renderRound();
 };
+document.getElementById('show-connects').onchange = () => {
+  if (rounds.length) renderRound();
+};
 document.getElementById('show-messages').onchange = () => {
   document.getElementById('legend-msg').style.display = document.getElementById('show-messages').checked ? 'inline' : 'none';
   if (rounds.length) renderRound();
@@ -1022,7 +1037,7 @@ function detectCommunities(edges, agents, roundIdx) {
     for (let i = Math.max(0, roundIdx - window + 1); i <= roundIdx; i++) {
       const rd = rounds[i]; if (!rd) continue;
       Object.entries(rd.agents).forEach(([aid, info]) => {
-        if (info.action === 'invest_other' && info.target && comp.includes(aid) && comp.includes(info.target)) {
+        if (info.action === 'transfer' && info.target && comp.includes(aid) && comp.includes(info.target)) {
           const key = [aid, info.target].sort().join('-');
           coopWeight[key] = (coopWeight[key] || 0) + 1;
         }
@@ -1071,11 +1086,11 @@ function detectActionCommunities(agents, roundIdx, windowSize) {
     Object.entries(rd.agents).forEach(([aid, info]) => {
       if (!info.target) return;
       const key = [aid, info.target].sort().join('-');
-      if (info.action === 'invest_other') {
+      if (info.action === 'transfer') {
         coopWeight[key] = (coopWeight[key] || 0) + recency;
-      } else if (info.action === 'attack') {
+      } else if (info.action === 'take') {
         hostWeight[key] = (hostWeight[key] || 0) + recency;
-      } else if (info.action === 'arm_other') {
+      } else if (info.action === 'strengthen') {
         coopWeight[key] = (coopWeight[key] || 0) + recency * 0.5;
       }
     });
@@ -1287,8 +1302,8 @@ function showTooltip(e, d) {
   const bd = info?.breakdown;
   if (bd) {
     const parts = [];
-    if (bd.invest_self > 0.01) parts.push(`self +${bd.invest_self.toFixed(1)}`);
     if (bd.invest_received > 0.01) parts.push(`recv +${bd.invest_received.toFixed(1)}`);
+    if (bd.harvest > 0.01) parts.push(`harvest +${bd.harvest.toFixed(1)}`);
     if (bd.invest_cost > 0.01) parts.push(`cost -${bd.invest_cost.toFixed(1)}`);
     if (bd.arm_cost > 0.01) parts.push(`arm -${bd.arm_cost.toFixed(1)}`);
     if (Math.abs(bd.combat_transfer||0) > 0.01) parts.push(`combat ${bd.combat_transfer>=0?'+':''}${bd.combat_transfer.toFixed(1)}`);
@@ -1498,7 +1513,7 @@ function updateGraph(r) {
         const key = [aid, info.target].sort().join('-');
         if (info.action === 'invest_other' || info.action === 'arm_other') {
           coopEdges[key] = (coopEdges[key] || 0) + 1;
-        } else if (info.action === 'attack') {
+        } else if (info.action === 'take') {
           attackEdges[key] = (attackEdges[key] || 0) + 1;
         }
       });
@@ -1521,13 +1536,17 @@ function updateGraph(r) {
       .attr('stroke-dasharray', d => d.status === 'hostile' ? '4,3' : 'none')
       .attr('stroke-opacity', d => Math.min(0.3 + d.weight * 0.15, 0.8));
   } else {
-    // Network mode: show structural edges
+    // Network mode: show structural edges (hidden entirely when the
+    // Connects-toggle is off)
+    const showConnects = document.getElementById('show-connects')?.checked !== false;
     const prevEdges = currentRound > 0 ? (rounds[currentRound - 1].network?.edges || []) : [];
     const changes = edgeChanges(rawEdges, prevEdges);
     const addedSet = new Set(changes.added.map(toKey));
 
     let allEdges;
-    if (showDiff) {
+    if (!showConnects) {
+      allEdges = [];
+    } else if (showDiff) {
       allEdges = [
         ...rawEdges.map(e => ({source: e[0], target: e[1], status: addedSet.has(toKey(e)) ? 'added' : 'stable'})),
         ...changes.removed.map(e => ({source: e[0], target: e[1], status: 'removed'})),
@@ -1585,7 +1604,7 @@ function updateGraph(r) {
       const info = agents[aid];
       if (info.target && info.action) {
         let type = null;
-        if (info.action === 'invest_other') type = 'coop';
+        if (info.action === 'transfer') type = 'coop';
         else if (info.action === 'attack') type = 'attack';
         else if (info.action === 'arm_other') type = 'arm';
         if (type) actionEdges.push({source: aid, target: info.target, type});

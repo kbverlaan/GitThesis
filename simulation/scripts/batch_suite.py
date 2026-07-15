@@ -5,15 +5,27 @@ import numpy as np, igraph as ig, leidenalg
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import deontic, enforcement
 
-PRIMARY=['transfer','hold','take','strengthen_self','strengthen_other']
+PRIMARY=['transfer','strengthen','take','harvest','drop','invite','hold']
 def cat(a):
     if a is None: return 'hold'
     a=str(a).lower()
     if a.startswith('invest') or a=='transfer': return 'transfer'
     if a.startswith('take') or a=='attack': return 'take'
-    if 'arm_self' in a or 'strengthen_self' in a: return 'strengthen_self'
-    if 'arm' in a or 'strengthen' in a: return 'strengthen_other'
+    if 'arm' in a or 'strengthen' in a: return 'strengthen'
+    if a.startswith('harvest'): return 'harvest'
+    if a.startswith('drop'): return 'drop'
+    if a.startswith('invite'): return 'invite'
     return 'hold'
+def effective_action(info):
+    """Actie zoals gekozen: productie-logs schrijven de rewire-keuze als
+    action='hold' + rewire_intent (engine-neutraal); hier terugvertaald."""
+    a = info.get('action')
+    ri = info.get('rewire_intent') or {}
+    if (a in (None, 'hold', 'do_nothing')) and isinstance(ri, dict):
+        if ri.get('drop'): return 'drop'
+        if ri.get('invite'): return 'invite'
+    return a
+
 def gini(xs):
     xs=sorted(x for x in xs if x is not None); n=len(xs); s=sum(xs)
     if n==0 or s<=0: return 0.0
@@ -30,7 +42,7 @@ def analyze(path):
         cc=Counter(); Rs={}
         bf=d.get('bilateral_flows') or {}
         for aid,info in ag.items():
-            c=cat(info.get('action')); cc[c]+=1
+            c=cat(effective_action(info)); cc[c]+=1
             R=info.get('resources');  Rs[aid]=R if R is not None else Rs.get(aid)
             tg=info.get('target')
             if c=='take' and tg: attacks.append((d.get('round'),aid,tg)); takes.append((aid,tg))
