@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# REGISTERED SWEEP-SPEC — complexity-ladder productie-grid (v1 DRAFT 2026-07-16)
+#
+# status: DRAFT tot pre-reg-deposit. Na deposit: freeze_sha + freeze_date
+#         invullen en NIET meer wijzigen (zelfde regime als dv_thresholds.yaml).
+# freeze_sha:  <TODO na deposit>
+# freeze_date: <TODO na deposit>
+#
+# Ontwerp: 2 hendels, 1 verschil per cel-paar (Debraj-principe).
+#   Hendel 1  actie-ruimte : L1 cooperation -> L2 +predation/arming ->
+#                            L3 +drop/invite -> L4 +commons (nested, frozen engine)
+#   Hendel 2  payoff       : g_inv 0.039 (scar, -5%) / 0.091 (knife, 0%) /
+#                            0.142 (abund, +5%) — netto reciprocerend-paar-groei
+#   Control   comms-off    : L1+L3 op knife-edge (Koen 2026-07-16; rationale +
+#                            falsifieerbare kern in amendement-dossier B3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+model_config: openrouter_gemma4.yaml       # prod op Snellius: vllm_gemma_config.yaml (zelfde model/params)
+engine: production-freeze (PR #11)         # frozen 2026-07-14; re-lock gedaan
+analysis:
+  thresholds: dv_thresholds.yaml           # freeze na IRR (fixplan Fase 3)
+  primary_dv: order_ladder_gate.py         # P1 genest ordinaal label (--frozen)
+  secondary: [commons_dv.py, deontic.py, enforcement.py, delta_equivalence.py]
+
+# reps per cel — KOEN beslist na `ssh snellius accinfo` (SBU-budget-check).
+# Power-onderbouwing DVs.md: MDES bij n=15 ~ d 1.0; regime-effecten d 3-13.
+reps_per_cell: null                        # <TODO Koen: bv. 15 confirmatory / 5 nocomm>
+max_rounds: 60
+seeds: run-id-derived                      # run_id bepaalt namen/topologie/shuffles,
+                                           # NIET LLM-sampling; run-id-schema hieronder
+
+# run-id-schema: {config}_rep{NN}  (bv. prod_L3_knife_rep07)
+confirmatory_cells:                        # 12 = 4 rungen x 3 payoffs
+  - prod_L1_scar.yaml
+  - prod_L1_knife.yaml
+  - prod_L1_abund.yaml
+  - prod_L2_scar.yaml
+  - prod_L2_knife.yaml
+  - prod_L2_abund.yaml
+  - prod_L3_scar.yaml
+  - prod_L3_knife.yaml
+  - prod_L3_abund.yaml
+  - prod_L4_scar.yaml
+  - prod_L4_knife.yaml
+  - prod_L4_abund.yaml
+
+comms_off_controls:                        # beide knife-edge (beslist 2026-07-16)
+  - prod_L1_knife_nocomm.yaml
+  - prod_L3_knife_nocomm.yaml
+
+conditional_exploratory:
+  # Vooraf aangekondigd (geen forking path): als T3 x knife x comms-aan over de
+  # reps bistabiliteit toont (>= drempel-aantal runs met institution-label),
+  # dan draagt het institutie-contrast de breuk-poot; zo niet, dan draagt het
+  # geweld-onderdrukkings-contrast de creating-step-claim. Drempel: <TODO Koen>.
+  - name: T3_knife_bistability_rule
+    threshold_runs_with_institution: null
+  # Budget permitting (checklist-beslissing 2026-07-15):
+  - prod_L4_knife_nocomm: "exploratory-if-budget (T4-comms-off, Ostrom-replicatie-argument)"
+  - forced_sociality: "gamma_sat 0.80 appendix-contrast, cel T3-abund (smoke loopt 2026-07-16)"
+
+robustness_arm:
+  model: null                              # <TODO Koen: Qwen-versie>
+  cells: "subset — beslissen bij amendement"
+
+superseded:
+  - ladder_L4_scarce.yaml                  # vervangen door prod_L4_scar.yaml (identieke cel)
+  - config/archive_20260714/ + archive_20260715/   # pre-freeze-semantiek, NIET draaien
