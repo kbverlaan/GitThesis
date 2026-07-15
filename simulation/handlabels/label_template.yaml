@@ -1,0 +1,57 @@
+# Hand-label-template — IRR-validatie order-ladder gate (fixplan Fase 3).
+#
+# KOEN: vul per run 'label:' in met het orde-type dat JIJ de run geeft op
+# basis van de narratieven/traces (niet op basis van de gate-output — blind
+# labelen, anders is de kappa circulair). Kies uit:
+#   coordination | cooperation | convention | norm | institution | governance
+# 'skip' = niet labelen. 'note:' vrij veld.
+#
+# Stratificatie: 5 rewire-probes (bekende narratieven) + 5 prod-proofs (alle
+# rungs, kort) + 2 nieuwe smokes zodra klaar. Aanvullen met grid-runs kan later
+# (zelfde formaat), maar de FREEZE moet vóór de confirmatory-analyse.
+#
+# Daarna: python3 scripts/irr_check.py handlabels/labels.yaml
+# (kopieer dit bestand naar labels.yaml zodat het template schoon blijft)
+
+runs:
+  # ── rewire-probes (2026-07-13/14, bekende narratieven) ──
+  - path: data/runs/rewire_ab/rewpar_reasoning_live.jsonl
+    label: todo
+    note: "A: parallel p.5 knife-edge — netwerk-frenzy, totale oorlog"
+  - path: data/runs/rewire_ab/rewact_reasoning_live.jsonl
+    label: todo
+    note: "B: actie p.5 knife-edge — tragere oorlog, Pearl-verraad"
+  - path: data/runs/rewire_ab/rewact100_reasoning_live.jsonl
+    label: todo
+    note: "B': actie p1.0 knife-edge — whale-doctrine, 8 doden"
+  - path: data/runs/rewire_ab/rewactC_reasoning_live.jsonl
+    label: todo
+    note: "C: abundance — Growth Circles, 35 rondes vrede"
+  - path: data/runs/rewire_ab/rewactC_memneutral_reasoning_live.jsonl
+    label: todo
+    note: "C-memneutral: Maroon-syndicaat + Order 1-gilde, trage revolutie"
+
+  # ── prod-proofs (10 rondes, alle rungs — kort, dus conservatief labelen) ──
+  - path: data/runs/prod_proof/prodproof_L1_reasoning_live.jsonl
+    label: todo
+    note: "T1 knife-edge proof"
+  - path: data/runs/prod_proof/prodproof_L2_reasoning_live.jsonl
+    label: todo
+    note: "T2 knife-edge proof"
+  - path: data/runs/prod_proof/prodproof_L3_reasoning_live.jsonl
+    label: todo
+    note: "T3 knife-edge proof"
+  - path: data/runs/prod_proof/prodproof_L4_reasoning_live.jsonl
+    label: todo
+    note: "T4 proof (pre-R2-gate variant)"
+  - path: data/runs/prod_proof/prodproof_L4b_reasoning_live.jsonl
+    label: todo
+    note: "T4 proof met R2-gate — overshoot 61.9 geabsorbeerd"
+
+  # ── smokes 2026-07-15 (paden kloppen zodra de runs klaar zijn) ──
+  - path: data/runs/nocomm_smoke/smoke_T1_nocomm_reasoning_live.jsonl
+    label: todo
+    note: "T1 comms-off — overlevings-poot-smoke"
+  - path: data/runs/t4_smoke/smoke_T4_knife_reasoning_live.jsonl
+    label: todo
+    note: "T4 knife-edge 60r — survival-drempel-smoke"
