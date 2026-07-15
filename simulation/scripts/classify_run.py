@@ -78,7 +78,11 @@ NAMED_STRUCTURE_STOP = {
     "leaves", "left", "leaving", "leave",
     "supports", "supported", "support",
     "maintain", "maintains", "maintained", "maintaining",
+    "matches", "matched", "matching", "match",
+    "confirms", "confirmed", "confirming", "confirm",
     "if", "when", "while", "after", "before", "because",
+    # sentence-start prepositions ("In order to..." -> false positive "In Order")
+    "in", "on", "at", "by", "for", "with", "from", "to",
 }
 
 # Pre-reg gating (Koen 2026-07-09): een gedeeld label telt als benoemde structuur

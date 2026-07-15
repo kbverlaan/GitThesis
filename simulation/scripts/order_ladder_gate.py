@@ -125,10 +125,30 @@ def gate_run(path, thr):
     detail["norm_density_pub"] = round(deo["norm"], 4)
     detail["sanctions"] = deo["sanction"]
 
-    # ── 4 institution: benoemde persistente structuur (pre-reg-gate) ────────
+    # ── 4 institution: benoemde persistente structuur, ALLEEN bespoke ───────
+    # NAP e.d. = baseline/gegeven (Koen 2026-07-15): universeel vanaf R<=5,
+    # geen muntmoment -> telt niet als bewijs van uitgevonden orde.
     named, _raw, coverage = detect_named_structures(lines)
-    gates["institution"] = len(named) >= thr["inst_min_structures"]
-    detail["named_structures"] = dict(named.most_common(5))
+    baseline_names = {n.lower() for n in thr.get("inst_baseline_names", [])}
+    bespoke = {n: c for n, c in named.items() if n.lower() not in baseline_names}
+    gates["institution"] = len(bespoke) >= thr["inst_min_structures"]
+    detail["named_bespoke"] = dict(sorted(bespoke.items(), key=lambda kv: -kv[1])[:5])
+    detail["named_baseline"] = {n: c for n, c in named.items()
+                                if n.lower() in baseline_names}
+    # muntmoment (coinage): eerste ronde waarin een bespoke naam valt — een
+    # invented naam heeft een aanwijsbare bron + diffusie; baseline-termen niet.
+    if bespoke:
+        firsts = {}
+        for d in lines:
+            r = d.get("round") or 0
+            texts = [m.get("text") or "" for m in (d.get("messages") or [])]
+            texts += [a.get(f) or "" for a in (d.get("agents") or {}).values()
+                      for f in ("memory", "thinking")]
+            blob = " ".join(texts).lower()
+            for nm in bespoke:
+                if nm not in firsts and nm.lower() in blob:
+                    firsts[nm] = r
+        detail["bespoke_first_round"] = firsts
 
     # ── 5 governance: commons volgehouden (alleen T4) ───────────────────────
     cm = commons_dv.commons_metrics(lines)

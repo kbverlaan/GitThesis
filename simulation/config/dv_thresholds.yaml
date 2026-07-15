@@ -68,8 +68,18 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
   norm_density_min: 0.02         # tussen bloei ~0.003 en bistable ~0.065 (DVs.md)
   norm_sanction_min: 1           # >= dit aantal sanctie-uitingen
-  # 4 institution — benoemde persistente structuur
-  inst_min_structures: 1         # >= dit aantal detector-hits (pre-reg-gate in detector)
+  # 4 institution — benoemde persistente structuur, ALLEEN bespoke/invented
+  # (Koen 2026-07-15: NAP = baseline/gegeven, telt niet; naming-baseline toont
+  # NAP universeel vanaf R<=5. Claim-formulering: "gedraagt zich als voorgevormde
+  # term" — geen muntmoment, canonieke naam, conditie-invariant — GEEN harde
+  # inherited-claim. Bespoke = wel muntmoment: eerste vermelding -> diffusie.)
+  inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits
+  inst_baseline_names:           # uitgesloten van de poort; apart gerapporteerd
+    - "Non-Aggression Pact"
+    - "NAP"
+    - "Resolution Order"         # mechaniek-term: pre-scrub prompt-echo, maar komt
+                                 # ook post-scrub natuurlijk voor (memneutral 6x) —
+                                 # "resolution order" is gewoon Engels voor beurtvolgorde
   # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
 
 # ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
