@@ -64,9 +64,9 @@ def test_rules_discriminate():
     # Eindigt levend maar onder het duurzame peil: no_collapse zegt ja,
     # window_stock/final_stock zeggen nee, window_flow (oogst > 40) nee.
     rounds = [
-        _round(120, 60, 90),
-        _round(90, 50, 60),
-        _round(60, 45, 70),
+        _round(120, 50, 75),   # oogst 70
+        _round(75, 30, 45),    # oogst 45
+        _round(45, 20, 30),    # oogst 25 -> gem 46.7 > debiet 40
     ]
     m = commons_metrics(rounds)
     br = m["sustained_by_rule"]
