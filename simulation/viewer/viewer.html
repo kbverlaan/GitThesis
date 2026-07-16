@@ -532,6 +532,19 @@ const AGENT_COLORS = [
   '#ec4899','#4ade80','#3b82f6','#eab308','#8b5cf6','#14b8a6',
   '#a8a29e','#cbd5e1','#94a3b8','#d8b4fe','#86efac','#93c5fd'
 ];
+// Agent names ARE colour names — paint each node its namesake colour. Dark
+// colours (maroon, indigo, onyx) are lightened so they stay visible on the dark
+// canvas; the hue stays recognisable. Keyed lowercase.
+const NAME_COLORS = {
+  amber:'#ffbf00', ash:'#b2beb5', blue:'#4a90e2', bronze:'#cd7f32',
+  cobalt:'#4169ff', copper:'#c87533', coral:'#ff7f50', crimson:'#dc143c',
+  cyan:'#00e5e5', dusk:'#9080b0', gold:'#ffd700', green:'#3cb043',
+  indigo:'#7d5fe0', ivory:'#f5f0dc', jade:'#00a86b', maroon:'#b0304f',
+  mauve:'#e0a0d0', olive:'#a5b81f', onyx:'#8a8a8a', pearl:'#eae0d5',
+  plum:'#c065b0', red:'#ff4040', rust:'#c0510e', sage:'#9caf88',
+  scarlet:'#ff3020', silver:'#c8c8c8', slate:'#8090a0', storm:'#7d8ca0',
+  teal:'#17b8a6', violet:'#a24edd'
+};
 const ACTION_ICONS = {transfer:'&#10230;',strengthen:'&#9670;',take:'&#9876;',hold:'&#183;',harvest:'&#10038;',drop:'&#9986;',invite:'&#43;'};
 const ACTION_LABELS = {transfer:'transfer',strengthen:'strengthen',take:'take',hold:'hold',harvest:'harvest',drop:'drop',invite:'invite',no_action:'eliminated'};
 const ACTION_COLORS_MAP = {transfer:'#34d399',strengthen:'#fbbf24',take:'#f87171',hold:'#64748b',harvest:'#2dd4bf',drop:'#fb923c',invite:'#60a5fa',no_action:'#3f3f46'};
@@ -575,8 +588,12 @@ let selectedAgent = null;
 // Stable color assignment: first round's agent order determines colors
 let agentColorMap = {};
 function agentColor(aid) {
+  // 1) name IS a colour → paint its namesake (Maroon = maroon, Gold = gold).
+  const named = NAME_COLORS[String(aid).toLowerCase()];
+  if (named) return named;
+  // 2) stable per-run assignment from the palette.
   if (agentColorMap[aid] !== undefined) return AGENT_COLORS[agentColorMap[aid] % AGENT_COLORS.length];
-  // Fallback: hash
+  // 3) fallback: hash.
   let h = 0;
   for (let i = 0; i < aid.length; i++) h = ((h << 5) - h + aid.charCodeAt(i)) | 0;
   return AGENT_COLORS[Math.abs(h) % AGENT_COLORS.length];
@@ -1163,16 +1180,29 @@ function applyEdgeHighlight() {
   });
 }
 
+// Endpoint of a directed edge on the TARGET circle's edge (+gap), so the
+// arrowhead lands on the rim instead of the centre. Falls back to centre if the
+// nodes coincide or the target radius is unknown.
+function edgeTip(sourceId, targetId, gap) {
+  const s = nodePos(sourceId), t = nodePos(targetId);
+  const tr = (typeof targetId === 'object' ? targetId : nodeMap[targetId])?._r || 0;
+  const dx = t.x - s.x, dy = t.y - s.y;
+  const dist = Math.hypot(dx, dy);
+  if (!dist || !tr) return t;
+  const back = Math.min(tr + gap, dist - 1);
+  return { x: t.x - (dx / dist) * back, y: t.y - (dy / dist) * back };
+}
+
 function ticked() {
   gLinks.selectAll('line')
     .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
     .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
   gActions.selectAll('line')
     .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
-    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+    .attr('x2', d=>edgeTip(d.source, d.target, 4).x).attr('y2', d=>edgeTip(d.source, d.target, 4).y);
   gMessages.selectAll('line')
     .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
-    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+    .attr('x2', d=>edgeTip(d.source, d.target, 3).x).attr('y2', d=>edgeTip(d.source, d.target, 3).y);
   gNodes.selectAll('g').attr('transform', d=>`translate(${d.x},${d.y})`);
   gLabels.selectAll('text').attr('x', d=>d.x).attr('y', d=>d.y);
 
@@ -1485,10 +1515,13 @@ function updateGraph(r) {
     .attr('stroke-dasharray', '3,4')
     .attr('stroke-opacity', 0.4);
 
-  // Node sizes
+  // Node sizes. Stash the radius on the datum so ticked() can land arrowheads
+  // on the circle's edge (not its centre) — direction stays legible on big nodes.
   const maxR = Math.max(...agentIds.map(a => agents[a].resources), 1);
+  const nodeRadius = d => 7 + 13 * Math.sqrt((agents[d.id]?.resources||1) / maxR);
+  agentIds.forEach(a => { if (nodeMap[a]) nodeMap[a]._r = nodeRadius(nodeMap[a]); });
   gNodes.selectAll('.node-circle').data(agentIds.map(a=>nodeMap[a]).filter(Boolean), d=>d.id)
-    .attr('r', d => 7 + 13 * Math.sqrt((agents[d.id]?.resources||1) / maxR))
+    .attr('r', nodeRadius)
     .attr('stroke', d => {
       const bonus = agents[d.id]?.arm_bonus || 0;
       return bonus > 0.1 ? '#fbbf24' : 'none';
