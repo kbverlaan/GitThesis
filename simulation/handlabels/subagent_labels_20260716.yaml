@@ -1,0 +1,14 @@
+# Onafhankelijke subagent-consensus (3 labelaars, blind voor de gate, 100% onderling eens)
+runs:
+  - {path: data/runs/nocomm_smoke/smoke_T1_nocomm_log.jsonl, label: convention}
+  - {path: data/runs/nocomm_smoke/smoke_T1_nocomm_abund_log.jsonl, label: convention}
+  - {path: data/runs/nocomm_smoke/smoke_T3_nocomm_knife_log.jsonl, label: convention}
+  - {path: data/runs/nocomm_smoke/smoke_T3_nocomm_abund_log.jsonl, label: convention}
+  - {path: data/runs/rewire_ab/rewpar_reasoning_live.jsonl, label: institution}
+  - {path: data/runs/rewire_ab/rewact_reasoning_live.jsonl, label: institution}
+  - {path: data/runs/rewire_ab/rewact100_reasoning_live.jsonl, label: institution}
+  - {path: data/runs/rewire_ab/rewactC_reasoning_live.jsonl, label: institution}
+  - {path: data/runs/rewire_ab/rewactC_memneutral_reasoning_live.jsonl, label: institution}
+  - {path: data/runs/t4_smoke/smoke_T4_knife_log.jsonl, label: norm}
+  - {path: data/runs/forced_smoke/smoke_T3_abund_forced_log.jsonl, label: institution}
+  - {path: data/runs/forced_smoke/smoke_T3_knife_forced_log.jsonl, label: institution}
