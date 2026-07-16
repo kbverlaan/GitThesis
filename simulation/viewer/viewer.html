@@ -433,7 +433,7 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
   <div class="toolbar-group">
     <label class="toggle-label"><input type="checkbox" id="show-actions" checked> Actions</label>
     <label class="toggle-label"><input type="checkbox" id="show-messages" checked> Msgs</label>
-    <label class="toggle-label"><input type="checkbox" id="show-connects" checked> Connects</label>
+    <label class="toggle-label" title="Highlight the selected agent's direct connections (the whole network stays subtly visible)"><input type="checkbox" id="show-connects" checked> Direct links</label>
     <label class="toggle-label"><input type="checkbox" id="show-edge-diff"> Edge diff</label>
   </div>
   <div class="toolbar-sep"></div>
@@ -859,7 +859,7 @@ document.getElementById('show-actions').onchange = () => {
   if (rounds.length) renderRound();
 };
 document.getElementById('show-connects').onchange = () => {
-  if (rounds.length) renderRound();
+  if (rounds.length) applyEdgeHighlight();   // base network always drawn; toggle only re-highlights
 };
 document.getElementById('show-messages').onchange = () => {
   document.getElementById('legend-msg').style.display = document.getElementById('show-messages').checked ? 'inline' : 'none';
@@ -1162,18 +1162,20 @@ function captureEdgeBaseline() {
 
 function applyEdgeHighlight() {
   if (!gLinks) return;
+  // 'Direct links' toggle: highlight the selected agent's incident edges in the
+  // agent's own colour. Off (or no selection) → every edge falls back to the
+  // subtle base, so the whole network stays visible either way.
+  const highlightOn = document.getElementById('show-connects')?.checked !== false;
+  const hiColor = selectedAgent ? agentColor(selectedAgent) : '#facc15';
   gLinks.selectAll('line').each(function(d) {
     const sel = d3.select(this);
     const baseOp = parseFloat(sel.attr('data-base-opacity') ?? sel.attr('stroke-opacity') ?? '1');
     const baseW = parseFloat(sel.attr('data-base-width') ?? sel.attr('stroke-width') ?? '1');
     const baseStroke = sel.attr('data-base-stroke') ?? sel.attr('stroke') ?? '#fff';
-    if (!selectedAgent) {
-      sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
-      return;
-    }
-    const incident = edgeEndId(d.source) === selectedAgent || edgeEndId(d.target) === selectedAgent;
+    const incident = highlightOn && selectedAgent &&
+      (edgeEndId(d.source) === selectedAgent || edgeEndId(d.target) === selectedAgent);
     if (incident) {
-      sel.attr('stroke-opacity', 1).attr('stroke-width', baseW + 2).attr('stroke', '#facc15');
+      sel.attr('stroke-opacity', 0.95).attr('stroke-width', baseW + 2).attr('stroke', hiColor);
     } else {
       sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
     }
@@ -1460,17 +1462,16 @@ function updateGraph(r) {
       .attr('stroke-dasharray', d => d.status === 'hostile' ? '4,3' : 'none')
       .attr('stroke-opacity', d => Math.min(0.3 + d.weight * 0.15, 0.8));
   } else {
-    // Network mode: show structural edges (hidden entirely when the
-    // Connects-toggle is off)
-    const showConnects = document.getElementById('show-connects')?.checked !== false;
+    // Network mode: the whole structural network is ALWAYS drawn, very subtly,
+    // so you keep the topology as backdrop. The 'Direct links' toggle only
+    // controls whether the selected agent's incident edges get highlighted
+    // (applyEdgeHighlight), not whether the base network shows.
     const prevEdges = currentRound > 0 ? (rounds[currentRound - 1].network?.edges || []) : [];
     const changes = edgeChanges(rawEdges, prevEdges);
     const addedSet = new Set(changes.added.map(toKey));
 
     let allEdges;
-    if (!showConnects) {
-      allEdges = [];
-    } else if (showDiff) {
+    if (showDiff) {
       allEdges = [
         ...rawEdges.map(e => ({source: e[0], target: e[1], status: addedSet.has(toKey(e)) ? 'added' : 'stable'})),
         ...changes.removed.map(e => ({source: e[0], target: e[1], status: 'removed'})),
@@ -1481,10 +1482,10 @@ function updateGraph(r) {
 
     gLinks.selectAll('line').data(allEdges, d=>`${d.source}-${d.target}-${d.status}`)
       .join('line')
-      .attr('stroke', d => d.status === 'added' ? '#34d399' : d.status === 'removed' ? '#f87171' : 'rgba(255,255,255,0.12)')
+      .attr('stroke', d => d.status === 'added' ? '#34d399' : d.status === 'removed' ? '#f87171' : 'rgba(255,255,255,0.14)')
       .attr('stroke-width', d => d.status === 'stable' ? 1 : 1.5)
       .attr('stroke-dasharray', d => d.status === 'removed' ? '3,5' : d.status === 'added' ? '5,3' : 'none')
-      .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 1);
+      .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 0.5);
   }
 
   captureEdgeBaseline();
