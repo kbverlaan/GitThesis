@@ -64,7 +64,8 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   tau: 0.6                       # thuis-share-drempel vast/split (DVs.md)
   # 1 cooperation — volgehouden reciprociteit
   coop_transfer_share: 0.15      # transfer-aandeel in slotvenster >= dit
-  coop_recip_dyads: 3            # wederzijdse transfer-dyades (whole-run) >= dit
+  coop_recip_dyads: 3            # OF-tak reciprociteit
+  coop_coverage_min: 0.3         # OF volgehouden gezamenlijke actie (coalitie/coop; Koen 2026-07-16)            # wederzijdse transfer-dyades (whole-run) >= dit
   # 2 convention — gekristalliseerde partnerstructuur (achter de Q-gate)
   conv_coverage_min: 0.5         # PRIMAIR (Koen 2026-07-16): fractie agents in
                                  # persistente gecoordineerde groep >= dit -> conventie.

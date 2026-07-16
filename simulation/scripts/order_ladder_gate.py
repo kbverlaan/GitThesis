@@ -164,15 +164,23 @@ def gate_run(path, thr):
     W = int(thr["window"])
     gates, detail = {}, {}
 
-    # ── 1 cooperation: volgehouden reciprociteit in het slotvenster ─────────
+    # persistente-coördinatie-coverage (transfer/bericht/coalitie over >=3
+    # venster-rondes) — draagt zowel de cooperation- als de convention-poort.
+    coverage = _coordination_coverage(lines, agents, attacks, W)
+
+    # ── 1 cooperation: volgehouden gecoördineerde GEZAMENLIJKE actie ─────────
+    # Verbreed (Koen 2026-07-16): reciprociteit (naar elkaar overmaken) ÓF een
+    # volgehouden coalitie (samen als groep optreden) — samen aanvallen is ook
+    # een coöperatiegroep. Repareert de nesting: een predatie-coalitie zakt niet
+    # meer door de cooperation-trede.
     late = per_round[-W:]
     n_tr = sum(r["counts"].get("transfer", 0) for r in late)
     n_all = sum(sum(r["counts"].values()) for r in late)
     tshare = n_tr / n_all if n_all else 0.0
     recip = sum(1 for (a, b), v in T.items()
                 if a < b and v > 0 and T.get((b, a), 0) > 0)
-    gates["cooperation"] = (tshare >= thr["coop_transfer_share"]
-                            and recip >= thr["coop_recip_dyads"])
+    reciprocity = tshare >= thr["coop_transfer_share"] and recip >= thr["coop_recip_dyads"]
+    gates["cooperation"] = bool(reciprocity or coverage >= thr.get("coop_coverage_min", 0.3))
     detail["transfer_share_lastW"] = round(tshare, 3)
     detail["recip_dyads"] = recip
 
@@ -184,8 +192,7 @@ def gate_run(path, thr):
     # maar om DEZELFDE subgroep die aanhoudend coördineert. Coalitie-edge: agents
     # die samen outsiders aanvallen en elkaar NIET aanvallen (alles-tegen-allen
     # heeft geen coalitie -> geen conventie). Gate = echte clusterstructuur
-    # (Q >= conv_q_min op de gecombineerde graaf transfer+bericht+coalitie).
-    coverage = _coordination_coverage(lines, agents, attacks, W)
+    # (coverage boven; Q gerapporteerd als detail).
     gates["convention"] = bool(coverage >= thr.get("conv_coverage_min", 0.5))
     detail["coord_coverage"] = round(coverage, 2)
     if HAVE_LEIDEN:                                  # Q + clusters: gerapporteerd, niet gepoort
@@ -197,15 +204,16 @@ def gate_run(path, thr):
         detail["cohesion"] = round(_cohesion(agents, memb, A, thr["tau"]), 2)
         detail["coalition_ties"] = int((Cm > 0).sum() // 2)
 
-    # ── 3 norm: collectieve prescriptie + sanctie-taal ──────────────────────
-    # Publieke laag (Bicchieri: afkondiging) OF privé-laag (Sugden:
-    # internalisering in notes). De OF is essentieel voor falsifieerbaarheid
-    # onder comms-off: pub is daar structureel 0, dus zonder de privé-route zou
-    # de norm-breuk per DV-constructie vaststaan i.p.v. empirisch zijn.
-    # (T1-nocomm-smoke: priv 0.0001 vs memneutral priv 0.0027 — discrimineert.)
+    # ── 3 norm: collectieve deontische prescriptie (CO's ADIC — GEEN handhaving)
+    # Koen 2026-07-16: CO's grammatica heeft DRIE niveaus. Norm (ADIC) = een
+    # collectief-voorschrijvende deontische uiting ("we must hold", "attacking is
+    # a violation of the NAP") — handhaving is NIET vereist; dat is het rule/
+    # institutie-niveau (ADICO). Een ingeroepen-maar-onafgedwongen norm is een
+    # norm. Daarom: sanctie-EIS eruit (die hoorde bij institutie). Publiek
+    # (Bicchieri: afkondiging) OF privé (Sugden: internalisering) — de OF houdt de
+    # comms-off-breuk empirisch (pub structureel 0 zonder berichten).
     deo = deontic.analyze(path)
-    pub_pass = (deo["norm"] >= thr["norm_density_min"]
-                and deo["sanction"] >= thr["norm_sanction_min"])
+    pub_pass = deo["norm"] >= thr["norm_density_min"]
     priv_pass = deo["priv"]["norm"] >= thr.get("norm_density_priv_min", 0.002)
     gates["norm"] = bool(pub_pass or priv_pass)
     detail["norm_density_pub"] = round(deo["norm"], 4)
