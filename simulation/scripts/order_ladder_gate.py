@@ -45,8 +45,12 @@ from order_suite import HAVE_LEIDEN
 CFG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config",
                    "dv_thresholds.yaml")
 
-LEVELS = ["coordination", "cooperation", "convention", "norm",
-          "institution", "governance"]
+# Sociale-orde-ladder: geneste ordinale as (coordination..institution).
+# Governance is een APARTE as (resource-orde, Koen 2026-07-16) — commons-beheer,
+# NIET de 6e geneste trede. Aparte T4-samenlevingen kunnen laag op de sociale
+# ladder zitten én de commons goed beheren (of omgekeerd); zie 3_design.md.
+LEVELS = ["coordination", "cooperation", "convention", "norm", "institution"]
+GOVERNANCE = "governance"
 
 
 def load_thresholds(path=CFG):
@@ -277,33 +281,35 @@ def gate_run(path, thr):
                     firsts[nm] = r
         detail["bespoke_first_round"] = firsts
 
-    # ── 5 governance: commons volgehouden (alleen T4) ───────────────────────
+    # ── governance: APARTE AS (resource-orde, niet geneste trede) ───────────
+    # Alleen T4; leest of collectieve terughoudendheid de commons levend houdt.
+    # Los van de sociale-orde-nesting: een T4-run krijgt een sociaal label EN
+    # (indien commons) een governance-label.
     cm = commons_dv.commons_metrics(lines)
     if cm is None:
-        gates["governance"] = None       # niet van toepassing (geen commons)
+        governance = None                # geen commons
         detail["commons"] = None
     else:
-        # NB drempel-herkomst: commons_dv 'sustained' gebruikt nu nog K/2 —
-        # STALE t.o.v. frozen engine (regen x1.5 => engine-anker 2/3*K).
-        # Waarde is KOEN-beslissing na de T4-smoke; hier alleen doorgeven.
-        gates["governance"] = bool(cm.get("sustained"))
+        governance = bool(cm.get("sustained"))
         detail["commons"] = {k: cm.get(k) for k in
                              ("collapsed", "sustained", "stock_final")}
+    gates["governance"] = governance     # gerapporteerd naast de ladder
 
-    # ── nested label: hoogste k waarvoor 1..k allemaal passen ───────────────
+    # ── nested sociaal-orde-label: hoogste k waarvoor 1..k allemaal passen ──
     nested = 0
     for k, lvl in enumerate(LEVELS[1:], start=1):
         if gates.get(lvl) is True:
             nested = k
         elif gates.get(lvl) is False:
             break
-        else:               # None (n.v.t./niet berekenbaar): telt niet mee,
-            break           # maar laat hogere treden ook niet passeren
+        else:               # None (n.v.t./niet berekenbaar): stopt de klim
+            break
     highest_any = max((k for k, lvl in enumerate(LEVELS[1:], start=1)
                        if gates.get(lvl) is True), default=0)
     return dict(name=os.path.basename(path), gates=gates,
                 nested_label=LEVELS[nested], nested_level=nested,
-                highest_any=LEVELS[highest_any], detail=detail)
+                highest_any=LEVELS[highest_any],
+                governance=governance, detail=detail)
 
 
 def print_row(r):
@@ -311,8 +317,9 @@ def print_row(r):
     def sym(v):
         return {True: "+", False: "-", None: "."}[v]
     vec = " ".join(f"{lvl[:4]}{sym(g[lvl])}" for lvl in LEVELS[1:])
-    print(f"{r['name'][:44]:44s} [{vec}]  nested={r['nested_label']:12s}"
-          f" any={r['highest_any']}")
+    gov = {True: "sustained", False: "collapsed", None: "n/a"}[r["governance"]]
+    print(f"{r['name'][:40]:40s} [{vec}]  nested={r['nested_label']:12s}"
+          f" any={r['highest_any']:12s} gov={gov}")
 
 
 def main():

@@ -79,9 +79,9 @@ def test_gate_runs_and_nests(tmp_path):
     _synthetic_log(str(p), comms=True)
     thr = G.load_thresholds()
     r = G.gate_run(str(p), thr)
-    assert set(r["gates"]) == set(G.LEVELS[1:])
+    assert set(G.LEVELS[1:]) <= set(r["gates"])       # sociale ladder in gates
     assert r["gates"]["cooperation"] is True          # A<->B wederkerig, share 0.5
-    assert r["gates"]["governance"] is None           # geen commons-blok
+    assert r["governance"] is None                    # aparte as; geen commons-blok
     assert r["nested_level"] >= 1
     # nesting: label mag nooit boven een gefaalde lagere poort uitkomen
     order = G.LEVELS[1:]
