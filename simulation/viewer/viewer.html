@@ -1117,7 +1117,9 @@ function initGraph() {
 
   gLabels.selectAll('text').data(nodes, d=>d.id).join('text')
     .attr('text-anchor','middle').attr('dy', 28).attr('font-size', 10)
-    .attr('fill','rgba(255,255,255,0.4)').attr('class','node-label')
+    .attr('font-weight', 600)
+    .attr('fill', d => agentColor(d.id)).attr('class','node-label')
+    .attr('paint-order', 'stroke').attr('stroke', 'rgba(0,0,0,0.6)').attr('stroke-width', 2.5)
     .text(d => agentShort(d.id));
 
   nodeMap = {};
