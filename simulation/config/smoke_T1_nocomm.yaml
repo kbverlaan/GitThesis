@@ -1,0 +1,57 @@
+# SMOKE — T1 comms-off (2026-07-15): informeert de pre-reg-voorspelling
+# "kale coöperatie overleeft tacit" vóór het deposit. Identiek aan ladder_L1.yaml
+# behalve comm_scope: none. Memory blijft AAN (tacit reciprociteit mogelijk).
+# NIET registered — prediction-wording-input, geen evidence.
+#
+# Flag matrix vs other rungs: zie ladder_L1.yaml header.
+
+num_agents: 30
+initial_resources: 100.0
+
+# Investment
+c_inv: 0.06
+g_inv: 0.091
+gamma_sat: 1.00
+tau_sat: 5
+
+# Arming — OFF on L1
+arm_enabled: false
+c_arm: 0.05
+mu_arm: 4.0
+delta_B: 0.75
+
+# Combat — OFF on L1
+take_enabled: false
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+
+# Commons — OFF on L1
+commons_enabled: false
+commons_K: 120.0
+commons_init: null
+commons_collapse_frac: 0.05
+commons_open_round: 2                 # inert zolang commons_enabled false (parity met L4)
+
+# Economy
+delta_R: 0.97
+
+# Game length
+max_rounds: 60
+history_length: 10
+
+# Network — static topology is always-on substrate; association (rewiring) OFF on L1
+network_enabled: true
+assoc_enabled: false
+mean_degree: 5.0
+rewiring_prob: 0.0
+
+# Communication — OFF (comms-off control-variant)
+comm_scope: "none"
+
+# Memory — ON (base substrate)
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true

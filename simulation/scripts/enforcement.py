@@ -23,7 +23,7 @@ Gebruik:
     python scripts/enforcement.py DIR/                 # triage-ranking over een map
     python scripts/enforcement.py RUN.jsonl --top 30
 """
-import json, re, sys, glob, os, argparse
+import json, re, sys, glob, os, argparse, random, statistics
 from collections import defaultdict, Counter
 
 
@@ -72,6 +72,100 @@ def cat(info):
     return (None, None)
 
 
+ADDRESSEE = re.compile(r"^\s*[A-Z]\w+(?:,\s*[A-Z]\w+)*\s*:\s*")  # "Copper, Gold, Green: ..."
+
+
+def make_framing(msgs_by_round):
+    """Framing-checker over een run (gememoized op (r, target, lens-rx) zodat de
+    permutatie-null geen 500x regex-sweep kost)."""
+    cache = {}
+
+    def framing(r, target, rx):
+        """Zoek in venster [r-1, r] een publieke zin waar target het DOELWIT van de
+        framing is. Twee precisie-eisen bovenop lexicon+naam:
+          1. strip de adressaat-kop ("Copper, Gold:") -> target mag geen geadresseerde zijn;
+          2. nabijheid: target-naam binnen ~40 tekens van de lexicon-trigger
+             -> target is object/subject van de straf, geen losse vermelding.
+        Naam case-SENSITIVE (agent-namen zijn Capitalized)."""
+        key = (r, target, id(rx))
+        if key in cache:
+            return cache[key]
+        name_rx = re.compile(r"\b" + re.escape(target) + r"\b")
+        hit = None
+        for rr in (r - 1, r):
+            if hit:
+                break
+            for frm, txt in msgs_by_round.get(rr, []):
+                if hit:
+                    break
+                for s in SENT.split(txt):
+                    s2 = ADDRESSEE.sub("", s)            # adressaat-kop weg
+                    for lm in rx.finditer(s2):
+                        for nm in name_rx.finditer(s2):
+                            if abs(lm.start() - nm.start()) <= 40:
+                                hit = (frm, s2.strip())
+                                break
+                        if hit:
+                            break
+                    if hit:
+                        break
+        cache[key] = hit
+        return hit
+
+    return framing
+
+
+def _load_actions(path):
+    """Gedeeld door analyze() en permutation_null(): (nr, msgs_by_round, actions)."""
+    rounds = [json.loads(l) for l in open(path) if l.strip()]
+    nr = len(rounds)
+    msgs_by_round = defaultdict(list)
+    actions = []
+    for d in rounds:
+        r = d.get("round") or 0
+        for m in d.get("messages", []) or []:
+            if m.get("text"):
+                msgs_by_round[r].append((m.get("from"), m["text"]))
+        for aid, info in (d.get("agents") or {}).items():
+            lens, tg = cat(info)
+            if lens:
+                actions.append((r, lens, aid, tg, str(info.get("action"))))
+            drop = (info.get("rewire_intent") or {}).get("drop")
+            if drop:
+                actions.append((r, "A", aid, drop, "drop"))
+    return nr, msgs_by_round, actions
+
+
+def permutation_null(path, n_perm=500, seed=42):
+    """Target-permutatie-null (DVs.md Laag B): wordt het ECHTE doelwit van een actie
+    vaker als straf/naleving geframed dan een WILLEKEURIG doelwit? Permuteer per
+    lens de target-kolom over de acties (rondes/actors blijven staan), herbereken
+    de framed-rate, n_perm x. Rapporteert obs vs null (mean, sd, z, percentiel)."""
+    _, msgs_by_round, actions = _load_actions(path)
+    framing = make_framing(msgs_by_round)
+    rng = random.Random(seed)
+    out = {}
+    for lens, rx in (("A", RX_SANC), ("B", RX_FULF)):
+        acts = [(r, tg) for (r, l, a, tg, lab) in actions if l == lens]
+        if not acts:
+            out[lens] = None
+            continue
+        obs = sum(1 for r, tg in acts if framing(r, tg, rx)) / len(acts)
+        targets = [tg for _, tg in acts]
+        null = []
+        for _ in range(n_perm):
+            rng.shuffle(targets)
+            null.append(sum(1 for (r, _), tg in zip(acts, targets)
+                            if framing(r, tg, rx)) / len(acts))
+        mu = statistics.fmean(null)
+        sd = statistics.pstdev(null)
+        z = (obs - mu) / sd if sd > 0 else float("inf") if obs > mu else 0.0
+        pctl = 100 * sum(1 for v in null if v < obs) / n_perm
+        out[lens] = dict(n_actions=len(acts), observed=obs, null_mean=mu,
+                         null_sd=sd, z=z, pctl=pctl)
+    return out
+
+
 def analyze(path):
     rounds = [json.loads(l) for l in open(path) if l.strip()]
     nr = len(rounds)
@@ -92,25 +186,7 @@ def analyze(path):
             if drop:                              # drop = sociale uitsluiting -> lens A
                 actions.append((r, "A", aid, drop, "drop"))
 
-    ADDRESSEE = re.compile(r"^\s*[A-Z]\w+(?:,\s*[A-Z]\w+)*\s*:\s*")  # "Copper, Gold, Green: ..."
-
-    def framing(r, target, rx):
-        """Zoek in venster [r-1, r] een publieke zin waar target het DOELWIT van de
-        framing is. Twee precisie-eisen bovenop lexicon+naam:
-          1. strip de adressaat-kop ("Copper, Gold:") -> target mag geen geadresseerde zijn;
-          2. nabijheid: target-naam binnen ~40 tekens van de lexicon-trigger
-             -> target is object/subject van de straf, geen losse vermelding.
-        Naam case-SENSITIVE (agent-namen zijn Capitalized)."""
-        name_rx = re.compile(r"\b" + re.escape(target) + r"\b")
-        for rr in (r - 1, r):
-            for frm, txt in msgs_by_round.get(rr, []):
-                for s in SENT.split(txt):
-                    s2 = ADDRESSEE.sub("", s)            # adressaat-kop weg
-                    for lm in rx.finditer(s2):
-                        for nm in name_rx.finditer(s2):
-                            if abs(lm.start() - nm.start()) <= 40:
-                                return (frm, s2.strip())
-        return None
+    framing = make_framing(msgs_by_round)
 
     triples = {"A": [], "B": []}
     n_act = {"A": 0, "B": 0}
@@ -213,6 +289,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("path")
     p.add_argument("--top", type=int, default=12)
+    p.add_argument("--null", type=int, default=0, metavar="N",
+                   help="target-permutatie-null met N permutaties (DVs.md: 500)")
     args = p.parse_args()
     if os.path.isdir(args.path):
         files = sorted(glob.glob(os.path.join(args.path, "*_reasoning_live.jsonl")))
@@ -225,6 +303,18 @@ def main():
                   f"   ({r['n_takedrop']},{r['n_investarm']})")
     else:
         print_single(analyze(args.path), args.top)
+        if args.null:
+            print(f"\n  --- TARGET-PERMUTATIE-NULL ({args.null}x, seed 42) ---")
+            allnull = permutation_null(args.path, n_perm=args.null)
+            for lens, tag in (("A", "handhaving"), ("B", "vervulling")):
+                nres = allnull.get(lens)
+                if nres is None:
+                    print(f"  LENS {lens} {tag}: geen gerichte acties")
+                    continue
+                print(f"  LENS {lens} {tag}: obs {nres['observed']:.3f} vs null "
+                      f"{nres['null_mean']:.3f}+-{nres['null_sd']:.3f}  "
+                      f"z={nres['z']:.1f}  obs>{nres['pctl']:.0f}% van de null "
+                      f"(n={nres['n_actions']})")
 
 
 if __name__ == "__main__":

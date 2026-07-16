@@ -44,11 +44,62 @@ economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime b
   top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
 
 commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
-  # MSY = commons_init = commons_K/2 (config/ladder_L4.yaml: K=120, init=60).
-  # sustained iff (not collapsed) AND stock_final >= MSY.
-  # collapse zelf is engine-absorbing (commons_collapse_frac=0.05 in ladder_L4.yaml) —
-  # geen aparte analyse-drempel; de DV leest de gelogde 'collapsed'-vlag.
-  sustained_requires_msy: true
+  # Engine-afgeleid anker (frozen engine: init=K, regen x1.5 gecapt): duurzaam
+  # punt = post-harvest >= K/regen (2/3*K = 80), duurzaam debiet K*(1-1/regen)
+  # (= 40/ronde). Klassiek MSY (K/2, logistisch) is voor deze groei ONGEGROND.
+  # T4-smoke 2026-07-15 (tragedie->moratorium->quota): kies eindstand-/slot-
+  # venster-criteria; whole-run-minima keuren herstel-arcs onterecht af.
+  # sustained_rule = KOEN-BESLISSING vóór freeze; alle kandidaten worden
+  # per run naast elkaar gerapporteerd (sustained_by_rule).
+  sustained_rule: "window_stock"  # v0 PROPOSED | final_stock | window_flow | no_collapse
+  sustained_stock_frac: 0.6667    # = 1/regen (engine-anker 2/3*K)
+  sustained_window: 10            # slotvenster (rondes)
+  regen: 1.5                      # spiegel van ladder_L4.yaml commons_regen (drift-guard)
+
+order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, ordinale label)
+  # v0 PROPOSED (Claude-scaffold 2026-07-15) — KOEN beslist waarden; freeze na
+  # IRR (fixplan Fase 3). Nested label: trede k pas iff poorten 1..k passen.
+  window: 10                     # slotvenster (rondes) voor 'volgehouden'-criteria
+  alpha: 0.5                     # combined-graph mengknop (DVs.md subgroep-detectie)
+  tau: 0.6                       # thuis-share-drempel vast/split (DVs.md)
+  # 1 cooperation — volgehouden reciprociteit
+  coop_transfer_share: 0.15      # transfer-aandeel in slotvenster >= dit
+  coop_recip_dyads: 3            # wederzijdse transfer-dyades (whole-run) >= dit
+  # 2 convention — gekristalliseerde partnerstructuur (achter de Q-gate)
+  conv_q_min: 0.10               # clubs-Q >= dit (DVs.md Q-gate)
+  conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
+  conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
+  # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
+  norm_density_min: 0.02         # PUBLIEK (Bicchieri): tussen bloei ~0.003 en bistable ~0.065
+  norm_sanction_min: 1           # >= dit aantal sanctie-uitingen (publiek)
+  norm_density_priv_min: 0.002   # PRIVÉ (Sugden-internalisering, notes) — OF-route;
+                                 # essentieel onder comms-off (pub structureel 0, anders
+                                 # is de norm-breuk definitorisch i.p.v. empirisch).
+                                 # Kalibratie n=2: nocomm 0.0001 / memneutral 0.0027
+  # 4 institution — benoemde persistente structuur, ALLEEN bespoke/invented
+  # (Koen 2026-07-15: NAP = baseline/gegeven, telt niet; naming-baseline toont
+  # NAP universeel vanaf R<=5. Claim-formulering: "gedraagt zich als voorgevormde
+  # term" — geen muntmoment, canonieke naam, conditie-invariant — GEEN harde
+  # inherited-claim. Bespoke = wel muntmoment: eerste vermelding -> diffusie.)
+  inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits
+  inst_public_only: true         # tweetraps: kandidaten Title-Case over alle lagen,
+                                 # gate = case-insensitieve CIRCULATIE in messages
+                                 # (Searle: publieke collectieve representatie; agents
+                                 # schrijven lowercase in berichten). Privé-only =
+                                 # convergentie-baseline, apart gerapporteerd.
+                                 # Bewijs: "Reciprocal Loop" in T1-nocomm (0 berichten).
+  inst_min_agents: 2             # publieke circulatie: >= distincte zenders (= named_institution)
+  inst_min_occurrences: 3        # publieke circulatie: >= vermeldingen (= named_institution)
+  inst_baseline_names:           # uitgesloten van de poort; apart gerapporteerd
+    - "Non-Aggression Pact"
+    - "NAP"
+    - "Resolution Order"         # mechaniek-term: pre-scrub prompt-echo, maar komt
+                                 # ook post-scrub natuurlijk voor (memneutral 6x) —
+                                 # "resolution order" is gewoon Engels voor beurtvolgorde
+  # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
+  # refutatie-marge (§2): equivalentie-claim alleen als bootstrap-CI-bovengrens
+  # van de max paarsgewijze TV tussen cel-profielen < delta (delta_equivalence.py).
+  delta: null                    # KOEN beslist vóór deposit (bv. 0.2)
 
 # ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
 
