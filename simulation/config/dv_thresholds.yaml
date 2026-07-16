@@ -66,8 +66,12 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   coop_transfer_share: 0.15      # transfer-aandeel in slotvenster >= dit
   coop_recip_dyads: 3            # wederzijdse transfer-dyades (whole-run) >= dit
   # 2 convention — gekristalliseerde partnerstructuur (achter de Q-gate)
+  conv_coverage_min: 0.5         # PRIMAIR (Koen 2026-07-16): fractie agents in
+                                 # persistente gecoordineerde groep >= dit -> conventie.
+                                 # (Q/cohesie hieronder: gerapporteerd, niet meer gepoort.)
   conv_q_min: 0.10               # clubs-Q >= dit (DVs.md Q-gate)
   conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
+  conv_coal_weight: 1.0          # gewicht coalitie-edges in cluster-graaf (Koen 2026-07-16)
   conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
   # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
   norm_density_min: 0.02         # PUBLIEK (Bicchieri): tussen bloei ~0.003 en bistable ~0.065

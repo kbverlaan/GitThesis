@@ -69,6 +69,81 @@ def _cohesion(agents, memb, A, tau):
     return vast / n if n else 0.0
 
 
+def _coordination_coverage(lines, agents, attacks, window):
+    """Fractie agents die over het slotvenster tot een PERSISTENTE gecoördineerde
+    groep behoort (Koen 2026-07-16 — conventie = stabiele groep die samen dingen
+    blijft doen). Een tie telt als coördinerend als het paar in >= min_rounds
+    venster-rondes samen overmaakt, berichten, OF samen outsiders aanvalt (zonder
+    elkaar aan te vallen — vijandige paren tellen niet). Chaos (schuivende,
+    eenmalige ties) -> lage coverage -> coordination, niet convention."""
+    aset = set(agents)
+    rounds = sorted({d.get("round") for d in lines})
+    W = set(rounds[-window:]) if rounds else set()
+    hostile = {tuple(sorted((a, t))) for (rd, a, t) in attacks
+               if a in aset and t in aset}
+    from collections import defaultdict
+    tie_rounds = defaultdict(set)
+    for d in lines:
+        rd = d.get("round")
+        if rd not in W:
+            continue
+        ag = d.get("agents") or {}
+        for aid, i in ag.items():
+            a = osuite.cat(osuite.effective_action(i))
+            if a == "transfer" and i.get("target"):
+                tie_rounds[tuple(sorted((aid, i["target"])))].add(rd)
+        for m in (d.get("messages") or []):
+            to = m.get("to")
+            tos = to if isinstance(to, list) else ([] if to in (None, "all") else [to])
+            for t in tos:
+                if m.get("from"):
+                    tie_rounds[tuple(sorted((m["from"], t)))].add(rd)
+        atk = [(aid, i.get("target")) for aid, i in ag.items()
+               if osuite.cat(osuite.effective_action(i)) == "take" and i.get("target")]
+        for x in range(len(atk)):
+            for y in range(x + 1, len(atk)):
+                (a1, t1), (a2, t2) = atk[x], atk[y]
+                if a1 != a2 and t1 != a2 and t2 != a1:
+                    tie_rounds[tuple(sorted((a1, a2)))].add(rd)
+    covered = set()
+    for pair, rds in tie_rounds.items():
+        if len(rds) >= 3 and pair not in hostile:
+            covered.update(pair)
+    return len(covered) / len(agents) if agents else 0.0
+
+
+def _coalition_matrix(agents, attacks):
+    """Alliantie-matrix: agents die SAMEN outsiders aanvallen en elkaar NIET
+    aanvallen (Koen 2026-07-16 — dezelfde subgroep aanvallers = coalitie = een
+    vorm van conventie). Cm[i,j] = # rondes waarin i en j allebei aanvielen,
+    geen van beiden de ander als doelwit had; op 0 gezet als ze elkaar OOIT
+    aanvielen (dan zijn het vijanden, geen bondgenoten). Alles-tegen-allen ->
+    geen coalitie -> geen structuur."""
+    idx = {a: i for i, a in enumerate(agents)}
+    n = len(agents)
+    Cm = np.zeros((n, n))
+    hostile = set()
+    by_round = {}
+    for (rd, a, t) in attacks:
+        if a in idx and t in idx:
+            hostile.add((idx[a], idx[t])); hostile.add((idx[t], idx[a]))
+        by_round.setdefault(rd, []).append((a, t))
+    for rd, acts in by_round.items():
+        attackers = [(idx[a], t) for (a, t) in acts if a in idx]
+        for x in range(len(attackers)):
+            for y in range(x + 1, len(attackers)):
+                i, ti = attackers[x]; j, tj = attackers[y]
+                if i == j:
+                    continue
+                # bondgenoten: geen van beiden viel de ander aan deze ronde
+                if ti != agents[j] and tj != agents[i]:
+                    Cm[i, j] += 1; Cm[j, i] += 1
+    # vijanden ontkoppelen (ooit elkaar aangevallen -> geen alliantie)
+    for (i, j) in hostile:
+        Cm[i, j] = 0.0
+    return Cm
+
+
 def _rewire_rates(lines):
     """(vroege, late) drop+invite-acties per ronde (helft/helft-split).
     None als de run de affordance niet heeft (geen enkele rewire-poging)."""
@@ -101,23 +176,26 @@ def gate_run(path, thr):
     detail["transfer_share_lastW"] = round(tshare, 3)
     detail["recip_dyads"] = recip
 
-    # ── 2 convention: gekristalliseerde partnerstructuur (achter de Q-gate) ─
-    if HAVE_LEIDEN:
-        memb, Q, A, Tm, idx = osuite.subgroups(agents, T, Mc, thr["alpha"])
-        coh = _cohesion(agents, memb, A, thr["tau"])
-        conv = Q >= thr["conv_q_min"] and coh >= thr["conv_cohesion_min"]
-        rw = _rewire_rates(lines)
-        if rw is not None:  # assoc-rung: structuur moet ook stollen
-            early, late_r = rw
-            crystallized = (early == 0) or (late_r <= thr["conv_rewire_ratio"] * early)
-            conv = conv and crystallized
-            detail["rewire_early_late"] = (round(early, 2), round(late_r, 2))
-        gates["convention"] = bool(conv)
+    # ── 2 convention: persistente coördinerende subgroep (Koen 2026-07-16) ──
+    # Lewis-getrouw verbreed: een conventie is een STABIELE cluster die samen
+    # dingen blijft doen — of ze nu naar elkaar overmaken (coöperatie), elkaar
+    # berichten (communicatie), OF samen buitenstaanders aanvallen (coalitie).
+    # Gaat NIET om mob-grootte of focal doelwit (blijkt uit de data, deep-dive),
+    # maar om DEZELFDE subgroep die aanhoudend coördineert. Coalitie-edge: agents
+    # die samen outsiders aanvallen en elkaar NIET aanvallen (alles-tegen-allen
+    # heeft geen coalitie -> geen conventie). Gate = echte clusterstructuur
+    # (Q >= conv_q_min op de gecombineerde graaf transfer+bericht+coalitie).
+    coverage = _coordination_coverage(lines, agents, attacks, W)
+    gates["convention"] = bool(coverage >= thr.get("conv_coverage_min", 0.5))
+    detail["coord_coverage"] = round(coverage, 2)
+    if HAVE_LEIDEN:                                  # Q + clusters: gerapporteerd, niet gepoort
+        Cm = _coalition_matrix(agents, attacks)
+        memb, Q, A, Tm, idx = osuite.subgroups(
+            agents, T, Mc, thr["alpha"], Cm=Cm, coal_weight=thr.get("conv_coal_weight", 1.0))
         detail["Q"] = round(float(Q), 3)
-        detail["cohesion"] = round(coh, 2)
-    else:
-        gates["convention"] = None
-        detail["Q"] = detail["cohesion"] = None
+        detail["n_clusters"] = len(set(memb))
+        detail["cohesion"] = round(_cohesion(agents, memb, A, thr["tau"]), 2)
+        detail["coalition_ties"] = int((Cm > 0).sum() // 2)
 
     # ── 3 norm: collectieve prescriptie + sanctie-taal ──────────────────────
     # Publieke laag (Bicchieri: afkondiging) OF privé-laag (Sugden:

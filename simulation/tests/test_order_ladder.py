@@ -25,7 +25,7 @@ def _cfg():
 REQUIRED_KEYS = [
     "window", "alpha", "tau",
     "coop_transfer_share", "coop_recip_dyads",
-    "conv_q_min", "conv_cohesion_min", "conv_rewire_ratio",
+    "conv_coverage_min", "conv_q_min", "conv_cohesion_min", "conv_rewire_ratio",
     "norm_density_min", "norm_sanction_min", "norm_density_priv_min",
     "inst_co_enforce_min",
     "inst_min_structures", "inst_public_only", "inst_baseline_names",
