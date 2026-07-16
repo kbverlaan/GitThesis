@@ -232,10 +232,17 @@ def gate_run(path, thr):
     # focal doelwit ("level the whale" = conventie). enforcement.py co_enforce_rate
     # meet precies dit (violatie-lexicon + nabijheid). Searle's benoemde-structuur
     # is een APARTE, secundaire as (named_bespoke in detail), niet de gate.
+    # Institutie-poort (Koen 2026-07-16): handhaving INGEROEPEN/aanwezig — er is
+    # minstens een echte poging tot sanctie op een overtreder (>= inst_min_enforce
+    # violatie-geframede sancties). CO-grammatica-getrouw + Aoki: een institutie is
+    # een gedeeld-geloof-evenwicht; handhaving is een off-path dreiging die zelden
+    # uitgevoerd hoeft. De EFFECTIVITEIT (uitgevoerde handhaving = co_enforce_rate,
+    # 'kerst op de taart') en het STANDHOUDEN (P3, apart) zijn aparte maten — een
+    # institutie mag instorten (oorlogs-ruïne = ingeroepen maar hol, geen vertrouwen).
     enf = enforcement.analyze(path)
-    gates["institution"] = enf["co_enforce_rate"] >= thr.get("inst_co_enforce_min", 0.4)
-    detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)
-    detail["n_co_enforce"] = enf["n_co_enforce"]
+    gates["institution"] = enf["n_co_enforce"] >= thr.get("inst_min_enforce", 3)
+    detail["n_co_enforce"] = enf["n_co_enforce"]          # handhaving aanwezig (poort)
+    detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)  # effectiviteit/degree (kerst)
 
     # Secundaire as (Searle, GERAPPORTEERD niet gepoort): benoemde publiek
     # circulerende bespoke-structuur. NAP e.d. = baseline (universeel vanaf R<=5).
