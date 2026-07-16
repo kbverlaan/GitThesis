@@ -213,15 +213,24 @@ def gate_run(path, thr):
     # collectief-voorschrijvende deontische uiting ("we must hold", "attacking is
     # a violation of the NAP") — handhaving is NIET vereist; dat is het rule/
     # institutie-niveau (ADICO). Een ingeroepen-maar-onafgedwongen norm is een
-    # norm. Daarom: sanctie-EIS eruit (die hoorde bij institutie). Publiek
-    # (Bicchieri: afkondiging) OF privé (Sugden: internalisering) — de OF houdt de
-    # comms-off-breuk empirisch (pub structureel 0 zonder berichten).
+    # norm. Daarom: sanctie-EIS eruit (die hoorde bij institutie).
+    #
+    # PUBLIC-ONLY (Koen 2026-07-17): een norm is per definitie een COLLECTIEF
+    # object — een gedeelde ought die publiek wordt ingeroepen (Bicchieri's
+    # normatieve verwachting; CO's ADIC-prescriptie is een uiting IN de gedeelde
+    # ruimte). Een privé-note is een privé-overtuiging, geen norm. De poort kijkt
+    # daarom ALLEEN naar publieke berichten. Privé-dichtheid blijft gerapporteerd
+    # als secundaire observatie (internalisering), maar poort NIET meer.
+    # Consequentie: zonder kanaal (comms-off) is er per definitie geen publieke
+    # norm — de comms-off norm-afwezigheid is dan DEFINITORISCH, niet empirisch;
+    # de falsifieerbare comms-off-voorspellingen zijn (i) coöp overleeft +
+    # (iii) geweld blijft uit (zie §3/§5). Grensgeval-drijver weg: de dunne
+    # private Sugden-route telde strategisch "we should grow"-geklets als norm
+    # (Gemini/DeepSeek-probes 2026-07-17) — die rand is nu dicht.
     deo = deontic.analyze(path)
-    pub_pass = deo["norm"] >= thr["norm_density_min"]
-    priv_pass = deo["priv"]["norm"] >= thr.get("norm_density_priv_min", 0.002)
-    gates["norm"] = bool(pub_pass or priv_pass)
+    gates["norm"] = bool(deo["norm"] >= thr["norm_density_min"])
     detail["norm_density_pub"] = round(deo["norm"], 4)
-    detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)
+    detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)  # gerapporteerd, poort NIET
     detail["sanctions"] = deo["sanction"]
 
     # ── 4 institution: norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)

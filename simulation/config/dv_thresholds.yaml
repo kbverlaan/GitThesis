@@ -74,13 +74,17 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
   conv_coal_weight: 1.0          # gewicht coalitie-edges in cluster-graaf (Koen 2026-07-16)
   conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
-  # 3 norm — collectieve prescriptie + sanctie-taal (publieke laag, deontic.py)
+  # 3 norm — collectieve prescriptie (PUBLIC-ONLY, Koen 2026-07-17, deontic.py)
+  # Een norm is per definitie een collectief object: publiek ingeroepen ought
+  # (Bicchieri). De poort kijkt ALLEEN naar publieke berichten; privé-dichtheid
+  # wordt gerapporteerd maar poort NIET. Consequentie: comms-off norm-afwezigheid
+  # is definitorisch (geen kanaal → geen publieke norm); falsifieerbare comms-off-
+  # poten zijn (i) coöp overleeft + (iii) geweld blijft uit — zie §3/§5.
   norm_density_min: 0.02         # PUBLIEK (Bicchieri): tussen bloei ~0.003 en bistable ~0.065
   norm_sanction_min: 1           # >= dit aantal sanctie-uitingen (publiek)
-  norm_density_priv_min: 0.002   # PRIVÉ (Sugden-internalisering, notes) — OF-route;
-                                 # essentieel onder comms-off (pub structureel 0, anders
-                                 # is de norm-breuk definitorisch i.p.v. empirisch).
-                                 # Kalibratie n=2: nocomm 0.0001 / memneutral 0.0027
+  norm_density_priv_min: 0.002   # DEPRECATED 2026-07-17 (public-only): niet meer poortend,
+                                 # alleen nog gerapporteerd als internalisering-observatie.
+                                 # Kalibratie n=2 (historisch): nocomm 0.0001 / memneutral 0.0027
   # 4 institution — norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)
   # PRIMAIRE DEFINITIE (Koen 2026-07-16): CO's "rule" = norm + OR ELSE ("the
   # sanction assigned to detected NONCOMPLIANCE with an institutional statement",
