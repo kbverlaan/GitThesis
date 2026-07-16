@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import order_suite as osuite
 import deontic
 import commons_dv
+import enforcement
 from classify_run import detect_named_structures
 from order_suite import HAVE_LEIDEN
 
@@ -133,18 +134,21 @@ def gate_run(path, thr):
     detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)
     detail["sanctions"] = deo["sanction"]
 
-    # ── 4 institution: benoemde persistente structuur, ALLEEN bespoke ───────
-    # NAP e.d. = baseline/gegeven (Koen 2026-07-15): universeel vanaf R<=5,
-    # geen muntmoment -> telt niet als bewijs van uitgevonden orde.
-    # PUBLIEKE-CIRCULATIE-toets (v0, T1-nocomm-smoke 2026-07-15). De detector
-    # mint kandidaat-namen Title-Case over ALLE lagen (precisie), maar een label
-    # in privé-notes alleen is convergente taal, geen gedeeld symbool
-    # ("Reciprocal Loop" verscheen in een run ZONDER berichten). Searle:
-    # institutie vergt publieke collectieve representatie. Tegelijk schrijven
-    # agents in berichten lowercase ("our transfer circle") die de Title-Case-
-    # regex mist. Daarom tweetraps: kandidaten uit de volle scan, gate =
-    # case-insensitieve circulatie in MESSAGES (>= min_agents distincte zenders,
-    # >= min_occurrences). Privé-only-hits apart gerapporteerd (baseline).
+    # ── 4 institution: norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)
+    # PRIMAIRE DEFINITIE (Koen 2026-07-16): CO's rule = norm + "the OR ELSE, the
+    # sanction assigned to detected NONCOMPLIANCE with an institutional statement"
+    # (p.586). Cumulatief (via nesting: norm moet al passen). Institutie = er wordt
+    # gehandhaafd op een OVERTREDING, niet louter gecoördineerde agressie op een
+    # focal doelwit ("level the whale" = conventie). enforcement.py co_enforce_rate
+    # meet precies dit (violatie-lexicon + nabijheid). Searle's benoemde-structuur
+    # is een APARTE, secundaire as (named_bespoke in detail), niet de gate.
+    enf = enforcement.analyze(path)
+    gates["institution"] = enf["co_enforce_rate"] >= thr.get("inst_co_enforce_min", 0.4)
+    detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)
+    detail["n_co_enforce"] = enf["n_co_enforce"]
+
+    # Secundaire as (Searle, GERAPPORTEERD niet gepoort): benoemde publiek
+    # circulerende bespoke-structuur. NAP e.d. = baseline (universeel vanaf R<=5).
     named, _raw, coverage = detect_named_structures(lines)
     if thr.get("inst_public_only", True):
         import re as _re
@@ -169,7 +173,6 @@ def gate_run(path, thr):
         named = pub_named
     baseline_names = {n.lower() for n in thr.get("inst_baseline_names", [])}
     bespoke = {n: c for n, c in named.items() if n.lower() not in baseline_names}
-    gates["institution"] = len(bespoke) >= thr["inst_min_structures"]
     detail["named_bespoke"] = dict(sorted(bespoke.items(), key=lambda kv: -kv[1])[:5])
     detail["named_baseline"] = {n: c for n, c in named.items()
                                 if n.lower() in baseline_names}

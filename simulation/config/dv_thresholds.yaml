@@ -76,11 +76,17 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
                                  # essentieel onder comms-off (pub structureel 0, anders
                                  # is de norm-breuk definitorisch i.p.v. empirisch).
                                  # Kalibratie n=2: nocomm 0.0001 / memneutral 0.0027
-  # 4 institution — benoemde persistente structuur, ALLEEN bespoke/invented
-  # (Koen 2026-07-15: NAP = baseline/gegeven, telt niet; naming-baseline toont
-  # NAP universeel vanaf R<=5. Claim-formulering: "gedraagt zich als voorgevormde
-  # term" — geen muntmoment, canonieke naam, conditie-invariant — GEEN harde
-  # inherited-claim. Bespoke = wel muntmoment: eerste vermelding -> diffusie.)
+  # 4 institution — norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)
+  # PRIMAIRE DEFINITIE (Koen 2026-07-16): CO's "rule" = norm + OR ELSE ("the
+  # sanction assigned to detected NONCOMPLIANCE with an institutional statement",
+  # C&O 1995 p.586). Cumulatief: institutie vereist dat de norm-poort al past
+  # (nesting) EN handhaving op een OVERTREDING — niet louter focal agressie
+  # ("level the whale" = conventie). Searle's benoemde-structuur = APARTE,
+  # secundaire as (gerapporteerd als named_bespoke, NIET de gate).
+  # Kalibratie co_enforce_rate: rewactC 0.75 (institutie) / oorlog-B 0.36 /
+  # memneutral 0.16 — drempel = KOEN na IRR.
+  inst_co_enforce_min: 0.4       # co_enforce_rate >= dit -> OR ELSE aanwezig (PRIMAIR)
+  # ── SECUNDAIRE Searle-as (alleen gerapporteerd als named_bespoke, geen gate) ──
   inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits
   inst_public_only: true         # tweetraps: kandidaten Title-Case over alle lagen,
                                  # gate = case-insensitieve CIRCULATIE in messages

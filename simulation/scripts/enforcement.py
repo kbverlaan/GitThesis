@@ -35,13 +35,31 @@ def gini(xs):
     return (2 * sum((i + 1) * x for i, x in enumerate(xs))) / (n * s) - (n + 1) / n
 
 # ── LEXICONS (Engels) ────────────────────────────────────────────────────────
-# Lens A: straf / handhaving van een verbod.
-SANCTION = [r"punish", r"exile", r"expel", r"banish", r"oust", r"ostrac\w*",
-            r"betray\w*", r"traitor", r"wolves?", r"violat\w*", r"retaliat\w*",
-            r"sanction", r"purge", r"cast out", r"make an example", r"cut off",
-            r"deserv\w*", r"bring (?:him|her|them|down)", r"must fall",
-            r"must be (?:stopped|removed|punished)", r"hold (?:him|them) accountable",
-            r"backstab\w*", r"liar", r"hypocri\w*", r"deal with", r"target the"]
+# Lens A: straf / handhaving. SPLIT 2026-07-16 (Koen — CO-definitie): Crawford &
+# Ostrom's OR ELSE is "the sanction assigned to detected NONCOMPLIANCE with an
+# institutional statement" (p.586). Handhaving telt dus alleen als het doelwit
+# een gedeeld voorschrift SCHOND — niet als het gewoon het sterkste/rijkste
+# doelwit is ("level the whale" = gecoördineerde predatie, conventie-niveau).
+#
+# VIOLATION = de framing impliceert een geschonden verbintenis (betrapte
+# noncompliance) -> telt als CO OR-ELSE-handhaving.
+VIOLATION = [r"betray\w*", r"traitor", r"backstab\w*", r"double[\-\s]?cross\w*",
+             r"violat\w*", r"defect\w*", r"renege\w*", r"cheat\w*", r"two[\-\s]?faced",
+             r"broke (?:the|our|his|her|their) (?:pact|nap|deal|word|agreement|promise|vow|trust)",
+             r"broke faith", r"oath[\-\s]?break\w*", r"dishonest", r"liar", r"hypocri\w*",
+             # straf-werkwoorden die een overtreding vooronderstellen
+             r"punish", r"exile", r"expel", r"banish", r"ostrac\w*", r"cast out",
+             r"sanction", r"make an example", r"hold (?:him|her|them) accountable",
+             r"pay for (?:this|that|it|betray\w*)"]
+# COORD_AGGRESSION = focal predatie zonder voorschrift -> NIET CO-handhaving,
+# apart geteld als contrast (dit is wat de oude marker ten onrechte meetelde).
+COORD_AGGRESSION = [r"bring (?:him|her|them)? ?down", r"must fall", r"take down",
+                    r"level the", r"gang up", r"wolves?", r"deserv\w*", r"deal with",
+                    r"target the", r"must be (?:stopped|removed)", r"cut (?:him|her|them) off"]
+# Terugwaartse compat: SANCTION = de brede unie (oude gedrag, nu 'coordinated
+# aggression'-triage). RX_VIOLATION draagt de CO-handhaving.
+SANCTION = VIOLATION + COORD_AGGRESSION
+RX_VIOLATION = re.compile(r"(?:" + "|".join(VIOLATION) + r")", re.I)
 # Lens B: naleving / uitvoering van een gebod (institutioneel, niet zomaar 'aardig').
 FULFILMENT = [r"mutual aid", r"support (?:our|the|each)", r"defend (?:our|the)",
               r"protect (?:our|the|each)", r"loyal\w*", r"reciprocat\w*",
@@ -191,6 +209,10 @@ def analyze(path):
     triples = {"A": [], "B": []}
     n_act = {"A": 0, "B": 0}
     n_framed = {"A": 0, "B": 0}
+    # CO-handhaving (OR ELSE): sanctie-actie geframed als reactie op een OVERTREDING
+    # (betrapte noncompliance), niet als losse agressie op een focal doelwit.
+    n_co_enforce = 0
+    co_triples = []
     for (r, lens, actor, tg, label) in actions:
         n_act[lens] += 1
         rx = RX_SANC if lens == "A" else RX_FULF
@@ -198,7 +220,13 @@ def analyze(path):
         if f:
             n_framed[lens] += 1
             triples[lens].append((r, actor, label, tg, f[0], f[1][:150]))
+        if lens == "A":
+            fv = framing(r, tg, RX_VIOLATION)     # zelfde nabijheids-regel, violatie-lexicon
+            if fv:
+                n_co_enforce += 1
+                co_triples.append((r, actor, label, tg, fv[0], fv[1][:150]))
     rate = lambda l: n_framed[l] / n_act[l] if n_act[l] else 0.0
+    co_enforce_rate = n_co_enforce / n_act["A"] if n_act["A"] else 0.0
     # ── Governance-rol-attributie (rol-laag, 2026-07-07; Aoki-verfijning 2026-07-08) ──
     # WIE handhaaft, en OP WIE? Geconcentreerde geframede sanctie (lens A) op een
     # paar agents = een monitor/sanctioner-ROL is ontstaan. MAAR: concentratie van
@@ -238,6 +266,8 @@ def analyze(path):
     top_enforcer_targeted = bool(top_enf[0]) and tgt_by_target.get(top_enf[0], 0) > 0
     return dict(name=os.path.basename(path), nr=nr,
                 neg_rate=rate("A"), pos_rate=rate("B"),
+                co_enforce_rate=co_enforce_rate, n_co_enforce=n_co_enforce,
+                co_triples=co_triples,
                 n_takedrop=n_act["A"], n_investarm=n_act["B"],
                 n_neg=n_framed["A"], n_pos=n_framed["B"],
                 enforcer_gini=enforcer_gini, n_enforcers=n_enforcers,
