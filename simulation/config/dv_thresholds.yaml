@@ -90,7 +90,8 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   # secundaire as (gerapporteerd als named_bespoke, NIET de gate).
   # Kalibratie co_enforce_rate: rewactC 0.75 (institutie) / oorlog-B 0.36 /
   # memneutral 0.16 — drempel = KOEN na IRR.
-  inst_min_enforce: 3            # >= dit violatie-geframede sancties -> handhaving INGEROEPEN (PRIMAIR, Koen 2026-07-16)
+  inst_min_enforce: 3            # >= dit violatie-geframede sancties (handhaving aanwezig)
+  inst_min_enforcers: 2          # >= dit DISTINCTE handhavers -> collectief gedragen, geen cheap talk (Koen 2026-07-16)
   inst_co_enforce_min: 0.4       # co_enforce_rate: EFFECTIVITEIT-degree (gerapporteerd, geen poort)
   # ── SECUNDAIRE Searle-as (alleen gerapporteerd als named_bespoke, geen gate) ──
   inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits

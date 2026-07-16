@@ -239,9 +239,18 @@ def gate_run(path, thr):
     # uitgevoerd hoeft. De EFFECTIVITEIT (uitgevoerde handhaving = co_enforce_rate,
     # 'kerst op de taart') en het STANDHOUDEN (P3, apart) zijn aparte maten — een
     # institutie mag instorten (oorlogs-ruïne = ingeroepen maar hol, geen vertrouwen).
+    # COLLECTIEF gedragen (Koen 2026-07-16): één agent die "ik straf schenders"
+    # roept zonder dat anderen het overnemen = cheap talk = conventie, geen
+    # institutie. Bicchieri (norm = collectieve verwachting) + Searle (collectieve
+    # acceptatie): handhaving moet van >= inst_min_enforcers distincte handhavers
+    # komen. n_enforcers uit enforcement.py (bron-agents van violatie-sancties).
     enf = enforcement.analyze(path)
-    gates["institution"] = enf["n_co_enforce"] >= thr.get("inst_min_enforce", 3)
+    co_enforcers = len({t[1] for t in enf.get("co_triples", [])})  # distincte violatie-handhavers
+    gates["institution"] = bool(
+        enf["n_co_enforce"] >= thr.get("inst_min_enforce", 3)
+        and co_enforcers >= thr.get("inst_min_enforcers", 2))
     detail["n_co_enforce"] = enf["n_co_enforce"]          # handhaving aanwezig (poort)
+    detail["n_co_enforcers"] = co_enforcers              # collectief gedragen (poort)
     detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)  # effectiviteit/degree (kerst)
 
     # Secundaire as (Searle, GERAPPORTEERD niet gepoort): benoemde publiek
