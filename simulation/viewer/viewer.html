@@ -1458,13 +1458,21 @@ function updateGraph(r) {
   captureEdgeBaseline();
   applyEdgeHighlight();
 
-  // Message lines (shown in both modes)
+  // Message lines (shown in both modes). Production logs use an array `to`
+  // (message_to list); one dashed edge per resolved recipient. Broadcasts
+  // (empty target list) draw no edge — the network would be a hairball.
   const msgEdges = [];
+  const seenMsgEdge = new Set();
   if (showMsgs && r.messages) {
     r.messages.forEach(m => {
-      if (m.to && nodeMap[m.from] && nodeMap[m.to]) {
-        msgEdges.push({source: m.from, target: m.to});
-      }
+      if (!m.from || !nodeMap[m.from]) return;
+      msgTargets(m).forEach(t => {
+        if (!nodeMap[t]) return;
+        const key = `${m.from}->${t}`;
+        if (seenMsgEdge.has(key)) return;
+        seenMsgEdge.add(key);
+        msgEdges.push({source: m.from, target: t});
+      });
     });
   }
   gMessages.selectAll('line').data(msgEdges, d=>`msg-${d.source}-${d.target}`)
