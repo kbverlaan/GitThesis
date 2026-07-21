@@ -41,6 +41,8 @@ commons_enabled: false
 commons_K: 120.0
 commons_init: 120.0                   # dormant (commons_enabled false); parity met L4
 commons_regen: 1.5                    # dormant (commons off); parity met L4
+c_harvest: 0.03                       # dormant (commons off); parity met L4
+harvest_frac_cap: 0.04                # dormant; parity met L4
 commons_collapse_frac: 0.05
 commons_open_round: 2                 # inert zolang commons_enabled false (parity met L4)
 
