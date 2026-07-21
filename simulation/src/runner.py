@@ -213,6 +213,7 @@ def run_simulation(game_params: dict,
         commons_regen=game_params.get('commons_regen', 2.0),
         commons_open_round=game_params.get('commons_open_round', 1),
         c_harvest=game_params.get('c_harvest', 0.0),
+        harvest_frac_cap=game_params.get('harvest_frac_cap', 0.0),
     )
 
     network_enabled = game_params.get('network_enabled', game_params.get('spatial_enabled', False))

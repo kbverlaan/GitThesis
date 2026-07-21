@@ -368,17 +368,28 @@ class BaselinePrompt:
 
         if commons_on:
             c_h = self.game_params.get("c_harvest", 0.0)
+            cap = self.game_params.get("harvest_frac_cap", 0.0)
             cost_clause = (
                 f" Harvesting costs a flat {c_h * 100:.0f}% of your current resources "
                 f"every time you do it (a participation cost, like attacking), whether "
                 f"your claim is large or small — so claiming only a little loses money."
                 if c_h > 0 else ""
             )
+            if cap > 0:
+                limit_clause = (
+                    f"You may claim at most {cap * 100:.0f}% of your own resources per "
+                    f"round (a per-round harvest limit); larger requests are capped to "
+                    f"that. No single round can drain the whole stock."
+                )
+            else:
+                limit_clause = (
+                    "There is NO upper limit — you may take as much as you want, up to "
+                    "draining the entire stock."
+                )
             actions.append(
                 "- harvest: take a percent of YOUR OWN current resources out of the "
                 "shared stock, added to your resources in absolute units (set the "
-                "\"harvest\" field to that percent). There is NO upper limit — you may "
-                "take as much as you want, up to draining the entire stock. This USES "
+                "\"harvest\" field to that percent). " + limit_clause + " This USES "
                 "your action this round (you cannot also transfer/strengthen/take)."
                 + cost_clause + " See SHARED STOCK below."
             )

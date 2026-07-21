@@ -129,7 +129,8 @@ class GameEngine:
                  commons_collapse_frac: float = 0.05,
                  commons_regen: float = 2.0,
                  commons_open_round: int = 1,
-                 c_harvest: float = 0.0):
+                 c_harvest: float = 0.0,
+                 harvest_frac_cap: float = 0.0):
         """All proportional parameters are fractions in [0, 1] (§3.1 symbols):
         c_inv, g_inv = invest cost / return (fraction of actor's R)
         c_arm = arm cost (fraction of actor's R), mu_arm = arm multiplier (scalar)
@@ -163,6 +164,7 @@ class GameEngine:
             "commons_regen": commons_regen,
             "commons_open_round": commons_open_round,
             "c_harvest": c_harvest,
+            "harvest_frac_cap": harvest_frac_cap,
         }
 
         if isinstance(initial_resources, dict):
@@ -337,6 +339,15 @@ class GameEngine:
             if raw_str is not None:
                 harvest_raw[a.agent_id] = raw_str
                 round_log["resource_breakdown"][a.agent_id]["harvest_raw"] = raw_str
+            # Per-round harvest cap (Koen 2026-07-21): clamp the chosen fraction at
+            # harvest_frac_cap so no single agent can strip the pool in one grab.
+            # Makes depletion GRADUAL when many harvest (governance/moratorium has
+            # time to form) and turns "stripping" into a SUSTAINED coordinated act.
+            # 0 = uncapped (frozen behaviour). The sustainable harvester count is
+            # ~MSY/(cap*R): fewer than the population -> rival access -> enclosure.
+            cap = self.params.get("harvest_frac_cap", 0.0)
+            if cap > 0 and raw > cap:
+                raw = cap
             # raw is a fraction (>=0) of the agent's OWN current resources.
             chosen_frac[a.agent_id] = raw
             amt = raw * self.state.resources[a.agent_id]
