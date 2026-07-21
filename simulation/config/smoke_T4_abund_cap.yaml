@@ -1,0 +1,40 @@
+# DESIGN-SMOKE (NIET registered) — T4 abundance + harvest-CAP (kost uit).
+# Kopie van prod_L4_abund.yaml met TWEE deltas: harvest_frac_cap 0.02 (nieuw, kost uit) + max_rounds 30.
+# Doel: test of de participatiekost de crowd-out (100% harvest, smoke 2026-07) omzet
+# in een genuine dilemma — (1) harvest vs coöperatie/take als echte keuze,
+# (2) coalitie strip-then-dominate + emergente enclosure/asymmetrische toegang.
+num_agents: 30
+initial_resources: 100.0
+c_inv: 0.06
+g_inv: 0.142                         # abund
+gamma_sat: 1.00
+tau_sat: 5
+arm_enabled: true
+c_arm: 0.05
+mu_arm: 4.0
+delta_B: 0.75
+take_enabled: true
+alpha: 0.35
+c_atk: 0.02
+symmetric_stakes: true
+lethal_pot: false
+commons_enabled: true
+commons_K: 120.0
+commons_init: 120.0
+commons_regen: 1.5
+commons_collapse_frac: 0.05
+commons_open_round: 2
+c_harvest: 0.0                        # kost UIT — test cap alleen
+harvest_frac_cap: 0.02                 # NIEUW — per-ronde oogst-cap (dissipatie via congestie)
+delta_R: 0.97
+max_rounds: 30                        # smoke (vs prod 60)
+history_length: 10
+network_enabled: true
+assoc_enabled: true
+mean_degree: 5.0
+rewiring_prob: 1.0
+comm_scope: "choice"
+memory:
+  enabled: true
+  window_size: 10
+  notes_persist: true

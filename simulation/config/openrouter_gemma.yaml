@@ -1,0 +1,15 @@
+# EXPLORATORY (NIET registered) — Gemma 4 31B via OpenRouter.
+# Design-smoke voor de harvest-participatiekost (Koen 2026-07-21). Zelfde model
+# als productie (Gemma 4 31B), zodat de dilemma-kalibratie op het echte model wordt
+# getest. NB OpenRouter-serving != Snellius vLLM (fp8) — voldoende voor design-smoke,
+# niet voor registered evidence.
+api_key_env_var: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+model: "google/gemma-4-31b-it"
+temperature: 0.3
+max_tokens: 16000
+timeout: 900
+retry_attempts: 3
+retry_delay: 5
+prompt_config:
+  tom_level: "level0"
