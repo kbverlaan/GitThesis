@@ -1,10 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # DV pre-registratie — SINGLE SOURCE OF TRUTH voor alle classifier/DV-drempels.
 #
-# status: v0 DRAFT — nog NIET frozen. Freeze (git-SHA + datum hieronder invullen)
-#         pas ná IRR-validatie van de order-type-classifier (fixplan Fase 3).
-# freeze_sha:  <TODO na IRR>
-# freeze_date: <TODO na IRR>
+# status: FROZEN 2026-07-21 (na fidelity-validatie κ=0.714 — public-only + institutie⟹norm).
+#         Elke wijziging hierna = gedocumenteerd amendement, geen stille tuning.
+# freeze_sha:  56e794725cad642d823d9d9ac63cf91fa212d273
+# freeze_date: 2026-07-21
 #
 # Bron: driehoek-audit secties <-> DVs.md <-> engine (2026-07-09). Elke waarde met
 # herkomst (bestand:regel). CONFIRMATORY = draagt een P-hypothese (moet frozen).
@@ -51,7 +51,7 @@ commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-cla
   # venster-criteria; whole-run-minima keuren herstel-arcs onterecht af.
   # sustained_rule = KOEN-BESLISSING vóór freeze; alle kandidaten worden
   # per run naast elkaar gerapporteerd (sustained_by_rule).
-  sustained_rule: "window_stock"  # v0 PROPOSED | final_stock | window_flow | no_collapse
+  sustained_rule: "no_collapse"  # FROZEN — commons overleeft (GovSim-binair); survival-time + efficiency vs 40/ronde continu gerapporteerd
   sustained_stock_frac: 0.6667    # = 1/regen (engine-anker 2/3*K)
   sustained_window: 10            # slotvenster (rondes)
   regen: 1.5                      # spiegel van ladder_L4.yaml commons_regen (drift-guard)
@@ -116,7 +116,7 @@ order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, or
   # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
   # refutatie-marge (§2): equivalentie-claim alleen als bootstrap-CI-bovengrens
   # van de max paarsgewijze TV tussen cel-profielen < delta (delta_equivalence.py).
-  delta: null                    # KOEN beslist vóór deposit (bv. 0.2)
+  delta: 0.2                    # FROZEN — refutatie-marge (bootstrap-CI-bovengrens max-TV < delta)
 
 # ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
 
