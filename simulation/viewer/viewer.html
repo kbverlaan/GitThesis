@@ -130,26 +130,6 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
 #sidebar::-webkit-scrollbar { width: 4px; }
 #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* Config panel */
-#config-panel {
-  padding: 16px; border-bottom: 1px solid var(--border);
-}
-#config-panel .section-title {
-  font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;
-  margin-bottom: 10px;
-}
-.config-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-}
-.config-item {
-  background: var(--bg3); border-radius: 6px; padding: 8px 10px;
-}
-.config-item.full { grid-column: 1 / -1; }
-.config-item .config-label { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
-.config-item .config-value { font-size: 13px; font-weight: 600; margin-top: 2px; }
-.config-item .config-value.reasoning { color: var(--accent2); }
-.config-item .config-value.network { color: var(--coop); }
-.config-item .config-value.comm { color: var(--arm); }
 
 /* Action distribution */
 #action-dist {
@@ -421,17 +401,17 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
       </div>
       <canvas id="spark-gini"></canvas>
     </div>
-    <div class="metric-pill" title="Network modularity (Leiden algorithm)">
+    <div class="metric-pill" title="Clubs (Q): network modularity, connected-components approximation. Q&gt;0.1 = real clubs">
       <div>
-        <div class="label">Q</div>
+        <div class="label">Q clubs</div>
         <div class="value" id="m-mod">--</div>
       </div>
       <canvas id="spark-mod"></canvas>
     </div>
-    <div class="metric-pill" title="Action stability: fraction repeating last action">
+    <div class="metric-pill" title="Mob: max distinct attackers on one target this round. ~1 = duels, high = pile-on (predation)">
       <div>
-        <div class="label">Stability</div>
-        <div class="value" id="m-stab">--</div>
+        <div class="label">Mob</div>
+        <div class="value" id="m-mob-val">--</div>
       </div>
     </div>
   </div>
@@ -453,7 +433,7 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
   <div class="toolbar-group">
     <label class="toggle-label"><input type="checkbox" id="show-actions" checked> Actions</label>
     <label class="toggle-label"><input type="checkbox" id="show-messages" checked> Msgs</label>
-    <label class="toggle-label"><input type="checkbox" id="show-connects" checked> Connects</label>
+    <label class="toggle-label" title="Highlight the selected agent's direct connections (the whole network stays subtly visible)"><input type="checkbox" id="show-connects" checked> Direct links</label>
     <label class="toggle-label"><input type="checkbox" id="show-edge-diff"> Edge diff</label>
   </div>
   <div class="toolbar-sep"></div>
@@ -476,33 +456,6 @@ code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monosp
 <div id="layout">
   <!-- Left sidebar -->
   <div id="sidebar" style="display:none">
-    <!-- Experiment config -->
-    <div id="config-panel">
-      <div class="section-title">Experiment Config</div>
-      <div class="config-grid">
-        <div class="config-item">
-          <div class="config-label">Reasoning (baseline)</div>
-          <div class="config-value reasoning" id="cfg-reasoning">--</div>
-        </div>
-        <div class="config-item">
-          <div class="config-label">Rewiring (w)</div>
-          <div class="config-value network" id="cfg-rewiring">--</div>
-        </div>
-        <div class="config-item">
-          <div class="config-label">Comm Scope</div>
-          <div class="config-value comm" id="cfg-comm">--</div>
-        </div>
-        <div class="config-item">
-          <div class="config-label">Agents</div>
-          <div class="config-value" id="cfg-agents">--</div>
-        </div>
-        <div class="config-item full">
-          <div class="config-label">Palma Ratio</div>
-          <div class="config-value" id="cfg-palma">--</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Action distribution -->
     <div id="action-dist">
       <div class="section-title">Actions</div>
@@ -579,6 +532,19 @@ const AGENT_COLORS = [
   '#ec4899','#4ade80','#3b82f6','#eab308','#8b5cf6','#14b8a6',
   '#a8a29e','#cbd5e1','#94a3b8','#d8b4fe','#86efac','#93c5fd'
 ];
+// Agent names ARE colour names — paint each node its namesake colour. Dark
+// colours (maroon, indigo, onyx) are lightened so they stay visible on the dark
+// canvas; the hue stays recognisable. Keyed lowercase.
+const NAME_COLORS = {
+  amber:'#ffbf00', ash:'#b2beb5', blue:'#4a90e2', bronze:'#cd7f32',
+  cobalt:'#4169ff', copper:'#c87533', coral:'#ff7f50', crimson:'#dc143c',
+  cyan:'#00e5e5', dusk:'#9080b0', gold:'#ffd700', green:'#3cb043',
+  indigo:'#7d5fe0', ivory:'#f5f0dc', jade:'#00a86b', maroon:'#b0304f',
+  mauve:'#e0a0d0', olive:'#a5b81f', onyx:'#8a8a8a', pearl:'#eae0d5',
+  plum:'#c065b0', red:'#ff4040', rust:'#c0510e', sage:'#9caf88',
+  scarlet:'#ff3020', silver:'#c8c8c8', slate:'#8090a0', storm:'#7d8ca0',
+  teal:'#17b8a6', violet:'#a24edd'
+};
 const ACTION_ICONS = {transfer:'&#10230;',strengthen:'&#9670;',take:'&#9876;',hold:'&#183;',harvest:'&#10038;',drop:'&#9986;',invite:'&#43;'};
 const ACTION_LABELS = {transfer:'transfer',strengthen:'strengthen',take:'take',hold:'hold',harvest:'harvest',drop:'drop',invite:'invite',no_action:'eliminated'};
 const ACTION_COLORS_MAP = {transfer:'#34d399',strengthen:'#fbbf24',take:'#f87171',hold:'#64748b',harvest:'#2dd4bf',drop:'#fb923c',invite:'#60a5fa',no_action:'#3f3f46'};
@@ -622,8 +588,12 @@ let selectedAgent = null;
 // Stable color assignment: first round's agent order determines colors
 let agentColorMap = {};
 function agentColor(aid) {
+  // 1) name IS a colour → paint its namesake (Maroon = maroon, Gold = gold).
+  const named = NAME_COLORS[String(aid).toLowerCase()];
+  if (named) return named;
+  // 2) stable per-run assignment from the palette.
   if (agentColorMap[aid] !== undefined) return AGENT_COLORS[agentColorMap[aid] % AGENT_COLORS.length];
-  // Fallback: hash
+  // 3) fallback: hash.
   let h = 0;
   for (let i = 0; i < aid.length; i++) h = ((h << 5) - h + aid.charCodeAt(i)) | 0;
   return AGENT_COLORS[Math.abs(h) % AGENT_COLORS.length];
@@ -672,18 +642,19 @@ function computeMetrics(rd, prevRd) {
   const edges = rd.network?.edges || [];
   const modularity = computeModularity(edges, Object.keys(agents));
 
-  // Action stability — fraction of agents with same action as previous round
-  let action_stability = null;
-  if (prevRd) {
-    const prevAgents = prevRd.agents || {};
-    const ids = Object.keys(agents);
-    const match = ids.filter(aid => agents[aid].action === prevAgents[aid]?.action).length;
-    action_stability = ids.length ? match / ids.length : 0;
-  }
+  // Mob — max distinct attackers on a single target this round (DVs.md predation
+  // signature). take actions carry a target; count attackers per target, take max.
+  const attackersPerTarget = {};
+  Object.values(agents).forEach(a => {
+    if (a.action === 'take' && a.target) {
+      (attackersPerTarget[a.target] = attackersPerTarget[a.target] || new Set()).add(a);
+    }
+  });
+  const mob = Object.values(attackersPerTarget).reduce((m, s) => Math.max(m, s.size), 0);
 
   return {
     primary: { cooperation_ratio, gini, modularity },
-    secondary: { action_stability, palma, action_distribution },
+    secondary: { mob, palma, action_distribution },
   };
 }
 
@@ -750,73 +721,13 @@ function loadData(text) {
 }
 
 function inferConfig() {
-  const r = rounds[0];
-  const n = Object.keys(r.agents).length;
-  document.getElementById('cfg-agents').textContent = n;
-
-  // Pretty ToM level labels (aligned with §3.3.1)
-  const TOM_LABELS = {
-    'level0': 'L0 (zero-order)', 'level1': 'L1 (first-order)',
-    'level2': 'L2 (second-order)', 'level3': 'L3 (third-order)',
-    'default': 'default',
-  };
-
-  // Try to detect from config embedded in JSONL (check all rounds, not just first)
+  // Config panel removed 2026-07-16 (stale ToM/Palma fields). Only remaining
+  // side-effect: surface the model name as the run label if a config is embedded.
   const configRound = rounds.find(rd => rd.config);
-  if (configRound) {
-    const cfg = configRound.config;
-    const gp = cfg.game_params || {};
-    const pc = cfg.prompt_config || {};
-    const tom = pc.tom_level || pc.reasoning_level || cfg.reasoning_level || '--';
-    document.getElementById('cfg-reasoning').textContent = TOM_LABELS[tom] || tom;
-    document.getElementById('cfg-rewiring').textContent = gp.rewiring_prob ?? cfg.rewiring_prob ?? '--';
-    document.getElementById('cfg-comm').textContent = gp.comm_scope || cfg.comm_scope || '--';
-    if (cfg.model) {
-      const runName = document.getElementById('run-name');
-      if (runName && !runName.textContent) runName.textContent = cfg.model;
-    }
-    return; // Config is authoritative, skip inference
+  if (configRound?.config?.model) {
+    const runName = document.getElementById('run-name');
+    if (runName && !runName.textContent) runName.textContent = configRound.config.model;
   }
-
-  // Fallback: infer from data
-  // Comm scope from messages
-  const hasMessages = rounds.some(rd => rd.messages && rd.messages.length > 0);
-  if (!hasMessages) document.getElementById('cfg-comm').textContent = 'none';
-  else {
-    // New logs: explicit target lists → unified comms ('on'). Old logs: infer
-    // dm/broadcast/choice from single-id vs 'all' message_to.
-    const anyList = rounds.some(rd => rd.messages?.some(m => Array.isArray(m.to)));
-    if (anyList) document.getElementById('cfg-comm').textContent = 'on';
-    else {
-      const hasBroadcast = rounds.some(rd => rd.messages?.some(m => !m.to || m.to === 'all'));
-      const hasDM = rounds.some(rd => rd.messages?.some(m => m.to && m.to !== 'all'));
-      document.getElementById('cfg-comm').textContent =
-        (hasBroadcast && hasDM) ? 'choice' : hasBroadcast ? 'broadcast' : 'dm';
-    }
-  }
-
-  // Rewiring from edge changes (check all consecutive round pairs)
-  let totalChanges = 0;
-  for (let i = 1; i < rounds.length; i++) {
-    const prev = rounds[i-1].network?.edges || [];
-    const curr = rounds[i].network?.edges || [];
-    if (prev.length === 0 && curr.length === 0) continue;
-    const prevSet = new Set(prev.map(e => e.slice().sort().join('-')));
-    const currSet = new Set(curr.map(e => e.slice().sort().join('-')));
-    curr.forEach(e => { if (!prevSet.has(e.slice().sort().join('-'))) totalChanges++; });
-    prev.forEach(e => { if (!currSet.has(e.slice().sort().join('-'))) totalChanges++; });
-  }
-  if (rounds.length < 2) document.getElementById('cfg-rewiring').textContent = '? (1 round)';
-  else if (totalChanges === 0) document.getElementById('cfg-rewiring').textContent = '0 (static)';
-  else document.getElementById('cfg-rewiring').textContent = 'dynamic';
-
-  // Reasoning level: try to infer from thinking length
-  // L0 has no thinking, L1-L3 have progressively longer reasoning
-  const avgThinkLen = rounds.slice(0, 3).flatMap(rd =>
-    Object.values(rd.agents).map(a => (a.thinking || a.reasoning || '').length)
-  ).reduce((s,v,i,a) => s + v / a.length, 0);
-  if (avgThinkLen < 50) document.getElementById('cfg-reasoning').textContent = 'L0? (inferred)';
-  else document.getElementById('cfg-reasoning').textContent = '? (no config)';
 }
 
 // ═══ FILE LOADING + LIVE WATCH ═══
@@ -948,7 +859,7 @@ document.getElementById('show-actions').onchange = () => {
   if (rounds.length) renderRound();
 };
 document.getElementById('show-connects').onchange = () => {
-  if (rounds.length) renderRound();
+  if (rounds.length) applyEdgeHighlight();   // base network always drawn; toggle only re-highlights
 };
 document.getElementById('show-messages').onchange = () => {
   document.getElementById('legend-msg').style.display = document.getElementById('show-messages').checked ? 'inline' : 'none';
@@ -1223,7 +1134,9 @@ function initGraph() {
 
   gLabels.selectAll('text').data(nodes, d=>d.id).join('text')
     .attr('text-anchor','middle').attr('dy', 28).attr('font-size', 10)
-    .attr('fill','rgba(255,255,255,0.4)').attr('class','node-label')
+    .attr('font-weight', 600)
+    .attr('fill', d => agentColor(d.id)).attr('class','node-label')
+    .attr('paint-order', 'stroke').attr('stroke', 'rgba(0,0,0,0.6)').attr('stroke-width', 2.5)
     .text(d => agentShort(d.id));
 
   nodeMap = {};
@@ -1249,22 +1162,37 @@ function captureEdgeBaseline() {
 
 function applyEdgeHighlight() {
   if (!gLinks) return;
+  // 'Direct links' toggle: highlight the selected agent's incident edges in the
+  // agent's own colour. Off (or no selection) → every edge falls back to the
+  // subtle base, so the whole network stays visible either way.
+  const highlightOn = document.getElementById('show-connects')?.checked !== false;
+  const hiColor = selectedAgent ? agentColor(selectedAgent) : '#facc15';
   gLinks.selectAll('line').each(function(d) {
     const sel = d3.select(this);
     const baseOp = parseFloat(sel.attr('data-base-opacity') ?? sel.attr('stroke-opacity') ?? '1');
     const baseW = parseFloat(sel.attr('data-base-width') ?? sel.attr('stroke-width') ?? '1');
     const baseStroke = sel.attr('data-base-stroke') ?? sel.attr('stroke') ?? '#fff';
-    if (!selectedAgent) {
-      sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
-      return;
-    }
-    const incident = edgeEndId(d.source) === selectedAgent || edgeEndId(d.target) === selectedAgent;
+    const incident = highlightOn && selectedAgent &&
+      (edgeEndId(d.source) === selectedAgent || edgeEndId(d.target) === selectedAgent);
     if (incident) {
-      sel.attr('stroke-opacity', 1).attr('stroke-width', baseW + 2).attr('stroke', '#facc15');
+      sel.attr('stroke-opacity', 0.95).attr('stroke-width', baseW + 2).attr('stroke', hiColor);
     } else {
       sel.attr('stroke-opacity', baseOp).attr('stroke-width', baseW).attr('stroke', baseStroke);
     }
   });
+}
+
+// Endpoint of a directed edge on the TARGET circle's edge (+gap), so the
+// arrowhead lands on the rim instead of the centre. Falls back to centre if the
+// nodes coincide or the target radius is unknown.
+function edgeTip(sourceId, targetId, gap) {
+  const s = nodePos(sourceId), t = nodePos(targetId);
+  const tr = (typeof targetId === 'object' ? targetId : nodeMap[targetId])?._r || 0;
+  const dx = t.x - s.x, dy = t.y - s.y;
+  const dist = Math.hypot(dx, dy);
+  if (!dist || !tr) return t;
+  const back = Math.min(tr + gap, dist - 1);
+  return { x: t.x - (dx / dist) * back, y: t.y - (dy / dist) * back };
 }
 
 function ticked() {
@@ -1273,10 +1201,10 @@ function ticked() {
     .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
   gActions.selectAll('line')
     .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
-    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+    .attr('x2', d=>edgeTip(d.source, d.target, 4).x).attr('y2', d=>edgeTip(d.source, d.target, 4).y);
   gMessages.selectAll('line')
     .attr('x1', d=>nodePos(d.source).x).attr('y1', d=>nodePos(d.source).y)
-    .attr('x2', d=>nodePos(d.target).x).attr('y2', d=>nodePos(d.target).y);
+    .attr('x2', d=>edgeTip(d.source, d.target, 3).x).attr('y2', d=>edgeTip(d.source, d.target, 3).y);
   gNodes.selectAll('g').attr('transform', d=>`translate(${d.x},${d.y})`);
   gLabels.selectAll('text').attr('x', d=>d.x).attr('y', d=>d.y);
 
@@ -1331,8 +1259,6 @@ function renderRound() {
   const fc = r.primary.cooperation_ratio;
   const gini = r.primary.gini;
   const mod = r.primary.modularity;
-  const stab = r.secondary.action_stability;
-  const palma = r.secondary.palma;
 
   function setMetric(id, val, fmt, prevVal) {
     const el = document.getElementById(id);
@@ -1355,11 +1281,11 @@ function renderRound() {
   setMetric('m-mod', mod, v=>v.toFixed(2), prev?.primary.modularity);
   document.getElementById('m-mod').style.color = mod > 0.3 ? '#818cf8' : mod > 0.1 ? '#60a5fa' : '#64748b';
 
-  document.getElementById('m-stab').textContent = stab != null ? (stab*100).toFixed(0)+'%' : '--';
-  document.getElementById('m-stab').style.color = stab != null && stab >= 0.7 ? 'var(--text)' : 'var(--text2)';
-
-  // Palma
-  document.getElementById('cfg-palma').textContent = palma != null ? (palma === Infinity ? '∞' : palma.toFixed(2)) : '--';
+  // Mob — max distinct attackers on a single target this round (predation
+  // signature; DVs.md). ~1 = duels, high = pile-on / "level the whale".
+  const mob = r.secondary.mob;
+  document.getElementById('m-mob-val').textContent = mob != null ? mob.toFixed(0) : '0';
+  document.getElementById('m-mob-val').style.color = mob >= 4 ? '#f87171' : mob >= 2 ? '#fbbf24' : 'var(--text2)';
 
   // Sparklines
   drawSparkline('spark-fc', rounds.map(r=>r.primary.cooperation_ratio), currentRound, '#34d399');
@@ -1511,7 +1437,7 @@ function updateGraph(r) {
       Object.entries(rd.agents).forEach(([aid, info]) => {
         if (!info.target) return;
         const key = [aid, info.target].sort().join('-');
-        if (info.action === 'invest_other' || info.action === 'arm_other') {
+        if (info.action === 'transfer' || info.action === 'strengthen') {
           coopEdges[key] = (coopEdges[key] || 0) + 1;
         } else if (info.action === 'take') {
           attackEdges[key] = (attackEdges[key] || 0) + 1;
@@ -1536,17 +1462,16 @@ function updateGraph(r) {
       .attr('stroke-dasharray', d => d.status === 'hostile' ? '4,3' : 'none')
       .attr('stroke-opacity', d => Math.min(0.3 + d.weight * 0.15, 0.8));
   } else {
-    // Network mode: show structural edges (hidden entirely when the
-    // Connects-toggle is off)
-    const showConnects = document.getElementById('show-connects')?.checked !== false;
+    // Network mode: the whole structural network is ALWAYS drawn, very subtly,
+    // so you keep the topology as backdrop. The 'Direct links' toggle only
+    // controls whether the selected agent's incident edges get highlighted
+    // (applyEdgeHighlight), not whether the base network shows.
     const prevEdges = currentRound > 0 ? (rounds[currentRound - 1].network?.edges || []) : [];
     const changes = edgeChanges(rawEdges, prevEdges);
     const addedSet = new Set(changes.added.map(toKey));
 
     let allEdges;
-    if (!showConnects) {
-      allEdges = [];
-    } else if (showDiff) {
+    if (showDiff) {
       allEdges = [
         ...rawEdges.map(e => ({source: e[0], target: e[1], status: addedSet.has(toKey(e)) ? 'added' : 'stable'})),
         ...changes.removed.map(e => ({source: e[0], target: e[1], status: 'removed'})),
@@ -1557,22 +1482,30 @@ function updateGraph(r) {
 
     gLinks.selectAll('line').data(allEdges, d=>`${d.source}-${d.target}-${d.status}`)
       .join('line')
-      .attr('stroke', d => d.status === 'added' ? '#34d399' : d.status === 'removed' ? '#f87171' : 'rgba(255,255,255,0.12)')
+      .attr('stroke', d => d.status === 'added' ? '#34d399' : d.status === 'removed' ? '#f87171' : 'rgba(255,255,255,0.14)')
       .attr('stroke-width', d => d.status === 'stable' ? 1 : 1.5)
       .attr('stroke-dasharray', d => d.status === 'removed' ? '3,5' : d.status === 'added' ? '5,3' : 'none')
-      .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 1);
+      .attr('stroke-opacity', d => d.status === 'removed' ? 0.4 : d.status === 'added' ? 0.7 : 0.5);
   }
 
   captureEdgeBaseline();
   applyEdgeHighlight();
 
-  // Message lines (shown in both modes)
+  // Message lines (shown in both modes). Production logs use an array `to`
+  // (message_to list); one dashed edge per resolved recipient. Broadcasts
+  // (empty target list) draw no edge — the network would be a hairball.
   const msgEdges = [];
+  const seenMsgEdge = new Set();
   if (showMsgs && r.messages) {
     r.messages.forEach(m => {
-      if (m.to && nodeMap[m.from] && nodeMap[m.to]) {
-        msgEdges.push({source: m.from, target: m.to});
-      }
+      if (!m.from || !nodeMap[m.from]) return;
+      msgTargets(m).forEach(t => {
+        if (!nodeMap[t]) return;
+        const key = `${m.from}->${t}`;
+        if (seenMsgEdge.has(key)) return;
+        seenMsgEdge.add(key);
+        msgEdges.push({source: m.from, target: t});
+      });
     });
   }
   gMessages.selectAll('line').data(msgEdges, d=>`msg-${d.source}-${d.target}`)
@@ -1583,10 +1516,13 @@ function updateGraph(r) {
     .attr('stroke-dasharray', '3,4')
     .attr('stroke-opacity', 0.4);
 
-  // Node sizes
+  // Node sizes. Stash the radius on the datum so ticked() can land arrowheads
+  // on the circle's edge (not its centre) — direction stays legible on big nodes.
   const maxR = Math.max(...agentIds.map(a => agents[a].resources), 1);
+  const nodeRadius = d => 7 + 13 * Math.sqrt((agents[d.id]?.resources||1) / maxR);
+  agentIds.forEach(a => { if (nodeMap[a]) nodeMap[a]._r = nodeRadius(nodeMap[a]); });
   gNodes.selectAll('.node-circle').data(agentIds.map(a=>nodeMap[a]).filter(Boolean), d=>d.id)
-    .attr('r', d => 7 + 13 * Math.sqrt((agents[d.id]?.resources||1) / maxR))
+    .attr('r', nodeRadius)
     .attr('stroke', d => {
       const bonus = agents[d.id]?.arm_bonus || 0;
       return bonus > 0.1 ? '#fbbf24' : 'none';
@@ -1605,8 +1541,8 @@ function updateGraph(r) {
       if (info.target && info.action) {
         let type = null;
         if (info.action === 'transfer') type = 'coop';
-        else if (info.action === 'attack') type = 'attack';
-        else if (info.action === 'arm_other') type = 'arm';
+        else if (info.action === 'take') type = 'attack';
+        else if (info.action === 'strengthen') type = 'arm';
         if (type) actionEdges.push({source: aid, target: info.target, type});
       }
     });
@@ -1629,7 +1565,7 @@ function updateGraph(r) {
     for (let i = Math.max(0, currentRound - simWindow + 1); i <= currentRound; i++) {
       const rd = rounds[i]; if (!rd) continue;
       Object.entries(rd.agents).forEach(([aid, info]) => {
-        if (info.target && (info.action === 'invest_other' || info.action === 'arm_other')) {
+        if (info.target && (info.action === 'transfer' || info.action === 'strengthen')) {
           coopPairs.add([aid, info.target].sort().join('-'));
         }
       });
@@ -1738,7 +1674,7 @@ function renderCard(aid) {
   let coopCount = 0, totalRounds = 0;
   rounds.forEach(rd => {
     const a = rd.agents[aid];
-    if (a) { totalRounds++; if (a.action === 'invest_other') coopCount++; }
+    if (a) { totalRounds++; if (a.action === 'transfer') coopCount++; }
   });
   const coopRate = totalRounds > 0 ? (coopCount/totalRounds*100).toFixed(0) + '%' : '--';
   statsEl.innerHTML = `
@@ -1764,6 +1700,45 @@ function renderCard(aid) {
     html += `<details class="card-section" open><summary>Memory Stream</summary><div class="content">${streamHtml}</div></details>`;
   }
 
+  // Inbox / Outbox — placed high so they're visible without scrolling past the
+  // (long) memory + reasoning sections. Empty on comms-off runs, which is correct.
+  {
+    const inboxNeighbourSet = new Set();
+    (r.network?.edges || []).forEach(pair => {
+      if (!Array.isArray(pair) || pair.length < 2) return;
+      if (pair[0] === aid) inboxNeighbourSet.add(pair[1]);
+      else if (pair[1] === aid) inboxNeighbourSet.add(pair[0]);
+    });
+    const inbox = (r.messages || []).filter(m => {
+      if (!m || m.from === aid) return false;
+      const tgts = msgTargets(m);
+      if (tgts.length) return tgts.includes(aid);
+      return inboxNeighbourSet.has(m.from);
+    });
+    if (inbox.length > 0) {
+      html += `<details class="card-section" open><summary>Inbox (${inbox.length})</summary><div class="content">`;
+      inbox.forEach(m => {
+        const n = msgTargets(m).length;
+        const tag = n > 1 ? ` <span style="color:var(--dim)">(+${n - 1} more)</span>`
+                  : n === 0 ? ' <span style="color:var(--dim)">(all)</span>' : '';
+        html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span>${tag} <span class="msg-text">${escHtml(m.text)}</span></div>`;
+      });
+      html += '</div></details>';
+    }
+    const outbox = r.messages?.filter(m => m.from === aid) || [];
+    if (outbox.length > 0) {
+      html += `<details class="card-section" open><summary>Outbox (${outbox.length})</summary><div class="content">`;
+      outbox.forEach(m => {
+        const tgts = msgTargets(m);
+        const to = tgts.length
+          ? tgts.map(t => `<span style="color:${agentColor(t)}">${agentShort(t)}</span>`).join(', ')
+          : '<span style="color:var(--dim)">all</span>';
+        html += `<div class="msg-item">&rarr; ${to} <span class="msg-text">${escHtml(m.text)}</span></div>`;
+      });
+      html += '</div></details>';
+    }
+  }
+
   // Reasoning (collapsed by default)
   const reasoning = info.reasoning || info.thinking || '';
   if (reasoning) {
@@ -1778,44 +1753,6 @@ function renderCard(aid) {
   // Raw LLM output (collapsed by default)
   if (info.response) {
     html += `<details class="card-section"><summary>Raw Output</summary><div class="content"><pre>${escHtml(info.response)}</pre></div></details>`;
-  }
-
-  // Inbox — DMs addressed to `aid` plus broadcasts from 1-hop neighbours.
-  const inboxNeighbourSet = new Set();
-  (r.network?.edges || []).forEach(pair => {
-    if (!Array.isArray(pair) || pair.length < 2) return;
-    if (pair[0] === aid) inboxNeighbourSet.add(pair[1]);
-    else if (pair[1] === aid) inboxNeighbourSet.add(pair[0]);
-  });
-  const inbox = (r.messages || []).filter(m => {
-    if (!m || m.from === aid) return false;
-    const tgts = msgTargets(m);
-    if (tgts.length) return tgts.includes(aid);          // new/DM: addressed to you
-    return inboxNeighbourSet.has(m.from);                // legacy broadcast: 1-hop neighbours
-  });
-  if (inbox.length > 0) {
-    html += `<details class="card-section"><summary>Inbox (${inbox.length})</summary><div class="content">`;
-    inbox.forEach(m => {
-      const n = msgTargets(m).length;
-      const tag = n > 1 ? ` <span style="color:var(--dim)">(+${n - 1} more)</span>`
-                : n === 0 ? ' <span style="color:var(--dim)">(all)</span>' : '';
-      html += `<div class="msg-item"><span class="sender" style="color:${agentColor(m.from)}">${agentShort(m.from)}</span>${tag} <span class="msg-text">${escHtml(m.text)}</span></div>`;
-    });
-    html += '</div></details>';
-  }
-
-  // Outbox
-  const outbox = r.messages?.filter(m => m.from === aid) || [];
-  if (outbox.length > 0) {
-    html += `<details class="card-section"><summary>Outbox (${outbox.length})</summary><div class="content">`;
-    outbox.forEach(m => {
-      const tgts = msgTargets(m);
-      const to = tgts.length
-        ? tgts.map(t => `<span style="color:${agentColor(t)}">${agentShort(t)}</span>`).join(', ')
-        : '<span style="color:var(--dim)">all</span>';
-      html += `<div class="msg-item">&rarr; ${to} <span class="msg-text">${escHtml(m.text)}</span></div>`;
-    });
-    html += '</div></details>';
   }
 
   // History
