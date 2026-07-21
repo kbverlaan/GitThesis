@@ -41,6 +41,8 @@ commons_enabled: true
 commons_K: 120.0
 commons_init: 120.0                   # start op volle K (GovSim-parity; her-lock 2026-07-14)
 commons_regen: 1.5                    # fragile-but-recoverable (tragedy threshold is between 1.5 and 1.0)
+c_harvest: 0.03                       # harvest-participatiekost (ADOPTED Koen 2026-07-21)
+harvest_frac_cap: 0.04                # per-ronde oogst-cap
 commons_collapse_frac: 0.05
 commons_open_round: 2                 # R1 = aangekondigd + bespreekbaar, oogstbaar vanaf R2
 

@@ -128,7 +128,13 @@ def action_dist_drift(per_round):
     cstd = float(np.std(cons)) if cons else 0.0
     return dist, drift, cmean, cstd
 
-def subgroups(agents, T, Mc, alpha):
+def subgroups(agents, T, Mc, alpha, Cm=None, coal_weight=0.0):
+    """Combined-graph community detection. T = transfers, Mc = messages
+    (both dict{(a,b):w}). Cm = optional coalition matrix (n×n ndarray: allied
+    joint-predation ties, symmetric), added with coal_weight — a persistent
+    subgroup can bind via cooperation, communication OF coalitie (Koen 2026-07-16:
+    conventie = stabiele coördinerende cluster, ongeacht of ze samen overmaken,
+    berichten of samen anderen aanvallen). coal_weight=0 -> oud gedrag."""
     idx = {a: i for i, a in enumerate(agents)}; n = len(agents)
     Tm = np.zeros((n, n)); Mm = np.zeros((n, n))
     for (a, b), v in T.items():
@@ -136,6 +142,8 @@ def subgroups(agents, T, Mc, alpha):
     for (a, b), v in Mc.items():
         if a in idx and b in idx: Mm[idx[a], idx[b]] += v
     A = alpha * normsym(Tm) + (1 - alpha) * normsym(Mm)
+    if Cm is not None and coal_weight:
+        A = A + coal_weight * normsym(Cm)
     edges, w = [], []
     for i in range(n):
         for j in range(i + 1, n):

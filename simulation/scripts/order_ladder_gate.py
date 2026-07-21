@@ -38,14 +38,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import order_suite as osuite
 import deontic
 import commons_dv
+import enforcement
 from classify_run import detect_named_structures
 from order_suite import HAVE_LEIDEN
 
 CFG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config",
                    "dv_thresholds.yaml")
 
-LEVELS = ["coordination", "cooperation", "convention", "norm",
-          "institution", "governance"]
+# Sociale-orde-ladder: geneste ordinale as (coordination..institution).
+# Governance is een APARTE as (resource-orde, Koen 2026-07-16) — commons-beheer,
+# NIET de 6e geneste trede. Aparte T4-samenlevingen kunnen laag op de sociale
+# ladder zitten én de commons goed beheren (of omgekeerd); zie 3_design.md.
+LEVELS = ["coordination", "cooperation", "convention", "norm", "institution"]
+GOVERNANCE = "governance"
 
 
 def load_thresholds(path=CFG):
@@ -68,6 +73,81 @@ def _cohesion(agents, memb, A, tau):
     return vast / n if n else 0.0
 
 
+def _coordination_coverage(lines, agents, attacks, window):
+    """Fractie agents die over het slotvenster tot een PERSISTENTE gecoördineerde
+    groep behoort (Koen 2026-07-16 — conventie = stabiele groep die samen dingen
+    blijft doen). Een tie telt als coördinerend als het paar in >= min_rounds
+    venster-rondes samen overmaakt, berichten, OF samen outsiders aanvalt (zonder
+    elkaar aan te vallen — vijandige paren tellen niet). Chaos (schuivende,
+    eenmalige ties) -> lage coverage -> coordination, niet convention."""
+    aset = set(agents)
+    rounds = sorted({d.get("round") for d in lines})
+    W = set(rounds[-window:]) if rounds else set()
+    hostile = {tuple(sorted((a, t))) for (rd, a, t) in attacks
+               if a in aset and t in aset}
+    from collections import defaultdict
+    tie_rounds = defaultdict(set)
+    for d in lines:
+        rd = d.get("round")
+        if rd not in W:
+            continue
+        ag = d.get("agents") or {}
+        for aid, i in ag.items():
+            a = osuite.cat(osuite.effective_action(i))
+            if a == "transfer" and i.get("target"):
+                tie_rounds[tuple(sorted((aid, i["target"])))].add(rd)
+        for m in (d.get("messages") or []):
+            to = m.get("to")
+            tos = to if isinstance(to, list) else ([] if to in (None, "all") else [to])
+            for t in tos:
+                if m.get("from"):
+                    tie_rounds[tuple(sorted((m["from"], t)))].add(rd)
+        atk = [(aid, i.get("target")) for aid, i in ag.items()
+               if osuite.cat(osuite.effective_action(i)) == "take" and i.get("target")]
+        for x in range(len(atk)):
+            for y in range(x + 1, len(atk)):
+                (a1, t1), (a2, t2) = atk[x], atk[y]
+                if a1 != a2 and t1 != a2 and t2 != a1:
+                    tie_rounds[tuple(sorted((a1, a2)))].add(rd)
+    covered = set()
+    for pair, rds in tie_rounds.items():
+        if len(rds) >= 3 and pair not in hostile:
+            covered.update(pair)
+    return len(covered) / len(agents) if agents else 0.0
+
+
+def _coalition_matrix(agents, attacks):
+    """Alliantie-matrix: agents die SAMEN outsiders aanvallen en elkaar NIET
+    aanvallen (Koen 2026-07-16 — dezelfde subgroep aanvallers = coalitie = een
+    vorm van conventie). Cm[i,j] = # rondes waarin i en j allebei aanvielen,
+    geen van beiden de ander als doelwit had; op 0 gezet als ze elkaar OOIT
+    aanvielen (dan zijn het vijanden, geen bondgenoten). Alles-tegen-allen ->
+    geen coalitie -> geen structuur."""
+    idx = {a: i for i, a in enumerate(agents)}
+    n = len(agents)
+    Cm = np.zeros((n, n))
+    hostile = set()
+    by_round = {}
+    for (rd, a, t) in attacks:
+        if a in idx and t in idx:
+            hostile.add((idx[a], idx[t])); hostile.add((idx[t], idx[a]))
+        by_round.setdefault(rd, []).append((a, t))
+    for rd, acts in by_round.items():
+        attackers = [(idx[a], t) for (a, t) in acts if a in idx]
+        for x in range(len(attackers)):
+            for y in range(x + 1, len(attackers)):
+                i, ti = attackers[x]; j, tj = attackers[y]
+                if i == j:
+                    continue
+                # bondgenoten: geen van beiden viel de ander aan deze ronde
+                if ti != agents[j] and tj != agents[i]:
+                    Cm[i, j] += 1; Cm[j, i] += 1
+    # vijanden ontkoppelen (ooit elkaar aangevallen -> geen alliantie)
+    for (i, j) in hostile:
+        Cm[i, j] = 0.0
+    return Cm
+
+
 def _rewire_rates(lines):
     """(vroege, late) drop+invite-acties per ronde (helft/helft-split).
     None als de run de affordance niet heeft (geen enkele rewire-poging)."""
@@ -88,63 +168,119 @@ def gate_run(path, thr):
     W = int(thr["window"])
     gates, detail = {}, {}
 
-    # ── 1 cooperation: volgehouden reciprociteit in het slotvenster ─────────
+    # persistente-coördinatie-coverage (transfer/bericht/coalitie over >=3
+    # venster-rondes) — draagt zowel de cooperation- als de convention-poort.
+    coverage = _coordination_coverage(lines, agents, attacks, W)
+
+    # ── 1 cooperation: volgehouden gecoördineerde GEZAMENLIJKE actie ─────────
+    # Verbreed (Koen 2026-07-16): reciprociteit (naar elkaar overmaken) ÓF een
+    # volgehouden coalitie (samen als groep optreden) — samen aanvallen is ook
+    # een coöperatiegroep. Repareert de nesting: een predatie-coalitie zakt niet
+    # meer door de cooperation-trede.
     late = per_round[-W:]
     n_tr = sum(r["counts"].get("transfer", 0) for r in late)
     n_all = sum(sum(r["counts"].values()) for r in late)
     tshare = n_tr / n_all if n_all else 0.0
     recip = sum(1 for (a, b), v in T.items()
                 if a < b and v > 0 and T.get((b, a), 0) > 0)
-    gates["cooperation"] = (tshare >= thr["coop_transfer_share"]
-                            and recip >= thr["coop_recip_dyads"])
+    reciprocity = tshare >= thr["coop_transfer_share"] and recip >= thr["coop_recip_dyads"]
+    gates["cooperation"] = bool(reciprocity or coverage >= thr.get("coop_coverage_min", 0.3))
     detail["transfer_share_lastW"] = round(tshare, 3)
     detail["recip_dyads"] = recip
 
-    # ── 2 convention: gekristalliseerde partnerstructuur (achter de Q-gate) ─
-    if HAVE_LEIDEN:
-        memb, Q, A, Tm, idx = osuite.subgroups(agents, T, Mc, thr["alpha"])
-        coh = _cohesion(agents, memb, A, thr["tau"])
-        conv = Q >= thr["conv_q_min"] and coh >= thr["conv_cohesion_min"]
-        rw = _rewire_rates(lines)
-        if rw is not None:  # assoc-rung: structuur moet ook stollen
-            early, late_r = rw
-            crystallized = (early == 0) or (late_r <= thr["conv_rewire_ratio"] * early)
-            conv = conv and crystallized
-            detail["rewire_early_late"] = (round(early, 2), round(late_r, 2))
-        gates["convention"] = bool(conv)
+    # ── 2 convention: persistente coördinerende subgroep (Koen 2026-07-16) ──
+    # Lewis-getrouw verbreed: een conventie is een STABIELE cluster die samen
+    # dingen blijft doen — of ze nu naar elkaar overmaken (coöperatie), elkaar
+    # berichten (communicatie), OF samen buitenstaanders aanvallen (coalitie).
+    # Gaat NIET om mob-grootte of focal doelwit (blijkt uit de data, deep-dive),
+    # maar om DEZELFDE subgroep die aanhoudend coördineert. Coalitie-edge: agents
+    # die samen outsiders aanvallen en elkaar NIET aanvallen (alles-tegen-allen
+    # heeft geen coalitie -> geen conventie). Gate = echte clusterstructuur
+    # (coverage boven; Q gerapporteerd als detail).
+    gates["convention"] = bool(coverage >= thr.get("conv_coverage_min", 0.5))
+    detail["coord_coverage"] = round(coverage, 2)
+    if HAVE_LEIDEN:                                  # Q + clusters: gerapporteerd, niet gepoort
+        Cm = _coalition_matrix(agents, attacks)
+        memb, Q, A, Tm, idx = osuite.subgroups(
+            agents, T, Mc, thr["alpha"], Cm=Cm, coal_weight=thr.get("conv_coal_weight", 1.0))
         detail["Q"] = round(float(Q), 3)
-        detail["cohesion"] = round(coh, 2)
-    else:
-        gates["convention"] = None
-        detail["Q"] = detail["cohesion"] = None
+        detail["n_clusters"] = len(set(memb))
+        detail["cohesion"] = round(_cohesion(agents, memb, A, thr["tau"]), 2)
+        detail["coalition_ties"] = int((Cm > 0).sum() // 2)
 
-    # ── 3 norm: collectieve prescriptie + sanctie-taal ──────────────────────
-    # Publieke laag (Bicchieri: afkondiging) OF privé-laag (Sugden:
-    # internalisering in notes). De OF is essentieel voor falsifieerbaarheid
-    # onder comms-off: pub is daar structureel 0, dus zonder de privé-route zou
-    # de norm-breuk per DV-constructie vaststaan i.p.v. empirisch zijn.
-    # (T1-nocomm-smoke: priv 0.0001 vs memneutral priv 0.0027 — discrimineert.)
+    # ── 3 norm: collectieve deontische prescriptie (CO's ADIC — GEEN handhaving)
+    # Koen 2026-07-16: CO's grammatica heeft DRIE niveaus. Norm (ADIC) = een
+    # collectief-voorschrijvende deontische uiting ("we must hold", "attacking is
+    # a violation of the NAP") — handhaving is NIET vereist; dat is het rule/
+    # institutie-niveau (ADICO). Een ingeroepen-maar-onafgedwongen norm is een
+    # norm. Daarom: sanctie-EIS eruit (die hoorde bij institutie).
+    #
+    # PUBLIC-ONLY (Koen 2026-07-17): een norm is per definitie een COLLECTIEF
+    # object — een gedeelde ought die publiek wordt ingeroepen (Bicchieri's
+    # normatieve verwachting; CO's ADIC-prescriptie is een uiting IN de gedeelde
+    # ruimte). Een privé-note is een privé-overtuiging, geen norm. De poort kijkt
+    # daarom ALLEEN naar publieke berichten. Privé-dichtheid blijft gerapporteerd
+    # als secundaire observatie (internalisering), maar poort NIET meer.
+    # Consequentie: zonder kanaal (comms-off) is er per definitie geen publieke
+    # norm — de comms-off norm-afwezigheid is dan DEFINITORISCH, niet empirisch;
+    # de falsifieerbare comms-off-voorspellingen zijn (i) coöp overleeft +
+    # (iii) geweld blijft uit (zie §3/§5). Grensgeval-drijver weg: de dunne
+    # private Sugden-route telde strategisch "we should grow"-geklets als norm
+    # (Gemini/DeepSeek-probes 2026-07-17) — die rand is nu dicht.
     deo = deontic.analyze(path)
-    pub_pass = (deo["norm"] >= thr["norm_density_min"]
-                and deo["sanction"] >= thr["norm_sanction_min"])
-    priv_pass = deo["priv"]["norm"] >= thr.get("norm_density_priv_min", 0.002)
-    gates["norm"] = bool(pub_pass or priv_pass)
+    gates["norm"] = bool(deo["norm"] >= thr["norm_density_min"])
     detail["norm_density_pub"] = round(deo["norm"], 4)
-    detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)
+    detail["norm_density_priv"] = round(deo["priv"]["norm"], 4)  # gerapporteerd, poort NIET
     detail["sanctions"] = deo["sanction"]
 
-    # ── 4 institution: benoemde persistente structuur, ALLEEN bespoke ───────
-    # NAP e.d. = baseline/gegeven (Koen 2026-07-15): universeel vanaf R<=5,
-    # geen muntmoment -> telt niet als bewijs van uitgevonden orde.
-    # PUBLIEKE-CIRCULATIE-toets (v0, T1-nocomm-smoke 2026-07-15). De detector
-    # mint kandidaat-namen Title-Case over ALLE lagen (precisie), maar een label
-    # in privé-notes alleen is convergente taal, geen gedeeld symbool
-    # ("Reciprocal Loop" verscheen in een run ZONDER berichten). Searle:
-    # institutie vergt publieke collectieve representatie. Tegelijk schrijven
-    # agents in berichten lowercase ("our transfer circle") die de Title-Case-
-    # regex mist. Daarom tweetraps: kandidaten uit de volle scan, gate =
-    # case-insensitieve circulatie in MESSAGES (>= min_agents distincte zenders,
-    # >= min_occurrences). Privé-only-hits apart gerapporteerd (baseline).
+    # ── 4 institution: norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)
+    # PRIMAIRE DEFINITIE (Koen 2026-07-16): CO's rule = norm + "the OR ELSE, the
+    # sanction assigned to detected NONCOMPLIANCE with an institutional statement"
+    # (p.586). Cumulatief (via nesting: norm moet al passen). Institutie = er wordt
+    # gehandhaafd op een OVERTREDING, niet louter gecoördineerde agressie op een
+    # focal doelwit ("level the whale" = conventie). enforcement.py co_enforce_rate
+    # meet precies dit (violatie-lexicon + nabijheid). Searle's benoemde-structuur
+    # is een APARTE, secundaire as (named_bespoke in detail), niet de gate.
+    # Institutie-poort (Koen 2026-07-16): handhaving INGEROEPEN/aanwezig — er is
+    # minstens een echte poging tot sanctie op een overtreder (>= inst_min_enforce
+    # violatie-geframede sancties). CO-grammatica-getrouw + Aoki: een institutie is
+    # een gedeeld-geloof-evenwicht; handhaving is een off-path dreiging die zelden
+    # uitgevoerd hoeft. De EFFECTIVITEIT (uitgevoerde handhaving = co_enforce_rate,
+    # 'kerst op de taart') en het STANDHOUDEN (P3, apart) zijn aparte maten — een
+    # institutie mag instorten (oorlogs-ruïne = ingeroepen maar hol, geen vertrouwen).
+    # COLLECTIEF gedragen (Koen 2026-07-16): één agent die "ik straf schenders"
+    # roept zonder dat anderen het overnemen = cheap talk = conventie, geen
+    # institutie. Bicchieri (norm = collectieve verwachting) + Searle (collectieve
+    # acceptatie): handhaving moet van >= inst_min_enforcers distincte handhavers
+    # komen. n_enforcers uit enforcement.py (bron-agents van violatie-sancties).
+    enf = enforcement.analyze(path)
+    co_enforcers = len({t[1] for t in enf.get("co_triples", [])})  # distincte violatie-handhavers
+    gates["institution"] = bool(
+        enf["n_co_enforce"] >= thr.get("inst_min_enforce", 3)
+        and co_enforcers >= thr.get("inst_min_enforcers", 2))
+    detail["n_co_enforce"] = enf["n_co_enforce"]          # handhaving aanwezig (poort)
+    detail["n_co_enforcers"] = co_enforcers              # collectief gedragen (poort)
+    detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)  # effectiviteit/degree (kerst)
+
+    # CO-NESTING: institutie ⟹ norm (Koen 2026-07-21, rewpar-diagnose). Een
+    # institutie handhaaft de OVERTREDING van een norm; je kunt geen breuk van een
+    # niet-bestaande regel bestraffen. Collectieve handhaving van een BENOEMDE
+    # overtreding ("this is a violation of our NAP", "X is a traitor") is dus zélf
+    # bewijs dat de norm publiek operatief is — de norm wordt ingeroepen-via-z'n-breuk.
+    # De norm-DICHTHEIDS-poort (regel 231) telt expliciete prescriptie ("we must
+    # hold"), maar de schendings-vorm zit in het violatie-lexicon (enforcement.py) en
+    # telt daar apart. Zonder deze regel mist de nesting een echte institutie zodra
+    # normativiteit als schendings-taal wordt uitgedrukt (oorlogscellen) — false-
+    # negative op rewpar (norm_density 0.0134 < 0.02, maar 29 handhavers straffen
+    # NAP-verraad). Een vurende institutie bevredigt daarom het norm-niveau. De
+    # STANDALONE norm-trede (prescriptie zónder handhaving) blijft op de dichtheids-
+    # poort staan — dit raakt alleen runs die al institution-handhaving vertonen.
+    if gates["institution"]:
+        gates["norm"] = True
+        detail["norm_via_enforcement"] = True   # norm afgeleid uit handhaving, niet dichtheid
+
+    # Secundaire as (Searle, GERAPPORTEERD niet gepoort): benoemde publiek
+    # circulerende bespoke-structuur. NAP e.d. = baseline (universeel vanaf R<=5).
     named, _raw, coverage = detect_named_structures(lines)
     if thr.get("inst_public_only", True):
         import re as _re
@@ -169,7 +305,6 @@ def gate_run(path, thr):
         named = pub_named
     baseline_names = {n.lower() for n in thr.get("inst_baseline_names", [])}
     bespoke = {n: c for n, c in named.items() if n.lower() not in baseline_names}
-    gates["institution"] = len(bespoke) >= thr["inst_min_structures"]
     detail["named_bespoke"] = dict(sorted(bespoke.items(), key=lambda kv: -kv[1])[:5])
     detail["named_baseline"] = {n: c for n, c in named.items()
                                 if n.lower() in baseline_names}
@@ -188,33 +323,35 @@ def gate_run(path, thr):
                     firsts[nm] = r
         detail["bespoke_first_round"] = firsts
 
-    # ── 5 governance: commons volgehouden (alleen T4) ───────────────────────
+    # ── governance: APARTE AS (resource-orde, niet geneste trede) ───────────
+    # Alleen T4; leest of collectieve terughoudendheid de commons levend houdt.
+    # Los van de sociale-orde-nesting: een T4-run krijgt een sociaal label EN
+    # (indien commons) een governance-label.
     cm = commons_dv.commons_metrics(lines)
     if cm is None:
-        gates["governance"] = None       # niet van toepassing (geen commons)
+        governance = None                # geen commons
         detail["commons"] = None
     else:
-        # NB drempel-herkomst: commons_dv 'sustained' gebruikt nu nog K/2 —
-        # STALE t.o.v. frozen engine (regen x1.5 => engine-anker 2/3*K).
-        # Waarde is KOEN-beslissing na de T4-smoke; hier alleen doorgeven.
-        gates["governance"] = bool(cm.get("sustained"))
+        governance = bool(cm.get("sustained"))
         detail["commons"] = {k: cm.get(k) for k in
                              ("collapsed", "sustained", "stock_final")}
+    gates["governance"] = governance     # gerapporteerd naast de ladder
 
-    # ── nested label: hoogste k waarvoor 1..k allemaal passen ───────────────
+    # ── nested sociaal-orde-label: hoogste k waarvoor 1..k allemaal passen ──
     nested = 0
     for k, lvl in enumerate(LEVELS[1:], start=1):
         if gates.get(lvl) is True:
             nested = k
         elif gates.get(lvl) is False:
             break
-        else:               # None (n.v.t./niet berekenbaar): telt niet mee,
-            break           # maar laat hogere treden ook niet passeren
+        else:               # None (n.v.t./niet berekenbaar): stopt de klim
+            break
     highest_any = max((k for k, lvl in enumerate(LEVELS[1:], start=1)
                        if gates.get(lvl) is True), default=0)
     return dict(name=os.path.basename(path), gates=gates,
                 nested_label=LEVELS[nested], nested_level=nested,
-                highest_any=LEVELS[highest_any], detail=detail)
+                highest_any=LEVELS[highest_any],
+                governance=governance, detail=detail)
 
 
 def print_row(r):
@@ -222,8 +359,9 @@ def print_row(r):
     def sym(v):
         return {True: "+", False: "-", None: "."}[v]
     vec = " ".join(f"{lvl[:4]}{sym(g[lvl])}" for lvl in LEVELS[1:])
-    print(f"{r['name'][:44]:44s} [{vec}]  nested={r['nested_label']:12s}"
-          f" any={r['highest_any']}")
+    gov = {True: "sustained", False: "collapsed", None: "n/a"}[r["governance"]]
+    print(f"{r['name'][:40]:40s} [{vec}]  nested={r['nested_label']:12s}"
+          f" any={r['highest_any']:12s} gov={gov}")
 
 
 def main():
