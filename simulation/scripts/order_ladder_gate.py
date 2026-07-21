@@ -262,6 +262,23 @@ def gate_run(path, thr):
     detail["n_co_enforcers"] = co_enforcers              # collectief gedragen (poort)
     detail["co_enforce_rate"] = round(enf["co_enforce_rate"], 3)  # effectiviteit/degree (kerst)
 
+    # CO-NESTING: institutie ⟹ norm (Koen 2026-07-21, rewpar-diagnose). Een
+    # institutie handhaaft de OVERTREDING van een norm; je kunt geen breuk van een
+    # niet-bestaande regel bestraffen. Collectieve handhaving van een BENOEMDE
+    # overtreding ("this is a violation of our NAP", "X is a traitor") is dus zélf
+    # bewijs dat de norm publiek operatief is — de norm wordt ingeroepen-via-z'n-breuk.
+    # De norm-DICHTHEIDS-poort (regel 231) telt expliciete prescriptie ("we must
+    # hold"), maar de schendings-vorm zit in het violatie-lexicon (enforcement.py) en
+    # telt daar apart. Zonder deze regel mist de nesting een echte institutie zodra
+    # normativiteit als schendings-taal wordt uitgedrukt (oorlogscellen) — false-
+    # negative op rewpar (norm_density 0.0134 < 0.02, maar 29 handhavers straffen
+    # NAP-verraad). Een vurende institutie bevredigt daarom het norm-niveau. De
+    # STANDALONE norm-trede (prescriptie zónder handhaving) blijft op de dichtheids-
+    # poort staan — dit raakt alleen runs die al institution-handhaving vertonen.
+    if gates["institution"]:
+        gates["norm"] = True
+        detail["norm_via_enforcement"] = True   # norm afgeleid uit handhaving, niet dichtheid
+
     # Secundaire as (Searle, GERAPPORTEERD niet gepoort): benoemde publiek
     # circulerende bespoke-structuur. NAP e.d. = baseline (universeel vanaf R<=5).
     named, _raw, coverage = detect_named_structures(lines)
