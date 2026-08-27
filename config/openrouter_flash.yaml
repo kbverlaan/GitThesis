@@ -1,0 +1,13 @@
+# EXPLORATORY (NIET registered) — Gemini 2.5 Flash via OpenRouter.
+# "Kijken of een veel slimmere bot dan Gemma iets anders doet" (Koen 2026-07-16).
+# Ander model = niet vergelijkbaar met de frozen Gemma-grid; puur verkennend.
+api_key_env_var: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+model: "google/gemini-2.5-flash"
+temperature: 0.3
+max_tokens: 16000
+timeout: 900
+retry_attempts: 3
+retry_delay: 5
+prompt_config:
+  tom_level: "level0"

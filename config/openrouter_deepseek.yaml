@@ -1,0 +1,15 @@
+# EXPLORATORY (NIET registered) — DeepSeek V3.2 via OpenRouter.
+# Sycofantie-probe (Koen 2026-07-17): Gemini was vreedzaam op knife — is dat "slim"
+# of gewoon meegaand? DeepSeek = bluntere, minder-sycofante familie op DEZELFDE knife-cel.
+# Drie-weg-contrast: Gemma (oorlog) vs Gemini (vrede, sycofant-verdacht) vs DeepSeek (blunt, ?).
+# Ander model = niet vergelijkbaar met de frozen Gemma-grid; puur verkennend.
+api_key_env_var: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+model: "deepseek/deepseek-v3.2"
+temperature: 0.3
+max_tokens: 16000
+timeout: 900
+retry_attempts: 3
+retry_delay: 5
+prompt_config:
+  tom_level: "level0"

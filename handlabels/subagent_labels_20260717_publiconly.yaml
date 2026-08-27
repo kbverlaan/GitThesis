@@ -1,0 +1,23 @@
+# Her-validatie fidelity-check ONDER PUBLIC-ONLY norm-definitie (2026-07-17).
+# 3 blinde onafhankelijke general-purpose subagents, gestripte data (identiek protocol
+# aan 20260716), enige wijziging: norm-definitie = publiek ingeroepen (privé telt niet).
+# Blind voor gate + voor elkaar. Run-volgorde = subagent_labels_20260716.yaml.
+#
+# UITKOMST:
+#   onderlinge κ: A-B 1.000, A-C 0.912, B-C 0.912 (11/12 unaniem; split = forced_abund)
+#   consensus vs OUDE labels (20260716): 11/12 identiek — mensen repliceren zichzelf
+#   gate(public-only) vs consensus: gewogen κ = 0.581, exact 9/12
+#   3 disagreements: rewpar (NIEUW, public-only), T4_knife + forced_abund (bestaande adjudicaties)
+runs:
+  - {run: T1_nocomm,        A: convention,  B: convention,  C: convention,  gate: convention}
+  - {run: T1_nocomm_abund,  A: convention,  B: convention,  C: convention,  gate: convention}
+  - {run: T3_nocomm_knife,  A: convention,  B: convention,  C: convention,  gate: convention}
+  - {run: T3_nocomm_abund,  A: convention,  B: convention,  C: convention,  gate: convention}
+  - {run: rewpar,           A: institution, B: institution, C: institution, gate: convention}   # NIEUWE disagreement
+  - {run: rewact,           A: institution, B: institution, C: institution, gate: institution}
+  - {run: rewact100,        A: institution, B: institution, C: institution, gate: institution}
+  - {run: rewactC,          A: institution, B: institution, C: institution, gate: institution}
+  - {run: rewactC_memneut,  A: institution, B: institution, C: institution, gate: institution}
+  - {run: T4_knife,         A: norm,        B: norm,        C: norm,        gate: coordination}  # bestaand (governance-as)
+  - {run: forced_abund,     A: norm,        B: norm,        C: institution, gate: convention}    # bestaand (pub_norm 0.0013 = ~0)
+  - {run: forced_knife,     A: institution, B: institution, C: institution, gate: institution}

@@ -1,0 +1,14 @@
+# OpenRouter — Gemma 4 31B (PAID), matches Snellius /scratch.../Gemma4-31B.
+api_key_env_var: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+
+model: "google/gemma-4-31b-it"
+
+temperature: 0.3
+max_tokens: 16000        # thinking model: <think> telt mee in completion; 8000 gaf truncatie+retries vanaf ~R13 (median CoT 8.4K tok)
+timeout: 900
+retry_attempts: 3
+retry_delay: 5
+
+prompt_config:
+  tom_level: "level0"     # reasoning baseline held CONSTANT (not the IV)

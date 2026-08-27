@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DV pre-registratie — SINGLE SOURCE OF TRUTH voor alle classifier/DV-drempels.
+#
+# status: FROZEN 2026-07-21 (na fidelity-validatie κ=0.714 — public-only + institutie⟹norm).
+#         Elke wijziging hierna = gedocumenteerd amendement, geen stille tuning.
+# freeze_sha:  56e794725cad642d823d9d9ac63cf91fa212d273
+# freeze_date: 2026-07-21
+#
+# Bron: driehoek-audit secties <-> DVs.md <-> engine (2026-07-09). Elke waarde met
+# herkomst (bestand:regel). CONFIRMATORY = draagt een P-hypothese (moet frozen).
+# EXPLORATORY = triage / narratief-duik, geen P-toets (drempels mogen los blijven).
+#
+# Dit bestand is de bron-van-record. De drift-guard-test
+# (tests/test_dv_thresholds.py) dwingt af dat de code-constanten hiermee
+# overeenkomen, zodat code en pre-reg niet stil uiteenlopen.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── CONFIRMATORY ─────────────────────────────────────────────────────────────
+
+order_type:            # classify_run.py:24-44 DEFAULTS — kern-DV voor P1 (order klimt de ladder)
+  attempt_threshold: 1            # PREDATION iff >k coalition-attempts in event_window
+  strike_threshold: 0            # success vs failed binnen predation-subs
+  paralysis_stdev: 5.0           # 1b iff stdev(final_wealth) < dit
+  paralysis_do_nothing: 0.6      # 1b iff do_nothing_fraction > dit
+  top_n_others: 3                # math-protected: top vs sum(top-N others)
+  hegemony_top_ratio: 2.0        # 1c iff top_wealth >= dit x mean(others)
+  hegemony_runnerup_ratio: 1.5   # 1c ook: top >= dit x second_highest
+  bankruptcy_window: 5           # laatste-K rondes voor bankruptcy-framing
+  solo_predator_min_strikes: 2   # persistente solo-predator drempel (per venster)
+  partial_outcome_ratio: 0.5     # outcome=partial iff 0 < success_ratio < dit
+  window_size: 10                # rolling window (0 = whole run)
+  window_step: 1
+  event_window: 3                # laatste-K rondes voor predation/violence-detectie
+  smoothing: false               # 3-window majority filter (default OFF = AAMAS-rigor)
+
+named_institution:     # classify_run.py:84-85 — CONFIRMATORY (aanwezigheid benoemde structuur)
+  min_agents: 2                  # >=2 distincte agents (pre-reg Koen 2026-07-09)
+  min_occurrences: 3             # >=3 occurrences, whole-run
+  # NB venster-propagatie (>=2 vensters) = optionele EXPLORATORY verfijning, geen gate
+
+economy_regime:        # order_suite.py economy() — CONFIRMATORY (P2, regime binnen niveau)
+  positive_sum_threshold: 0.3    # coop-kwadrant iff productivity-ratio > dit
+  negative_sum_threshold: -0.3   # predatie-kwadrant iff pr < dit
+  top_share_threshold: 15        # concentratie-as iff top-aandeel (%) >= dit  (percentage, niet fractie)
+
+commons:               # commons_dv.py — CONFIRMATORY (stock-collapse, §3-claim)
+  # Engine-afgeleid anker (frozen engine: init=K, regen x1.5 gecapt): duurzaam
+  # punt = post-harvest >= K/regen (2/3*K = 80), duurzaam debiet K*(1-1/regen)
+  # (= 40/ronde). Klassiek MSY (K/2, logistisch) is voor deze groei ONGEGROND.
+  # T4-smoke 2026-07-15 (tragedie->moratorium->quota): kies eindstand-/slot-
+  # venster-criteria; whole-run-minima keuren herstel-arcs onterecht af.
+  # sustained_rule = KOEN-BESLISSING vóór freeze; alle kandidaten worden
+  # per run naast elkaar gerapporteerd (sustained_by_rule).
+  sustained_rule: "no_collapse"  # FROZEN — commons overleeft (GovSim-binair); survival-time + efficiency vs 40/ronde continu gerapporteerd
+  sustained_stock_frac: 0.6667    # = 1/regen (engine-anker 2/3*K)
+  sustained_window: 10            # slotvenster (rondes)
+  regen: 1.5                      # spiegel van ladder_L4.yaml commons_regen (drift-guard)
+
+order_ladder:          # order_ladder_gate.py — CONFIRMATORY-KANDIDAAT (P1, ordinale label)
+  # v0 PROPOSED (Claude-scaffold 2026-07-15) — KOEN beslist waarden; freeze na
+  # IRR (fixplan Fase 3). Nested label: trede k pas iff poorten 1..k passen.
+  window: 10                     # slotvenster (rondes) voor 'volgehouden'-criteria
+  alpha: 0.5                     # combined-graph mengknop (DVs.md subgroep-detectie)
+  tau: 0.6                       # thuis-share-drempel vast/split (DVs.md)
+  # 1 cooperation — volgehouden reciprociteit
+  coop_transfer_share: 0.15      # transfer-aandeel in slotvenster >= dit
+  coop_recip_dyads: 3            # OF-tak reciprociteit
+  coop_coverage_min: 0.3         # OF volgehouden gezamenlijke actie (coalitie/coop; Koen 2026-07-16)            # wederzijdse transfer-dyades (whole-run) >= dit
+  # 2 convention — gekristalliseerde partnerstructuur (achter de Q-gate)
+  conv_coverage_min: 0.5         # PRIMAIR (Koen 2026-07-16): fractie agents in
+                                 # persistente gecoordineerde groep >= dit -> conventie.
+                                 # (Q/cohesie hieronder: gerapporteerd, niet meer gepoort.)
+  conv_q_min: 0.10               # clubs-Q >= dit (DVs.md Q-gate)
+  conv_cohesion_min: 0.50        # vast/split-cohesie >= dit
+  conv_coal_weight: 1.0          # gewicht coalitie-edges in cluster-graaf (Koen 2026-07-16)
+  conv_rewire_ratio: 0.5         # assoc-rungs: late rewire-rate <= dit x vroege (stolling)
+  # 3 norm — collectieve prescriptie (PUBLIC-ONLY, Koen 2026-07-17, deontic.py)
+  # Een norm is per definitie een collectief object: publiek ingeroepen ought
+  # (Bicchieri). De poort kijkt ALLEEN naar publieke berichten; privé-dichtheid
+  # wordt gerapporteerd maar poort NIET. Consequentie: comms-off norm-afwezigheid
+  # is definitorisch (geen kanaal → geen publieke norm); falsifieerbare comms-off-
+  # poten zijn (i) coöp overleeft + (iii) geweld blijft uit — zie §3/§5.
+  norm_density_min: 0.02         # PUBLIEK (Bicchieri): tussen bloei ~0.003 en bistable ~0.065
+  norm_sanction_min: 1           # >= dit aantal sanctie-uitingen (publiek)
+  norm_density_priv_min: 0.002   # DEPRECATED 2026-07-17 (public-only): niet meer poortend,
+                                 # alleen nog gerapporteerd als internalisering-observatie.
+                                 # Kalibratie n=2 (historisch): nocomm 0.0001 / memneutral 0.0027
+  # 4 institution — norm + HANDHAVING van overtreding (Crawford-Ostrom OR ELSE)
+  # PRIMAIRE DEFINITIE (Koen 2026-07-16): CO's "rule" = norm + OR ELSE ("the
+  # sanction assigned to detected NONCOMPLIANCE with an institutional statement",
+  # C&O 1995 p.586). Cumulatief: institutie vereist dat de norm-poort al past
+  # (nesting) EN handhaving op een OVERTREDING — niet louter focal agressie
+  # ("level the whale" = conventie). Searle's benoemde-structuur = APARTE,
+  # secundaire as (gerapporteerd als named_bespoke, NIET de gate).
+  # Kalibratie co_enforce_rate: rewactC 0.75 (institutie) / oorlog-B 0.36 /
+  # memneutral 0.16 — drempel = KOEN na IRR.
+  inst_min_enforce: 3            # >= dit violatie-geframede sancties (handhaving aanwezig)
+  inst_min_enforcers: 2          # >= dit DISTINCTE handhavers -> collectief gedragen, geen cheap talk (Koen 2026-07-16)
+  inst_co_enforce_min: 0.4       # co_enforce_rate: EFFECTIVITEIT-degree (gerapporteerd, geen poort)
+  # ── SECUNDAIRE Searle-as (alleen gerapporteerd als named_bespoke, geen gate) ──
+  inst_min_structures: 1         # >= dit aantal BESPOKE detector-hits
+  inst_public_only: true         # tweetraps: kandidaten Title-Case over alle lagen,
+                                 # gate = case-insensitieve CIRCULATIE in messages
+                                 # (Searle: publieke collectieve representatie; agents
+                                 # schrijven lowercase in berichten). Privé-only =
+                                 # convergentie-baseline, apart gerapporteerd.
+                                 # Bewijs: "Reciprocal Loop" in T1-nocomm (0 berichten).
+  inst_min_agents: 2             # publieke circulatie: >= distincte zenders (= named_institution)
+  inst_min_occurrences: 3        # publieke circulatie: >= vermeldingen (= named_institution)
+  inst_baseline_names:           # uitgesloten van de poort; apart gerapporteerd
+    - "Non-Aggression Pact"
+    - "NAP"
+    - "Resolution Order"         # mechaniek-term: pre-scrub prompt-echo, maar komt
+                                 # ook post-scrub natuurlijk voor (memneutral 6x) —
+                                 # "resolution order" is gewoon Engels voor beurtvolgorde
+  # 5 governance — commons sustained (T4; drempel = commons-blok hierboven, OPEN)
+  # refutatie-marge (§2): equivalentie-claim alleen als bootstrap-CI-bovengrens
+  # van de max paarsgewijze TV tussen cel-profielen < delta (delta_equivalence.py).
+  delta: 0.2                    # FROZEN — refutatie-marge (bootstrap-CI-bovengrens max-TV < delta)
+
+# ── EXPLORATORY (niet-confirmatory; ongekalibreerd — draagt de narratief-duik) ──
+
+governance_roles:      # enforcement.py:190-194 — EXPLORATORY (Koen 2026-07-09)
+  # ONGEKALIBREERD (code-comment: "nog geen bevestigde governance-run"). NIET in de
+  # confirmatory hypothese-set. Monitor/sanctioner-detectie voor de narratief-duik.
+  top_enforcer_share: 0.40       # concentr.-handhaver iff top_enf_share >= dit
+  max_enforcers: 4               # ... AND n_enforcers <= dit
+  top_target_share: 0.40         # vast-doelwit (roof-signatuur) iff top_tgt_share >= dit
+
+institution_overlay:   # classify_run.py:681-682 — EXPLORATORY (Aoki 5-kenmerken, buiten label-pad)
+  universality_frac: 0.6         # ONGEKALIBREERD — diagnostische overlay, niet in het label-pad
+  robustness_frac: 0.6           # ONGEKALIBREERD

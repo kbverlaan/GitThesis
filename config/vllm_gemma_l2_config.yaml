@@ -1,0 +1,15 @@
+# vLLM on Snellius — Gemma 4 31B dense, L2 ToM variant for comparison vs L3.
+
+api_key_env_var: ""
+base_url: "http://localhost:8000/v1"
+
+model: "/scratch-shared/kverlaan/origins_models/Gemma4-31B"
+
+temperature: 0.3
+max_tokens: 16000       # thinking-CoT groeit naar 8K+ bij vol window; 8000 gaf truncatie+retries (OpenRouter-lab 2026-07-10)
+timeout: 600
+retry_attempts: 3
+retry_delay: 5
+
+prompt_config:
+  tom_level: "level2"
